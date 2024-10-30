@@ -50,7 +50,7 @@ pub mod sqlite;
 
 use std::marker::PhantomData;
 
-use torrust_tracker_primitives::info_hash::InfoHash;
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::PersistentTorrents;
 
 use self::error::Error;

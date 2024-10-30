@@ -50,7 +50,7 @@ pub trait BRefAccessExt<'a>: BRefAccess {
     fn bytes_ext(&self) -> Option<&'a [u8]>;
 }
 
-impl<'a, T> BRefAccess for &'a T
+impl<T> BRefAccess for &T
 where
     T: BRefAccess,
 {

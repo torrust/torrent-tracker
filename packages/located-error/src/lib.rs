@@ -50,7 +50,7 @@ where
     location: Box<Location<'a>>,
 }
 
-impl<'a, E> std::fmt::Display for LocatedError<'a, E>
+impl<E> std::fmt::Display for LocatedError<'_, E>
 where
     E: Error + ?Sized + Send + Sync,
 {
@@ -59,7 +59,7 @@ where
     }
 }
 
-impl<'a, E> Error for LocatedError<'a, E>
+impl<E> Error for LocatedError<'_, E>
 where
     E: Error + ?Sized + Send + Sync + 'static,
 {
@@ -68,7 +68,7 @@ where
     }
 }
 
-impl<'a, E> Clone for LocatedError<'a, E>
+impl<E> Clone for LocatedError<'_, E>
 where
     E: Error + ?Sized + Send + Sync,
 {

@@ -6,7 +6,7 @@
 //! - [`get_torrents`]: it returns data about some torrent in bulk excluding the peer list.
 use std::sync::Arc;
 
-use torrust_tracker_primitives::info_hash::InfoHash;
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 use torrust_tracker_primitives::peer;
 use torrust_tracker_torrent_repository::entry::EntrySync;
@@ -125,8 +125,8 @@ mod tests {
         use std::str::FromStr;
         use std::sync::Arc;
 
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::Configuration;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::services::torrent::tests::sample_peer;
@@ -178,8 +178,8 @@ mod tests {
         use std::str::FromStr;
         use std::sync::Arc;
 
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::Configuration;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::services::torrent::tests::sample_peer;

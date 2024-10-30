@@ -2,11 +2,11 @@
 use std::panic::Location;
 use std::str::FromStr;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use r2d2::Pool;
 use r2d2_sqlite::rusqlite::params;
 use r2d2_sqlite::rusqlite::types::Null;
 use r2d2_sqlite::SqliteConnectionManager;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::{DurationSinceUnixEpoch, PersistentTorrents};
 
 use super::driver::Driver;

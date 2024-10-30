@@ -10,8 +10,8 @@ use aquatic_udp_protocol::{
     ErrorResponse, Ipv4AddrBytes, Ipv6AddrBytes, NumberOfDownloads, NumberOfPeers, Port, Request, Response, ResponsePeer,
     ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics, TransactionId,
 };
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::DynError;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use tracing::{instrument, Level};
 use uuid::Uuid;
 use zerocopy::network_endian::I32;

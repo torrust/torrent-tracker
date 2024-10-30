@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker::servers::apis::v1::context::stats::resources::Stats;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
 use tracing::level_filters::LevelFilter;

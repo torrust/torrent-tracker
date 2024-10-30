@@ -1,5 +1,5 @@
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_configuration::TrackerPolicy;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
@@ -19,10 +19,7 @@ impl<T> RwLockTokio<T> {
     pub fn write(
         &self,
     ) -> impl std::future::Future<
-        Output = tokio::sync::RwLockWriteGuard<
-            '_,
-            std::collections::BTreeMap<torrust_tracker_primitives::info_hash::InfoHash, T>,
-        >,
+        Output = tokio::sync::RwLockWriteGuard<'_, std::collections::BTreeMap<bittorrent_primitives::info_hash::InfoHash, T>>,
     > {
         self.torrents.write()
     }

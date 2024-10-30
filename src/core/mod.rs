@@ -63,7 +63,7 @@
 //! use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
 //! use torrust_tracker_primitives::DurationSinceUnixEpoch;
 //! use torrust_tracker_primitives::peer;
-//! use torrust_tracker_primitives::info_hash::InfoHash;
+//! use bittorrent_primitives::info_hash::InfoHash;
 //!
 //! let info_hash = InfoHash::from_str("3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0").unwrap();
 //!
@@ -136,7 +136,7 @@
 //! The returned struct is:
 //!
 //! ```rust,no_run
-//! use torrust_tracker_primitives::info_hash::InfoHash;
+//! use bittorrent_primitives::info_hash::InfoHash;
 //! use std::collections::HashMap;
 //!
 //! pub struct ScrapeData {
@@ -165,7 +165,7 @@
 //! There are two data structures for infohashes: byte arrays and hex strings:
 //!
 //! ```rust,no_run
-//! use torrust_tracker_primitives::info_hash::InfoHash;
+//! use bittorrent_primitives::info_hash::InfoHash;
 //! use std::str::FromStr;
 //!
 //! let info_hash: InfoHash = [255u8; 20].into();
@@ -456,6 +456,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use auth::PeerKey;
+use bittorrent_primitives::info_hash::InfoHash;
 use databases::driver::Driver;
 use derive_more::Constructor;
 use error::PeerKeyError;
@@ -464,7 +465,6 @@ use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_located_error::Located;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
@@ -1253,15 +1253,15 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
+        use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::peer::Peer;
         use crate::core::services::tracker_factory;
         use crate::core::{TorrentsMetrics, Tracker};
-        use crate::shared::bit_torrent::info_hash::fixture::gen_seeded_infohash;
 
         fn public_tracker() -> Tracker {
             tracker_factory(&configuration::ephemeral_public())
@@ -1716,7 +1716,7 @@ mod tests {
 
                 use std::net::{IpAddr, Ipv4Addr};
 
-                use torrust_tracker_primitives::info_hash::InfoHash;
+                use bittorrent_primitives::info_hash::InfoHash;
 
                 use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, public_tracker};
                 use crate::core::{PeersWanted, ScrapeData, SwarmMetadata};
@@ -1880,7 +1880,7 @@ mod tests {
 
             mod handling_an_scrape_request {
 
-                use torrust_tracker_primitives::info_hash::InfoHash;
+                use bittorrent_primitives::info_hash::InfoHash;
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::tests::the_tracker::{

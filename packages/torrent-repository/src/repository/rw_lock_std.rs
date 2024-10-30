@@ -1,5 +1,5 @@
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_configuration::TrackerPolicy;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
@@ -21,7 +21,7 @@ impl<T> RwLockStd<T> {
     /// Panics if unable to get a lock.
     pub fn write(
         &self,
-    ) -> std::sync::RwLockWriteGuard<'_, std::collections::BTreeMap<torrust_tracker_primitives::info_hash::InfoHash, T>> {
+    ) -> std::sync::RwLockWriteGuard<'_, std::collections::BTreeMap<bittorrent_primitives::info_hash::InfoHash, T>> {
         self.torrents.write().expect("it should get lock")
     }
 }

@@ -7,9 +7,9 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::Query;
+use bittorrent_primitives::info_hash::InfoHash;
 use serde::{de, Deserialize, Deserializer};
 use thiserror::Error;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 
 use super::responses::{torrent_info_response, torrent_list_response, torrent_not_known_response};
