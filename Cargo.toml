@@ -36,6 +36,7 @@ axum = { version = "0", features = ["macros"] }
 axum-client-ip = "0"
 axum-extra = { version = "0", features = ["query"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
+bittorrent-primitives = "0.1.0"
 camino = { version = "1", features = ["serde", "serde1"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }

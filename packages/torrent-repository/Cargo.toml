@@ -17,6 +17,7 @@ version.workspace = true
 
 [dependencies]
 aquatic_udp_protocol = "0"
+bittorrent-primitives = "0.1.0"
 crossbeam-skiplist = "0"
 dashmap = "6"
 futures = "0"
