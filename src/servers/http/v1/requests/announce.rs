@@ -6,9 +6,9 @@ use std::panic::Location;
 use std::str::FromStr;
 
 use aquatic_udp_protocol::{NumberOfBytes, PeerId};
+use bittorrent_primitives::info_hash::{self, InfoHash};
 use thiserror::Error;
 use torrust_tracker_located_error::{Located, LocatedError};
-use torrust_tracker_primitives::info_hash::{self, InfoHash};
 use torrust_tracker_primitives::peer;
 
 use crate::servers::http::percent_encoding::{percent_decode_info_hash, percent_decode_peer_id};
@@ -32,7 +32,7 @@ const NUMWANT: &str = "numwant";
 /// ```rust
 /// use aquatic_udp_protocol::{NumberOfBytes, PeerId};
 /// use torrust_tracker::servers::http::v1::requests::announce::{Announce, Compact, Event};
-/// use torrust_tracker_primitives::info_hash::InfoHash;
+/// use bittorrent_primitives::info_hash::InfoHash;
 ///
 /// let request = Announce {
 ///     // Mandatory params
@@ -379,7 +379,7 @@ mod tests {
     mod announce_request {
 
         use aquatic_udp_protocol::{NumberOfBytes, PeerId};
-        use torrust_tracker_primitives::info_hash::InfoHash;
+        use bittorrent_primitives::info_hash::InfoHash;
 
         use crate::servers::http::v1::query::Query;
         use crate::servers::http::v1::requests::announce::{

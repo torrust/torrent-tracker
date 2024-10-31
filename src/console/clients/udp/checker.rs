@@ -7,7 +7,7 @@ use aquatic_udp_protocol::{
     AnnounceActionPlaceholder, AnnounceEvent, AnnounceRequest, ConnectRequest, ConnectionId, NumberOfBytes, NumberOfPeers,
     PeerId, PeerKey, Port, Response, ScrapeRequest, TransactionId,
 };
-use torrust_tracker_primitives::info_hash::InfoHash as TorrustInfoHash;
+use bittorrent_primitives::info_hash::InfoHash as TorrustInfoHash;
 
 use super::Error;
 use crate::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;

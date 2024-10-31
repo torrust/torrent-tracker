@@ -95,7 +95,7 @@ fn extract_scrape_from(maybe_raw_query: Option<&str>) -> Result<Scrape, response
 mod tests {
     use std::str::FromStr;
 
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
 
     use super::extract_scrape_from;
     use crate::servers::http::v1::requests::scrape::Scrape;

@@ -11,7 +11,7 @@
 use std::net::IpAddr;
 use std::sync::Arc;
 
-use torrust_tracker_primitives::info_hash::InfoHash;
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::peer;
 
 use crate::core::{statistics, AnnounceData, PeersWanted, Tracker};
@@ -54,7 +54,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 

@@ -8,8 +8,8 @@
 //!
 use std::panic::Location;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::LocatedError;
-use torrust_tracker_primitives::info_hash::InfoHash;
 
 use super::auth::ParseKeyError;
 use super::databases;

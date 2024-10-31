@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use aquatic_udp_protocol::{Request, Response, TransactionId};
-use torrust_tracker_primitives::info_hash::InfoHash;
+use bittorrent_primitives::info_hash::InfoHash;
 
 use super::handlers::RequestId;
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;

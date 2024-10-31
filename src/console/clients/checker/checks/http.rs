@@ -1,8 +1,8 @@
 use std::str::FromStr as _;
 use std::time::Duration;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use serde::Serialize;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use url::Url;
 
 use crate::console::clients::http::Error;

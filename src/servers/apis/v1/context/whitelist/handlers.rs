@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::response::Response;
-use torrust_tracker_primitives::info_hash::InfoHash;
+use bittorrent_primitives::info_hash::InfoHash;
 
 use super::responses::{
     failed_to_reload_whitelist_response, failed_to_remove_torrent_from_whitelist_response, failed_to_whitelist_torrent_response,

@@ -17,10 +17,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Context;
+use bittorrent_primitives::info_hash::InfoHash;
 use clap::{Parser, Subcommand};
 use reqwest::Url;
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
-use torrust_tracker_primitives::info_hash::InfoHash;
 
 use crate::shared::bit_torrent::tracker::http::client::requests::announce::QueryBuilder;
 use crate::shared::bit_torrent::tracker::http::client::responses::announce::Announce;

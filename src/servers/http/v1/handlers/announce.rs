@@ -174,7 +174,7 @@ pub fn map_to_torrust_event(event: &Option<Event>) -> AnnounceEvent {
 mod tests {
 
     use aquatic_udp_protocol::PeerId;
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::core::services::tracker_factory;

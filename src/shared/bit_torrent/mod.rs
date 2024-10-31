@@ -68,5 +68,4 @@
 //! Percent Encoding spec | <https://datatracker.ietf.org/doc/html/rfc3986#section-2.1>
 //!Bencode & bdecode in your browser | <https://github.com/Chocobo1/bencode_online>
 pub mod common;
-pub mod info_hash;
 pub mod tracker;

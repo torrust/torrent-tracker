@@ -13,7 +13,7 @@ use crate::core::ScrapeData;
 ///
 /// ```rust
 /// use torrust_tracker::servers::http::v1::responses::scrape::Bencoded;
-/// use torrust_tracker_primitives::info_hash::InfoHash;
+/// use bittorrent_primitives::info_hash::InfoHash;
 /// use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 /// use torrust_tracker::core::ScrapeData;
 ///
@@ -92,7 +92,7 @@ impl IntoResponse for Bencoded {
 mod tests {
 
     mod scrape_response {
-        use torrust_tracker_primitives::info_hash::InfoHash;
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
         use crate::core::ScrapeData;

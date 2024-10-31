@@ -103,10 +103,10 @@ mod for_all_config_modes {
         use std::str::FromStr;
 
         use aquatic_udp_protocol::PeerId;
+        use bittorrent_primitives::info_hash::InfoHash;
         use local_ip_address::local_ip;
         use reqwest::{Response, StatusCode};
         use tokio::net::TcpListener;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;
@@ -1042,8 +1042,8 @@ mod for_all_config_modes {
         use std::str::FromStr;
 
         use aquatic_udp_protocol::PeerId;
+        use bittorrent_primitives::info_hash::InfoHash;
         use tokio::net::TcpListener;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;
@@ -1300,7 +1300,7 @@ mod configured_as_whitelisted {
     mod and_receiving_an_announce_request {
         use std::str::FromStr;
 
-        use torrust_tracker_primitives::info_hash::InfoHash;
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;
 
@@ -1358,7 +1358,7 @@ mod configured_as_whitelisted {
         use std::str::FromStr;
 
         use aquatic_udp_protocol::PeerId;
-        use torrust_tracker_primitives::info_hash::InfoHash;
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;
@@ -1457,8 +1457,8 @@ mod configured_as_private {
         use std::str::FromStr;
         use std::time::Duration;
 
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker::core::auth::Key;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;
 
@@ -1552,8 +1552,8 @@ mod configured_as_private {
         use std::time::Duration;
 
         use aquatic_udp_protocol::PeerId;
+        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker::core::auth::Key;
-        use torrust_tracker_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
         use tracing::level_filters::LevelFilter;

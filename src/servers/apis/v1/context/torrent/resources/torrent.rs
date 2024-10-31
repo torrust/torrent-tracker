@@ -98,7 +98,7 @@ mod tests {
     use std::str::FromStr;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 
     use super::Torrent;

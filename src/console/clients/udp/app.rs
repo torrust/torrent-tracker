@@ -61,9 +61,9 @@ use std::str::FromStr;
 
 use anyhow::Context;
 use aquatic_udp_protocol::{Response, TransactionId};
+use bittorrent_primitives::info_hash::InfoHash as TorrustInfoHash;
 use clap::{Parser, Subcommand};
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
-use torrust_tracker_primitives::info_hash::InfoHash as TorrustInfoHash;
 use tracing::level_filters::LevelFilter;
 use url::Url;
 

@@ -3,9 +3,9 @@
 //! Data structures and logic for parsing the `scrape` request.
 use std::panic::Location;
 
+use bittorrent_primitives::info_hash::{self, InfoHash};
 use thiserror::Error;
 use torrust_tracker_located_error::{Located, LocatedError};
-use torrust_tracker_primitives::info_hash::{self, InfoHash};
 
 use crate::servers::http::percent_encoding::percent_decode_info_hash;
 use crate::servers::http::v1::query::Query;
@@ -84,7 +84,7 @@ mod tests {
 
     mod scrape_request {
 
-        use torrust_tracker_primitives::info_hash::InfoHash;
+        use bittorrent_primitives::info_hash::InfoHash;
 
         use crate::servers::http::v1::query::Query;
         use crate::servers::http::v1::requests::scrape::{Scrape, INFO_HASH};

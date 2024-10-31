@@ -603,6 +603,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
+name = "bittorrent-primitives"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdc1bd0462f0af0b57abd5f5f8f32b904ba0a17cc8be1714db160a054552f242"
+dependencies = [
+ "aquatic_udp_protocol",
+ "binascii",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
 name = "bitvec"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3269,9 +3283,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.128"
+version = "1.0.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
+checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
 dependencies = [
  "indexmap 2.5.0",
  "itoa",
@@ -3592,18 +3606,18 @@ checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
 name = "thiserror"
-version = "1.0.64"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d50af8abc119fb8bb6dbabcfa89656f46f84aa0ac7688088608076ad2b459a84"
+checksum = "5d11abd9594d9b38965ef50805c5e469ca9cc6f197f883f717e0269a3057b3d5"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.64"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
+checksum = "ae71770322cbd277e69d762a16c444af02aa0575ac0d174f0b9562d3b37f8602"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3782,6 +3796,7 @@ dependencies = [
  "axum-client-ip",
  "axum-extra",
  "axum-server",
+ "bittorrent-primitives",
  "camino",
  "chrono",
  "clap",
@@ -3824,7 +3839,7 @@ dependencies = [
  "torrust-tracker-primitives",
  "torrust-tracker-test-helpers",
  "torrust-tracker-torrent-repository",
- "tower 0.4.13",
+ "tower 0.5.1",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -3881,6 +3896,7 @@ version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
  "binascii",
+ "bittorrent-primitives",
  "derive_more",
  "serde",
  "tdyne-peer-id",
@@ -3903,6 +3919,7 @@ version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
  "async-std",
+ "bittorrent-primitives",
  "criterion",
  "crossbeam-skiplist",
  "dashmap",

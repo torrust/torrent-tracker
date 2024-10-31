@@ -16,7 +16,7 @@
 //! - <https://en.wikipedia.org/wiki/URL_encoding>
 //! - <https://developer.mozilla.org/en-US/docs/Glossary/percent-encoding>
 use aquatic_udp_protocol::PeerId;
-use torrust_tracker_primitives::info_hash::{self, InfoHash};
+use bittorrent_primitives::info_hash::{self, InfoHash};
 use torrust_tracker_primitives::peer;
 
 /// Percent decodes a percent encoded infohash. Internally an
@@ -28,7 +28,7 @@ use torrust_tracker_primitives::peer;
 /// ```rust
 /// use std::str::FromStr;
 /// use torrust_tracker::servers::http::percent_encoding::percent_decode_info_hash;
-/// use torrust_tracker_primitives::info_hash::InfoHash;
+/// use bittorrent_primitives::info_hash::InfoHash;
 /// use torrust_tracker_primitives::peer;
 ///
 /// let encoded_infohash = "%3B%24U%04%CF%5F%11%BB%DB%E1%20%1C%EAjk%F4Z%EE%1B%C0";
@@ -61,7 +61,7 @@ pub fn percent_decode_info_hash(raw_info_hash: &str) -> Result<InfoHash, info_ha
 ///
 /// use aquatic_udp_protocol::PeerId;
 /// use torrust_tracker::servers::http::percent_encoding::percent_decode_peer_id;
-/// use torrust_tracker_primitives::info_hash::InfoHash;
+/// use bittorrent_primitives::info_hash::InfoHash;
 ///
 /// let encoded_peer_id = "%2DqB00000000000000000";
 ///
@@ -83,7 +83,7 @@ mod tests {
     use std::str::FromStr;
 
     use aquatic_udp_protocol::PeerId;
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
 
     use crate::servers::http::percent_encoding::{percent_decode_info_hash, percent_decode_peer_id};
 

@@ -110,7 +110,7 @@ mod tests {
     use std::net::IpAddr;
     use std::str::FromStr;
 
-    use torrust_tracker_primitives::info_hash::InfoHash;
+    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::core::services::tracker_factory;

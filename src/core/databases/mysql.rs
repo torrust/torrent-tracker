@@ -2,11 +2,11 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use r2d2::Pool;
 use r2d2_mysql::mysql::prelude::Queryable;
 use r2d2_mysql::mysql::{params, Opts, OptsBuilder};
 use r2d2_mysql::MySqlConnectionManager;
-use torrust_tracker_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::PersistentTorrents;
 
 use super::driver::Driver;
