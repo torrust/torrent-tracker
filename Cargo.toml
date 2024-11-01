@@ -47,7 +47,6 @@ derive_more = { version = "1", features = ["as_ref", "constructor", "from"] }
 figment = "0"
 futures = "0"
 futures-util = "0"
-hex-literal = "0"
 http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }

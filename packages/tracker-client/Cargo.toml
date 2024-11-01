@@ -21,7 +21,6 @@ bittorrent-primitives = "0.1.0"
 clap = { version = "4", features = ["derive", "env"] }
 derive_more = { version = "1", features = ["as_ref", "constructor", "from"] }
 futures = "0"
-futures-util = "0"
 hex-literal = "0"
 hyper = "1"
 percent-encoding = "2"
@@ -40,3 +39,6 @@ tracing = "0"
 tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 zerocopy = "0.7"
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
