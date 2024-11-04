@@ -7,12 +7,14 @@ use std::process::Command;
 ///
 /// Will return an error if the Tracker Checker fails.
 pub fn run(config_content: &str) -> io::Result<()> {
-    tracing::info!("Running Tracker Checker: TORRUST_CHECKER_CONFIG=[config] cargo run --bin tracker_checker");
+    tracing::info!(
+        "Running Tracker Checker: TORRUST_CHECKER_CONFIG=[config] cargo run -p bittorrent-tracker-client --bin tracker_checker"
+    );
     tracing::info!("Tracker Checker config:\n{config_content}");
 
     let status = Command::new("cargo")
         .env("TORRUST_CHECKER_CONFIG", config_content)
-        .args(["run", "--bin", "tracker_checker"])
+        .args(["run", "-p", "bittorrent-tracker-client", "--bin", "tracker_checker"])
         .status()?;
 
     if status.success() {

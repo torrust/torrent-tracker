@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bittorrent_tracker_client::udp::client::check;
 use derive_more::Constructor;
 use futures_util::StreamExt;
 use tokio::select;
@@ -18,7 +19,6 @@ use crate::servers::udp::server::bound_socket::BoundSocket;
 use crate::servers::udp::server::processor::Processor;
 use crate::servers::udp::server::receiver::Receiver;
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
-use crate::shared::bit_torrent::tracker::udp::client::check;
 
 /// A UDP server instance launcher.
 #[derive(Constructor)]

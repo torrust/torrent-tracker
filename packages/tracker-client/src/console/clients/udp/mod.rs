@@ -4,7 +4,7 @@ use aquatic_udp_protocol::Response;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::shared::bit_torrent::tracker::udp;
+use crate::udp;
 
 pub mod app;
 pub mod checker;

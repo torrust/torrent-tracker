@@ -11,7 +11,7 @@ use torrust_tracker_configuration::DEFAULT_TIMEOUT;
 use zerocopy::network_endian::I32;
 
 use super::Error;
-use crate::shared::bit_torrent::tracker::udp::MAX_PACKET_SIZE;
+use crate::udp::MAX_PACKET_SIZE;
 
 pub const UDP_CLIENT_LOG_TARGET: &str = "UDP CLIENT";
 

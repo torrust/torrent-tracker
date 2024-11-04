@@ -6,7 +6,7 @@
 use core::panic;
 
 use aquatic_udp_protocol::{ConnectRequest, ConnectionId, Response, TransactionId};
-use torrust_tracker::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;
+use bittorrent_tracker_client::udp::client::UdpTrackerClient;
 use torrust_tracker::shared::bit_torrent::tracker::udp::MAX_PACKET_SIZE;
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
 use torrust_tracker_test_helpers::configuration;
@@ -71,7 +71,7 @@ async fn should_return_a_bad_request_response_when_the_client_sends_an_empty_req
 
 mod receiving_a_connection_request {
     use aquatic_udp_protocol::{ConnectRequest, TransactionId};
-    use torrust_tracker::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;
+    use bittorrent_tracker_client::udp::client::UdpTrackerClient;
     use torrust_tracker_configuration::DEFAULT_TIMEOUT;
     use torrust_tracker_test_helpers::configuration;
     use tracing::level_filters::LevelFilter;
@@ -120,7 +120,7 @@ mod receiving_an_announce_request {
         AnnounceActionPlaceholder, AnnounceEvent, AnnounceRequest, ConnectionId, InfoHash, NumberOfBytes, NumberOfPeers, PeerId,
         PeerKey, Port, TransactionId,
     };
-    use torrust_tracker::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;
+    use bittorrent_tracker_client::udp::client::UdpTrackerClient;
     use torrust_tracker_configuration::DEFAULT_TIMEOUT;
     use torrust_tracker_test_helpers::configuration;
     use tracing::level_filters::LevelFilter;
@@ -214,7 +214,7 @@ mod receiving_an_announce_request {
 
 mod receiving_an_scrape_request {
     use aquatic_udp_protocol::{ConnectionId, InfoHash, ScrapeRequest, TransactionId};
-    use torrust_tracker::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;
+    use bittorrent_tracker_client::udp::client::UdpTrackerClient;
     use torrust_tracker_configuration::DEFAULT_TIMEOUT;
     use torrust_tracker_test_helpers::configuration;
     use tracing::level_filters::LevelFilter;

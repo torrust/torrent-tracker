@@ -37,6 +37,7 @@ axum-client-ip = "0"
 axum-extra = { version = "0", features = ["query"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
 bittorrent-primitives = "0.1.0"
+bittorrent-tracker-client = { version = "3.0.0-develop", path = "packages/tracker-client" }
 camino = { version = "1", features = ["serde", "serde1"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
@@ -46,7 +47,6 @@ derive_more = { version = "1", features = ["as_ref", "constructor", "from"] }
 figment = "0"
 futures = "0"
 futures-util = "0"
-hex-literal = "0"
 http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
@@ -100,6 +100,7 @@ members = [
     "packages/primitives",
     "packages/test-helpers",
     "packages/torrent-repository",
+    "packages/tracker-client",
 ]
 
 [profile.dev]

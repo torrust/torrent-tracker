@@ -5,12 +5,12 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use derive_more::Display;
 use hyper::StatusCode;
 use requests::{announce, scrape};
 use reqwest::{Response, Url};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use crate::core::auth::Key;
 
 #[derive(Debug, Clone, Error)]
 pub enum Error {
@@ -200,5 +200,21 @@ impl Client {
 
     fn base_url(&self) -> String {
         self.base_url.to_string()
+    }
+}
+
+/// A token used for authentication.
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Display, Hash)]
+pub struct Key(String);
+
+impl Key {
+    #[must_use]
+    pub fn new(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.0
     }
 }

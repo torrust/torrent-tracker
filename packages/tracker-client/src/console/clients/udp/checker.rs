@@ -10,7 +10,7 @@ use aquatic_udp_protocol::{
 use bittorrent_primitives::info_hash::InfoHash as TorrustInfoHash;
 
 use super::Error;
-use crate::shared::bit_torrent::tracker::udp::client::UdpTrackerClient;
+use crate::udp::client::UdpTrackerClient;
 
 /// A UDP Tracker client to make test requests (checks).
 #[derive(Debug)]

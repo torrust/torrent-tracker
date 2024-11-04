@@ -6,7 +6,7 @@ use aquatic_udp_protocol::PeerId;
 use bittorrent_primitives::info_hash::InfoHash;
 use serde_repr::Serialize_repr;
 
-use crate::shared::bit_torrent::tracker::http::{percent_encode_byte_array, ByteArray20};
+use crate::http::{percent_encode_byte_array, ByteArray20};
 
 pub struct Query {
     pub info_hash: ByteArray20,

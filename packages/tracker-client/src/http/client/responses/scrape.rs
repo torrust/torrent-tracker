@@ -6,7 +6,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_bencode::value::Value;
 
-use crate::shared::bit_torrent::tracker::http::{ByteArray20, InfoHash};
+use crate::http::{ByteArray20, InfoHash};
 
 #[derive(Debug, PartialEq, Default, Deserialize)]
 pub struct Response {

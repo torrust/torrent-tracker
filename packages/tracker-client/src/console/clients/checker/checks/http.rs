@@ -6,9 +6,9 @@ use serde::Serialize;
 use url::Url;
 
 use crate::console::clients::http::Error;
-use crate::shared::bit_torrent::tracker::http::client::responses::announce::Announce;
-use crate::shared::bit_torrent::tracker::http::client::responses::scrape;
-use crate::shared::bit_torrent::tracker::http::client::{requests, Client};
+use crate::http::client::responses::announce::Announce;
+use crate::http::client::responses::scrape;
+use crate::http::client::{requests, Client};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Checks {

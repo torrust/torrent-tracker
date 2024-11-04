@@ -617,6 +617,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "bittorrent-tracker-client"
+version = "3.0.0-develop"
+dependencies = [
+ "anyhow",
+ "aquatic_udp_protocol",
+ "bittorrent-primitives",
+ "clap",
+ "derive_more",
+ "futures",
+ "hex-literal",
+ "hyper",
+ "percent-encoding",
+ "reqwest",
+ "serde",
+ "serde_bencode",
+ "serde_bytes",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tokio",
+ "torrust-tracker-configuration",
+ "torrust-tracker-located-error",
+ "torrust-tracker-primitives",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "zerocopy",
+]
+
+[[package]]
 name = "bitvec"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3818,6 +3848,7 @@ dependencies = [
  "axum-extra",
  "axum-server",
  "bittorrent-primitives",
+ "bittorrent-tracker-client",
  "camino",
  "chrono",
  "clap",
@@ -3827,7 +3858,6 @@ dependencies = [
  "figment",
  "futures",
  "futures-util",
- "hex-literal",
  "http-body",
  "hyper",
  "hyper-util",

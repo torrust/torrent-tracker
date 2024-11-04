@@ -22,10 +22,10 @@ use clap::{Parser, Subcommand};
 use reqwest::Url;
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
 
-use crate::shared::bit_torrent::tracker::http::client::requests::announce::QueryBuilder;
-use crate::shared::bit_torrent::tracker::http::client::responses::announce::Announce;
-use crate::shared::bit_torrent::tracker::http::client::responses::scrape;
-use crate::shared::bit_torrent::tracker::http::client::{requests, Client};
+use crate::http::client::requests::announce::QueryBuilder;
+use crate::http::client::responses::announce::Announce;
+use crate::http::client::responses::scrape;
+use crate::http::client::{requests, Client};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
