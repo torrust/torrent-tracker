@@ -82,7 +82,7 @@ tracing = "0"
 tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
-zerocopy = "0.7"
+zerocopy = "0.8"
 
 [package.metadata.cargo-machete]
 ignored = ["crossbeam-skiplist", "dashmap", "figment", "parking_lot", "serde_bytes"]

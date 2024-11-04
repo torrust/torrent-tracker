@@ -38,7 +38,7 @@ torrust-tracker-primitives = { version = "3.0.0-develop", path = "../primitives"
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
-zerocopy = "0.7"
+zerocopy = "0.8"
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
