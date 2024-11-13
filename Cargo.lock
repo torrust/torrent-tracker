@@ -3900,6 +3900,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "torrust-tracker-client"
+version = "3.0.0-develop"
+dependencies = [
+ "anyhow",
+ "aquatic_udp_protocol",
+ "bittorrent-primitives",
+ "bittorrent-tracker-client",
+ "clap",
+ "futures",
+ "hex-literal",
+ "hyper",
+ "reqwest",
+ "serde",
+ "serde_bencode",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "torrust-tracker-configuration",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
 name = "torrust-tracker-clock"
 version = "3.0.0-develop"
 dependencies = [

@@ -55,11 +55,12 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: "${{ secrets.TORRUST_UPDATE_CARGO_REGISTRY_TOKEN }}"
         run: |
+          cargo publish -p torrust-tracker
+          cargo publish -p torrust-tracker-client
+          cargo publish -p torrust-tracker-clock
+          cargo publish -p torrust-tracker-configuration
           cargo publish -p torrust-tracker-contrib-bencode
           cargo publish -p torrust-tracker-located-error
           cargo publish -p torrust-tracker-primitives
-          cargo publish -p torrust-tracker-clock
-          cargo publish -p torrust-tracker-configuration
-          cargo publish -p torrust-tracker-torrent-repository
           cargo publish -p torrust-tracker-test-helpers
-          cargo publish -p torrust-tracker
+          cargo publish -p torrust-tracker-torrent-repository
