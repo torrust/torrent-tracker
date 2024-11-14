@@ -31,7 +31,7 @@ use torrust_tracker_primitives::peer;
 ///
 /// ```rust
 /// use std::str::FromStr;
-/// use torrust_tracker::servers::http::percent_encoding::percent_decode_info_hash;
+/// use bittorrent_tracker_client::http::url_encoding::percent_decode_info_hash;
 /// use bittorrent_primitives::info_hash::InfoHash;
 /// use torrust_tracker_primitives::peer;
 ///
@@ -64,7 +64,7 @@ pub fn percent_decode_info_hash(raw_info_hash: &str) -> Result<InfoHash, info_ha
 /// use std::str::FromStr;
 ///
 /// use aquatic_udp_protocol::PeerId;
-/// use torrust_tracker::servers::http::percent_encoding::percent_decode_peer_id;
+/// use bittorrent_tracker_client::http::url_encoding::percent_decode_peer_id;
 /// use bittorrent_primitives::info_hash::InfoHash;
 ///
 /// let encoded_peer_id = "%2DqB00000000000000000";

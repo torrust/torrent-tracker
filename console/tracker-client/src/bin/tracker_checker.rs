@@ -1,5 +1,5 @@
 //! Program to check running trackers.
-use bittorrent_tracker_client::console::clients::checker::app;
+use torrust_tracker_client::console::clients::checker::app;
 
 #[tokio::main]
 async fn main() {

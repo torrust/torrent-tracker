@@ -1,10 +1,9 @@
 use std::net::SocketAddr;
 
 use aquatic_udp_protocol::Response;
+use bittorrent_tracker_client::udp;
 use serde::Serialize;
 use thiserror::Error;
-
-use crate::udp;
 
 pub mod app;
 pub mod checker;

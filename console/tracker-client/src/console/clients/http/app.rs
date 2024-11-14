@@ -18,14 +18,13 @@ use std::time::Duration;
 
 use anyhow::Context;
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_client::http::client::requests::announce::QueryBuilder;
+use bittorrent_tracker_client::http::client::responses::announce::Announce;
+use bittorrent_tracker_client::http::client::responses::scrape;
+use bittorrent_tracker_client::http::client::{requests, Client};
 use clap::{Parser, Subcommand};
 use reqwest::Url;
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
-
-use crate::http::client::requests::announce::QueryBuilder;
-use crate::http::client::responses::announce::Announce;
-use crate::http::client::responses::scrape;
-use crate::http::client::{requests, Client};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

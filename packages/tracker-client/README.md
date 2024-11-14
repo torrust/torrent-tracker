@@ -1,8 +1,8 @@
 # BitTorrent Tracker Client
 
-A library an console applications to interact with a BitTorrent tracker.
+A library to interact with BitTorrent trackers.
 
-> **Disclaimer**: This project is actively under development. We’re currently extracting and refining common types from the ][Torrust Tracker](https://github.com/torrust/torrust-tracker) to make them available to the BitTorrent community in Rust. While these types are functional, they are not yet ready for use in production or third-party projects.
+> **Disclaimer**: This project is actively under development. We’re currently extracting and refining common types from the[Torrust Tracker](https://github.com/torrust/torrust-tracker) to make them available to the BitTorrent community in Rust. While these types are functional, they are not yet ready for use in production or third-party projects.
 
 ## License
 

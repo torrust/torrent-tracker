@@ -8,9 +8,9 @@ use aquatic_udp_protocol::{
     PeerId, PeerKey, Port, Response, ScrapeRequest, TransactionId,
 };
 use bittorrent_primitives::info_hash::InfoHash as TorrustInfoHash;
+use bittorrent_tracker_client::udp::client::UdpTrackerClient;
 
 use super::Error;
-use crate::udp::client::UdpTrackerClient;
 
 /// A UDP Tracker client to make test requests (checks).
 #[derive(Debug)]

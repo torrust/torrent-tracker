@@ -2,13 +2,13 @@ use std::str::FromStr as _;
 use std::time::Duration;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_client::http::client::responses::announce::Announce;
+use bittorrent_tracker_client::http::client::responses::scrape;
+use bittorrent_tracker_client::http::client::{requests, Client};
 use serde::Serialize;
 use url::Url;
 
 use crate::console::clients::http::Error;
-use crate::http::client::responses::announce::Announce;
-use crate::http::client::responses::scrape;
-use crate::http::client::{requests, Client};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Checks {
