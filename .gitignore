@@ -1,4 +1,5 @@
 .env
+*.code-workspace
 **/*.rs.bk
 /.coverage/
 /.idea/
@@ -12,5 +13,6 @@
 /tracker.*
 /tracker.toml
 callgrind.out
+codecov.json
+lcov.info
 perf.data*
-*.code-workspace

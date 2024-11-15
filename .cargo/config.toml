@@ -1,6 +1,7 @@
 [alias]
 cov = "llvm-cov"
 cov-lcov = "llvm-cov --lcov --output-path=./.coverage/lcov.info"
+cov-codecov = "llvm-cov --codecov --output-path=./.coverage/codecov.json"
 cov-html = "llvm-cov --html"
 time = "build --timings --all-targets"
 

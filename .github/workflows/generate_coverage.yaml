@@ -1,0 +1,87 @@
+name: Generate Coverage Report
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    environment: coverage
+    runs-on: ubuntu-latest
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTFLAGS: "-Cinstrument-coverage"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LLVM tools
+        run: sudo apt-get update && sudo apt-get install -y llvm
+
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+          components: llvm-tools-preview
+
+      - id: cache
+        name: Enable Workflow Cache
+        uses: Swatinem/rust-cache@v2
+
+      - id: tools
+        name: Install Tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: grcov,cargo-llvm-cov
+
+      - id: coverage
+        name: Generate Coverage Report
+        run: |
+          cargo clean 
+          cargo llvm-cov --all-features --workspace --codecov --output-path ./codecov.json
+
+      - name: Store PR number and commit SHA
+        run: |
+          echo "Storing PR number ${{ github.event.number }}"
+          echo "${{ github.event.number }}" > pr_number.txt
+
+          echo "Storing commit SHA ${{ github.event.pull_request.head.sha }}"
+          echo "${{ github.event.pull_request.head.sha }}" > commit_sha.txt
+
+      # Workaround for https://github.com/orgs/community/discussions/25220
+      # Triggered sub-workflow is not able to detect the original commit/PR which is available
+      # in this workflow.
+      - name: Store PR number
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr_number
+          path: pr_number.txt
+
+      - name: Store commit SHA
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit_sha
+          path: commit_sha.txt
+
+      # This stores the coverage report in artifacts. The actual upload to Codecov
+      # is executed by a different workflow `upload_coverage.yml`. The reason for this
+      # split is because `on.pull_request` workflows don't have access to secrets.
+      - name: Store coverage report in artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codecov_report
+          path: ./codecov.json
+
+      - run: |
+          echo "The coverage report was stored in Github artifacts."
+          echo "It will be uploaded to Codecov using [upload_coverage.yml] workflow shortly."
