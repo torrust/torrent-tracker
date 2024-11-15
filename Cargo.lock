@@ -612,7 +612,7 @@ dependencies = [
  "binascii",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 1.0.69",
  "zerocopy",
 ]
 
@@ -630,7 +630,7 @@ dependencies = [
  "serde_bencode",
  "serde_bytes",
  "serde_repr",
- "thiserror",
+ "thiserror 1.0.69",
  "tokio",
  "torrust-tracker-configuration",
  "torrust-tracker-located-error",
@@ -1396,7 +1396,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8835f84f38484cc86f110a805655697908257fb9a7af005234060891557198e9"
 dependencies = [
  "nonempty",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2215,7 +2215,7 @@ checksum = "3669cf5561f8d27e8fc84cc15e58350e70f557d4d65f70e3154e54cd2f8e1782"
 dependencies = [
  "libc",
  "neli",
- "thiserror",
+ "thiserror 1.0.69",
  "windows-sys 0.59.0",
 ]
 
@@ -2373,7 +2373,7 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "termcolor",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2409,7 +2409,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "subprocess",
- "thiserror",
+ "thiserror 1.0.69",
  "time",
  "uuid",
  "zstd",
@@ -3796,7 +3796,16 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c006c85c7651b3cf2ada4584faa36773bd07bac24acfb39f3c431b36d7e667aa"
+dependencies = [
+ "thiserror-impl 2.0.3",
 ]
 
 [[package]]
@@ -3804,6 +3813,17 @@ name = "thiserror-impl"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4026,7 +4046,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "serde_with",
- "thiserror",
+ "thiserror 2.0.3",
  "tokio",
  "torrust-tracker-clock",
  "torrust-tracker-configuration",
@@ -4061,7 +4081,7 @@ dependencies = [
  "serde_bencode",
  "serde_bytes",
  "serde_json",
- "thiserror",
+ "thiserror 1.0.69",
  "tokio",
  "torrust-tracker-configuration",
  "tracing",
@@ -4088,7 +4108,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "thiserror",
+ "thiserror 1.0.69",
  "toml",
  "torrust-tracker-located-error",
  "url",
@@ -4100,14 +4120,14 @@ name = "torrust-tracker-contrib-bencode"
 version = "3.0.0-develop"
 dependencies = [
  "criterion",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "torrust-tracker-located-error"
 version = "3.0.0-develop"
 dependencies = [
- "thiserror",
+ "thiserror 1.0.69",
  "tracing",
 ]
 
@@ -4122,7 +4142,7 @@ dependencies = [
  "serde",
  "tdyne-peer-id",
  "tdyne-peer-id-registry",
- "thiserror",
+ "thiserror 1.0.69",
  "zerocopy",
 ]
 

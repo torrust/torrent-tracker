@@ -68,7 +68,7 @@ serde_bytes = "0"
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_repr = "0"
 serde_with = { version = "3", features = ["json"] }
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
 torrust-tracker-clock = { version = "3.0.0-develop", path = "packages/clock" }
 torrust-tracker-configuration = { version = "3.0.0-develop", path = "packages/configuration" }
