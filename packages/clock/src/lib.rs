@@ -26,7 +26,6 @@
 pub mod clock;
 pub mod conv;
 pub mod static_time;
-pub mod time_extent;
 
 #[macro_use]
 extern crate lazy_static;
@@ -41,13 +40,3 @@ pub(crate) type CurrentClock = clock::Working;
 #[cfg(test)]
 #[allow(dead_code)]
 pub(crate) type CurrentClock = clock::Stopped;
-
-/// Working version, for production.
-#[cfg(not(test))]
-#[allow(dead_code)]
-pub(crate) type DefaultTimeExtentMaker = time_extent::WorkingTimeExtentMaker;
-
-/// Stopped version, for testing.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(crate) type DefaultTimeExtentMaker = time_extent::StoppedTimeExtentMaker;

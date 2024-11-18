@@ -76,7 +76,7 @@ mod tests {
         let stopped = Server::new(Spawner::new(bind_to));
 
         let started = stopped
-            .start(tracker, register.give_form())
+            .start(tracker, register.give_form(), config.cookie_lifetime)
             .await
             .expect("it should start the server");
 
@@ -98,7 +98,7 @@ mod tests {
         let stopped = Server::new(Spawner::new(bind_to));
 
         let started = stopped
-            .start(tracker, register.give_form())
+            .start(tracker, register.give_form(), config.cookie_lifetime)
             .await
             .expect("it should start the server");
 

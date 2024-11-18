@@ -32,9 +32,10 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 #[instrument(skip(config, tracker, form))]
 pub async fn start_job(config: &UdpTracker, tracker: Arc<core::Tracker>, form: ServiceRegistrationForm) -> JoinHandle<()> {
     let bind_to = config.bind_address;
+    let cookie_lifetime = config.cookie_lifetime;
 
     let server = Server::new(Spawner::new(bind_to))
-        .start(tracker, form)
+        .start(tracker, form, cookie_lifetime)
         .await
         .expect("it should be able to start the udp tracker");
 

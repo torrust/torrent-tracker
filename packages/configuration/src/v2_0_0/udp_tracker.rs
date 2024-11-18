@@ -1,4 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,11 +11,17 @@ pub struct UdpTracker {
     /// system to choose a random port, use port `0`.
     #[serde(default = "UdpTracker::default_bind_address")]
     pub bind_address: SocketAddr,
+
+    /// The lifetime of the server-generated connection cookie, that is passed
+    /// the client as the `ConnectionId`.
+    #[serde(default = "UdpTracker::default_cookie_lifetime")]
+    pub cookie_lifetime: Duration,
 }
 impl Default for UdpTracker {
     fn default() -> Self {
         Self {
             bind_address: Self::default_bind_address(),
+            cookie_lifetime: Self::default_cookie_lifetime(),
         }
     }
 }
@@ -22,5 +29,9 @@ impl Default for UdpTracker {
 impl UdpTracker {
     fn default_bind_address() -> SocketAddr {
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 6969)
+    }
+
+    fn default_cookie_lifetime() -> Duration {
+        Duration::from_secs(120)
     }
 }

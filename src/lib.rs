@@ -488,7 +488,7 @@
 //! In addition to the production code documentation you can find a lot of
 //! examples on the integration and unit tests.
 
-use torrust_tracker_clock::{clock, time_extent};
+use torrust_tracker_clock::clock;
 
 pub mod app;
 pub mod bootstrap;
@@ -510,13 +510,3 @@ pub(crate) type CurrentClock = clock::Working;
 #[cfg(test)]
 #[allow(dead_code)]
 pub(crate) type CurrentClock = clock::Stopped;
-
-/// Working version, for production.
-#[cfg(not(test))]
-#[allow(dead_code)]
-pub(crate) type DefaultTimeExtentMaker = time_extent::WorkingTimeExtentMaker;
-
-/// Stopped version, for testing.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(crate) type DefaultTimeExtentMaker = time_extent::StoppedTimeExtentMaker;

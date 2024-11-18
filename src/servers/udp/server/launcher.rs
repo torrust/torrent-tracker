@@ -35,6 +35,7 @@ impl Launcher {
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
         bind_to: SocketAddr,
+        cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
         rx_halt: oneshot::Receiver<Halted>,
     ) {
@@ -65,7 +66,7 @@ impl Launcher {
             let local_addr = local_udp_url.clone();
             tokio::task::spawn(async move {
                 tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_with_graceful_shutdown::task (listening...)");
-                let () = Self::run_udp_server_main(receiver, tracker.clone()).await;
+                let () = Self::run_udp_server_main(receiver, tracker.clone(), cookie_lifetime).await;
             })
         };
 
@@ -103,14 +104,16 @@ impl Launcher {
     }
 
     #[instrument(skip(receiver, tracker))]
-    async fn run_udp_server_main(mut receiver: Receiver, tracker: Arc<Tracker>) {
+    async fn run_udp_server_main(mut receiver: Receiver, tracker: Arc<Tracker>, cookie_lifetime: Duration) {
         let active_requests = &mut ActiveRequests::default();
 
         let addr = receiver.bound_socket_address();
         let local_addr = format!("udp://{addr}");
 
+        let cookie_lifetime = cookie_lifetime.as_secs_f64();
+
         loop {
-            let processor = Processor::new(receiver.socket.clone(), tracker.clone());
+            let processor = Processor::new(receiver.socket.clone(), tracker.clone(), cookie_lifetime);
 
             if let Some(req) = {
                 tracing::trace!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_udp_server (wait for request)");

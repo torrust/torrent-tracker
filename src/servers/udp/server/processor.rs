@@ -3,26 +3,45 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use aquatic_udp_protocol::Response;
+use torrust_tracker_clock::clock::Time as _;
 use tracing::{instrument, Level};
 
 use super::bound_socket::BoundSocket;
 use crate::core::Tracker;
 use crate::servers::udp::{handlers, RawRequest};
+use crate::CurrentClock;
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
     tracker: Arc<Tracker>,
+    cookie_lifetime: f64,
 }
 
 impl Processor {
-    pub fn new(socket: Arc<BoundSocket>, tracker: Arc<Tracker>) -> Self {
-        Self { socket, tracker }
+    pub fn new(socket: Arc<BoundSocket>, tracker: Arc<Tracker>, cookie_lifetime: f64) -> Self {
+        Self {
+            socket,
+            tracker,
+            cookie_lifetime,
+        }
     }
 
     #[instrument(skip(self, request))]
     pub async fn process_request(self, request: RawRequest) {
+        let cookie_issue_time = CurrentClock::now().as_secs_f64();
+        let cookie_expiry_time = cookie_issue_time - self.cookie_lifetime - 1.0;
+        let cookie_tolerance_max_time = cookie_issue_time + 1.0;
+
         let from = request.from;
-        let response = handlers::handle_packet(request, &self.tracker, self.socket.address()).await;
+        let response = handlers::handle_packet(
+            request,
+            &self.tracker,
+            self.socket.address(),
+            cookie_issue_time,
+            cookie_expiry_time,
+            cookie_tolerance_max_time,
+        )
+        .await;
         self.send_response(from, response).await;
     }
 

@@ -23,6 +23,7 @@ use crate::bootstrap;
 use crate::core::services::tracker_factory;
 use crate::core::Tracker;
 use crate::shared::crypto::ephemeral_instance_keys;
+use crate::shared::crypto::keys::{self, Keeper as _};
 
 /// It loads the configuration from the environment and builds the main domain [`Tracker`] struct.
 ///
@@ -32,6 +33,9 @@ use crate::shared::crypto::ephemeral_instance_keys;
 #[must_use]
 #[instrument(skip())]
 pub fn setup() -> (Configuration, Arc<Tracker>) {
+    #[cfg(not(test))]
+    check_seed();
+
     let configuration = initialize_configuration();
 
     if let Err(e) = configuration.validate() {
@@ -43,6 +47,18 @@ pub fn setup() -> (Configuration, Arc<Tracker>) {
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
     (configuration, tracker)
+}
+
+/// checks if the seed is the instance seed in production.
+///
+/// # Panics
+///
+/// It would panic if the seed is not the instance seed.
+pub fn check_seed() {
+    let seed = keys::Current::get_seed();
+    let instance = keys::Instance::get_seed();
+
+    assert_eq!(seed, instance, "maybe using zeroed see in production!?");
 }
 
 /// It initializes the application with the given configuration.
@@ -69,6 +85,12 @@ pub fn initialize_static() {
 
     // Initialize the Ephemeral Instance Random Seed
     lazy_static::initialize(&ephemeral_instance_keys::RANDOM_SEED);
+
+    // Initialize the Ephemeral Instance Random Cipher
+    lazy_static::initialize(&ephemeral_instance_keys::RANDOM_CIPHER_BLOWFISH);
+
+    // Initialize the Zeroed Cipher
+    lazy_static::initialize(&ephemeral_instance_keys::ZEROED_TEST_CIPHER_BLOWFISH);
 }
 
 /// It builds the domain tracker
