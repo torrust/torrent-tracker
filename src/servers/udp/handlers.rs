@@ -2,6 +2,7 @@
 use std::fmt;
 use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::net::{IpAddr, SocketAddr};
+use std::ops::Range;
 use std::panic::Location;
 use std::sync::Arc;
 use std::time::Instant;
@@ -12,6 +13,7 @@ use aquatic_udp_protocol::{
     ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics, TransactionId,
 };
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_clock::clock::Time as _;
 use torrust_tracker_located_error::DynError;
 use tracing::{instrument, Level};
 use uuid::Uuid;
@@ -24,6 +26,26 @@ use crate::servers::udp::error::Error;
 use crate::servers::udp::logging::{log_bad_request, log_error_response, log_request, log_response};
 use crate::servers::udp::peer_builder;
 use crate::shared::bit_torrent::common::MAX_SCRAPE_TORRENTS;
+use crate::CurrentClock;
+
+#[derive(Debug)]
+pub(super) struct CookieTimeValues {
+    pub(super) issue_time: f64,
+    pub(super) valid_range: Range<f64>,
+}
+
+impl CookieTimeValues {
+    pub(super) fn new(cookie_lifetime: f64) -> Self {
+        let issue_time = CurrentClock::now().as_secs_f64();
+        let expiry_time = issue_time - cookie_lifetime - 1.0;
+        let tolerance_max_time = issue_time + 1.0;
+
+        Self {
+            issue_time,
+            valid_range: expiry_time..tolerance_max_time,
+        }
+    }
+}
 
 /// It handles the incoming UDP packets.
 ///
@@ -38,9 +60,7 @@ pub(crate) async fn handle_packet(
     udp_request: RawRequest,
     tracker: &Tracker,
     local_addr: SocketAddr,
-    cookie_issue_time: f64,
-    cookie_expiry_time: f64,
-    cookie_tolerance_max_time: f64,
+    cookie_time_values: CookieTimeValues,
 ) -> Response {
     tracing::debug!("Handling Packets: {udp_request:?}");
 
@@ -63,16 +83,7 @@ pub(crate) async fn handle_packet(
                 Request::Scrape(scrape_request) => scrape_request.transaction_id,
             };
 
-            let response = match handle_request(
-                request,
-                udp_request.from,
-                tracker,
-                cookie_issue_time,
-                cookie_expiry_time,
-                cookie_tolerance_max_time,
-            )
-            .await
-            {
+            let response = match handle_request(request, udp_request.from, tracker, cookie_time_values).await {
                 Ok(response) => response,
                 Err(e) => handle_error(&e, transaction_id),
             };
@@ -110,23 +121,16 @@ pub async fn handle_request(
     request: Request,
     remote_addr: SocketAddr,
     tracker: &Tracker,
-    cookie_issue_time: f64,
-    cookie_expiry_time: f64,
-    cookie_tolerance_max_time: f64,
+    cookie_time_values: CookieTimeValues,
 ) -> Result<Response, Error> {
     tracing::trace!("handle request");
 
     match request {
-        Request::Connect(connect_request) => handle_connect(remote_addr, &connect_request, tracker, cookie_issue_time).await,
+        Request::Connect(connect_request) => {
+            handle_connect(remote_addr, &connect_request, tracker, cookie_time_values.issue_time).await
+        }
         Request::Announce(announce_request) => {
-            handle_announce(
-                remote_addr,
-                &announce_request,
-                tracker,
-                cookie_expiry_time,
-                cookie_tolerance_max_time,
-            )
-            .await
+            handle_announce(remote_addr, &announce_request, tracker, cookie_time_values.valid_range).await
         }
         Request::Scrape(scrape_request) => handle_scrape(remote_addr, &scrape_request, tracker).await,
     }
@@ -147,14 +151,7 @@ pub async fn handle_connect(
 ) -> Result<Response, Error> {
     tracing::trace!("handle connect");
 
-    let connection_id = make(
-        {
-            let mut state = DefaultHasher::new();
-            remote_addr.hash(&mut state);
-            state.finish()
-        },
-        cookie_issue_time,
-    )?;
+    let connection_id = make(make_remote_fingerprint(&remote_addr), cookie_issue_time)?;
 
     let response = ConnectResponse {
         transaction_id: request.transaction_id,
@@ -185,8 +182,7 @@ pub async fn handle_announce(
     remote_addr: SocketAddr,
     announce_request: &AnnounceRequest,
     tracker: &Tracker,
-    cookie_expiry_time: f64,
-    cookie_tolerance_max_time: f64,
+    cookie_valid_range: Range<f64>,
 ) -> Result<Response, Error> {
     tracing::trace!("handle announce");
 
@@ -199,13 +195,8 @@ pub async fn handle_announce(
 
     check(
         &announce_request.connection_id,
-        {
-            let mut state = DefaultHasher::new();
-            remote_addr.hash(&mut state);
-            state.finish()
-        },
-        cookie_expiry_time,
-        cookie_tolerance_max_time,
+        make_remote_fingerprint(&remote_addr),
+        cookie_valid_range,
     )?;
 
     let info_hash = announce_request.info_hash.into();
@@ -349,6 +340,12 @@ fn handle_error(e: &Error, transaction_id: TransactionId) -> Response {
     })
 }
 
+fn make_remote_fingerprint(remote_addr: &SocketAddr) -> u64 {
+    let mut state = DefaultHasher::new();
+    remote_addr.hash(&mut state);
+    state.finish()
+}
+
 /// An identifier for a request.
 #[derive(Debug, Clone)]
 pub struct RequestId(Uuid);
@@ -368,8 +365,8 @@ impl fmt::Display for RequestId {
 #[cfg(test)]
 mod tests {
 
-    use std::hash::{DefaultHasher, Hash as _, Hasher as _};
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+    use std::ops::Range;
     use std::sync::Arc;
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
@@ -378,6 +375,7 @@ mod tests {
     use torrust_tracker_primitives::peer;
     use torrust_tracker_test_helpers::configuration;
 
+    use super::make_remote_fingerprint;
     use crate::core::services::tracker_factory;
     use crate::core::Tracker;
     use crate::CurrentClock;
@@ -406,18 +404,12 @@ mod tests {
         tracker_factory(configuration).into()
     }
 
-    fn make_remote_addr_fingerprint(remote_addr: &SocketAddr) -> u64 {
-        let mut state = DefaultHasher::new();
-        remote_addr.hash(&mut state);
-        state.finish()
-    }
-
     fn sample_ipv4_remote_addr() -> SocketAddr {
         sample_ipv4_socket_address()
     }
 
     fn sample_ipv4_remote_addr_fingerprint() -> u64 {
-        make_remote_addr_fingerprint(&sample_ipv4_socket_address())
+        make_remote_fingerprint(&sample_ipv4_socket_address())
     }
 
     fn sample_ipv6_remote_addr() -> SocketAddr {
@@ -425,7 +417,7 @@ mod tests {
     }
 
     fn sample_ipv6_remote_addr_fingerprint() -> u64 {
-        make_remote_addr_fingerprint(&sample_ipv6_socket_address())
+        make_remote_fingerprint(&sample_ipv6_socket_address())
     }
 
     fn sample_ipv4_socket_address() -> SocketAddr {
@@ -440,12 +432,8 @@ mod tests {
         1_000_000_000_f64
     }
 
-    fn sample_expiry_time() -> f64 {
-        sample_issue_time() - 10.0
-    }
-
-    fn tolerance_max_time() -> f64 {
-        sample_issue_time() + 10.0
+    fn sample_cookie_valid_range() -> Range<f64> {
+        sample_issue_time() - 10.0..sample_issue_time() + 10.0
     }
 
     #[derive(Debug, Default)]
@@ -738,8 +726,8 @@ mod tests {
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
-                make_remote_addr_fingerprint, public_tracker, sample_expiry_time, sample_ipv4_socket_address, sample_issue_time,
-                tolerance_max_time, tracker_configuration, TorrentPeerBuilder,
+                make_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv4_socket_address,
+                sample_issue_time, tracker_configuration, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -755,14 +743,14 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V4(client_ip), client_port);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .with_info_hash(info_hash)
                     .with_peer_id(peer_id)
                     .with_ip_address(client_ip)
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap();
 
@@ -781,18 +769,12 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                let response = handle_announce(
-                    remote_addr,
-                    &request,
-                    &public_tracker(),
-                    sample_expiry_time(),
-                    tolerance_max_time(),
-                )
-                .await
-                .unwrap();
+                let response = handle_announce(remote_addr, &request, &public_tracker(), sample_cookie_valid_range())
+                    .await
+                    .unwrap();
 
                 let empty_peer_vector: Vec<ResponsePeer<Ipv4AddrBytes>> = vec![];
                 assert_eq!(
@@ -828,14 +810,14 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V4(remote_client_ip), remote_client_port);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .with_info_hash(info_hash)
                     .with_peer_id(peer_id)
                     .with_ip_address(peer_address)
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap();
 
@@ -863,10 +845,10 @@ mod tests {
             async fn announce_a_new_peer_using_ipv4(tracker: Arc<core::Tracker>) -> Response {
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap()
             }
@@ -911,8 +893,7 @@ mod tests {
                     sample_ipv4_socket_address(),
                     &AnnounceRequestBuilder::default().into(),
                     &tracker,
-                    sample_expiry_time(),
-                    tolerance_max_time(),
+                    sample_cookie_valid_range(),
                 )
                 .await
                 .unwrap();
@@ -928,8 +909,7 @@ mod tests {
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
                 use crate::servers::udp::handlers::tests::{
-                    make_remote_addr_fingerprint, public_tracker, sample_expiry_time, sample_issue_time, tolerance_max_time,
-                    TorrentPeerBuilder,
+                    make_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_issue_time, TorrentPeerBuilder,
                 };
 
                 #[tokio::test]
@@ -944,14 +924,14 @@ mod tests {
                     let remote_addr = SocketAddr::new(IpAddr::V4(client_ip), client_port);
 
                     let request = AnnounceRequestBuilder::default()
-                        .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                        .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                         .with_info_hash(info_hash)
                         .with_peer_id(peer_id)
                         .with_ip_address(client_ip)
                         .with_port(client_port)
                         .into();
 
-                    handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                    handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                         .await
                         .unwrap();
 
@@ -985,8 +965,8 @@ mod tests {
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
-                make_remote_addr_fingerprint, public_tracker, sample_expiry_time, sample_ipv6_remote_addr, sample_issue_time,
-                tolerance_max_time, tracker_configuration, TorrentPeerBuilder,
+                make_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv6_remote_addr, sample_issue_time,
+                tracker_configuration, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -1003,14 +983,14 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V6(client_ip_v6), client_port);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .with_info_hash(info_hash)
                     .with_peer_id(peer_id)
                     .with_ip_address(client_ip_v4)
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap();
 
@@ -1032,18 +1012,12 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V6(client_ip_v6), 8080);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                let response = handle_announce(
-                    remote_addr,
-                    &request,
-                    &public_tracker(),
-                    sample_expiry_time(),
-                    tolerance_max_time(),
-                )
-                .await
-                .unwrap();
+                let response = handle_announce(remote_addr, &request, &public_tracker(), sample_cookie_valid_range())
+                    .await
+                    .unwrap();
 
                 let empty_peer_vector: Vec<ResponsePeer<Ipv6AddrBytes>> = vec![];
                 assert_eq!(
@@ -1079,14 +1053,14 @@ mod tests {
                 let remote_addr = SocketAddr::new(IpAddr::V6(remote_client_ip), remote_client_port);
 
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .with_info_hash(info_hash)
                     .with_peer_id(peer_id)
                     .with_ip_address(peer_address)
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap();
 
@@ -1117,10 +1091,10 @@ mod tests {
                 let client_port = 8080;
                 let remote_addr = SocketAddr::new(IpAddr::V6(client_ip_v6), client_port);
                 let request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                     .await
                     .unwrap()
             }
@@ -1164,18 +1138,12 @@ mod tests {
                 let remote_addr = sample_ipv6_remote_addr();
 
                 let announce_request = AnnounceRequestBuilder::default()
-                    .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                    .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(
-                    remote_addr,
-                    &announce_request,
-                    &tracker,
-                    sample_expiry_time(),
-                    tolerance_max_time(),
-                )
-                .await
-                .unwrap();
+                handle_announce(remote_addr, &announce_request, &tracker, sample_cookie_valid_range())
+                    .await
+                    .unwrap();
             }
 
             mod from_a_loopback_ip {
@@ -1190,8 +1158,7 @@ mod tests {
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
                 use crate::servers::udp::handlers::tests::{
-                    make_remote_addr_fingerprint, sample_expiry_time, sample_issue_time, tolerance_max_time,
-                    TrackerConfigurationBuilder,
+                    make_remote_fingerprint, sample_cookie_valid_range, sample_issue_time, TrackerConfigurationBuilder,
                 };
 
                 #[tokio::test]
@@ -1214,14 +1181,14 @@ mod tests {
                     let remote_addr = SocketAddr::new(IpAddr::V6(client_ip_v6), client_port);
 
                     let request = AnnounceRequestBuilder::default()
-                        .with_connection_id(make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap())
+                        .with_connection_id(make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                         .with_info_hash(info_hash)
                         .with_peer_id(peer_id)
                         .with_ip_address(client_ip_v4)
                         .with_port(client_port)
                         .into();
 
-                    handle_announce(remote_addr, &request, &tracker, sample_expiry_time(), tolerance_max_time())
+                    handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
                         .await
                         .unwrap();
 
@@ -1251,7 +1218,7 @@ mod tests {
             TransactionId,
         };
 
-        use super::{make_remote_addr_fingerprint, TorrentPeerBuilder};
+        use super::{make_remote_fingerprint, TorrentPeerBuilder};
         use crate::core::{self};
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
@@ -1273,7 +1240,7 @@ mod tests {
             let info_hashes = vec![info_hash];
 
             let request = ScrapeRequest {
-                connection_id: make(make_remote_addr_fingerprint(&remote_addr), sample_issue_time()).unwrap(),
+                connection_id: make(make_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap(),
                 transaction_id: TransactionId(0i32.into()),
                 info_hashes,
             };
@@ -1307,7 +1274,7 @@ mod tests {
             let info_hashes = vec![*info_hash];
 
             ScrapeRequest {
-                connection_id: make(make_remote_addr_fingerprint(remote_addr), sample_issue_time()).unwrap(),
+                connection_id: make(make_remote_fingerprint(remote_addr), sample_issue_time()).unwrap(),
                 transaction_id: TransactionId::new(0i32),
                 info_hashes,
             }
@@ -1449,7 +1416,7 @@ mod tests {
             let info_hashes = vec![info_hash];
 
             ScrapeRequest {
-                connection_id: make(make_remote_addr_fingerprint(remote_addr), sample_issue_time()).unwrap(),
+                connection_id: make(make_remote_fingerprint(remote_addr), sample_issue_time()).unwrap(),
                 transaction_id: TransactionId(0i32.into()),
                 info_hashes,
             }

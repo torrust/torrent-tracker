@@ -81,7 +81,7 @@ use aquatic_udp_protocol::ConnectionId as Cookie;
 use cookie_builder::{assemble, decode, disassemble, encode};
 use zerocopy::AsBytes;
 
-use super::error::{self, Error};
+use super::error::Error;
 use crate::shared::crypto::keys::CipherArrayBlowfish;
 
 /// Generates a new connection cookie.
@@ -106,6 +106,8 @@ pub fn make(fingerprint: u64, issue_at: f64) -> Result<Cookie, Error> {
     Ok(zerocopy::FromBytes::read_from(cookie.as_slice()).expect("it should be the same size"))
 }
 
+use std::ops::Range;
+
 /// Checks if the supplied `connection_cookie` is valid.
 ///
 /// # Errors
@@ -114,9 +116,9 @@ pub fn make(fingerprint: u64, issue_at: f64) -> Result<Cookie, Error> {
 ///
 /// # Panics
 ///
-/// It would panic if cookie min value is larger than the max value.
-pub fn check(cookie: &Cookie, fingerprint: u64, min: f64, max: f64) -> Result<f64, Error> {
-    assert!(min < max, "min is larger than max");
+/// It would panic if the range start is not smaller than it's end.
+pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Result<f64, Error> {
+    assert!(valid_range.start <= valid_range.end, "range start is larger than range end");
 
     let cookie_bytes = CipherArrayBlowfish::from_slice(cookie.0.as_bytes());
     let cookie_bytes = decode(*cookie_bytes);
@@ -124,22 +126,22 @@ pub fn check(cookie: &Cookie, fingerprint: u64, min: f64, max: f64) -> Result<f6
     let issue_time = disassemble(fingerprint, cookie_bytes);
 
     if !issue_time.is_normal() {
-        return Err(Error::InvalidConnectionId {
-            bad_id: error::ConnectionCookie(*cookie),
+        return Err(Error::ConnectionIdNotNormal {
+            not_normal_value: issue_time,
         });
     }
 
-    if issue_time < min {
+    if issue_time < valid_range.start {
         return Err(Error::ConnectionIdExpired {
-            bad_age: issue_time,
-            min_age: min,
+            expired_value: issue_time,
+            min_value: valid_range.start,
         });
     }
 
-    if issue_time > max {
+    if issue_time > valid_range.end {
         return Err(Error::ConnectionIdFromFuture {
-            future_age: issue_time,
-            max_age: max,
+            future_value: issue_time,
+            max_value: valid_range.end,
         });
     }
 
@@ -262,7 +264,7 @@ mod tests {
         let min = issue_at - 10.0;
         let max = issue_at + 10.0;
 
-        let result = check(&cookie, fingerprint, min, max).unwrap();
+        let result = check(&cookie, fingerprint, min..max).unwrap();
 
         // we should have exactly the same bytes returned
         assert_eq!(result.to_ne_bytes(), issue_at.to_ne_bytes());
@@ -277,7 +279,7 @@ mod tests {
         let min = issue_at + 10.0;
         let max = issue_at + 20.0;
 
-        let result = check(&cookie, fingerprint, min, max).unwrap_err();
+        let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
         match result {
             Error::ConnectionIdExpired { .. } => {} // Expected error
@@ -295,7 +297,7 @@ mod tests {
         let min = issue_at - 20.0;
         let max = issue_at - 10.0;
 
-        let result = check(&cookie, fingerprint, min, max).unwrap_err();
+        let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
         match result {
             Error::ConnectionIdFromFuture { .. } => {} // Expected error

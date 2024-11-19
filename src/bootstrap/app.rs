@@ -58,7 +58,7 @@ pub fn check_seed() {
     let seed = keys::Current::get_seed();
     let instance = keys::Instance::get_seed();
 
-    assert_eq!(seed, instance, "maybe using zeroed see in production!?");
+    assert_eq!(seed, instance, "maybe using zeroed seed in production!?");
 }
 
 /// It initializes the application with the given configuration.

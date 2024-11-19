@@ -16,14 +16,14 @@ pub enum Error {
     #[error("the issue time should be a normal floating point number")]
     InvalidCookieIssueTime { invalid_value: f64 },
 
-    #[error("connection id was decoded, but could not be understood")]
-    InvalidConnectionId { bad_id: ConnectionCookie },
+    #[error("connection id did not produce a normal value")]
+    ConnectionIdNotNormal { not_normal_value: f64 },
 
-    #[error("connection id was decoded, but was expired (too old)")]
-    ConnectionIdExpired { bad_age: f64, min_age: f64 },
+    #[error("connection id produced an expired value")]
+    ConnectionIdExpired { expired_value: f64, min_value: f64 },
 
-    #[error("connection id was decoded, but was invalid (from future)")]
-    ConnectionIdFromFuture { future_age: f64, max_age: f64 },
+    #[error("connection id produces a future value")]
+    ConnectionIdFromFuture { future_value: f64, max_value: f64 },
 
     /// Error returned when the domain tracker returns an error.
     #[error("tracker server error: {source}")]
