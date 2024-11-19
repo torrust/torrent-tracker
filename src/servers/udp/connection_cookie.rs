@@ -1,339 +1,307 @@
-//! Logic for generating and verifying connection IDs.
+//! Module for Generating and Verifying Connection IDs (Cookies) in the UDP Tracker Protocol
 //!
-//! The UDP tracker requires the client to connect to the server before it can
-//! send any data. The server responds with a random 64-bit integer that the
-//! client must use to identify itself.
+//! **Overview:**
 //!
-//! This connection ID is used to avoid spoofing attacks. The client must send
-//! the connection ID in all requests to the server. The server will ignore any
-//! requests that do not contain the correct connection ID.
+//! In the `BitTorrent` UDP tracker protocol, clients initiate communication by obtaining a connection ID from the server. This connection ID serves as a safeguard against IP spoofing and replay attacks, ensuring that only legitimate clients can interact with the tracker.
 //!
-//! The simplest way to implement this would be to generate a random number when
-//! the client connects and store it in a hash table. However, this would
-//! require the server to store a large number of connection IDs, which would be
-//! a waste of memory. Instead, the server generates a connection ID based on
-//! the client's IP address and the current time. This allows the server to
-//! verify the connection ID without storing it.
+//! To maintain a stateless server architecture, this module implements a method for generating and verifying connection IDs based on the client's fingerprint (typically derived from the client's IP address) and the time of issuance, without storing state on the server.
 //!
-//! This module implements this method of generating connection IDs. It's the
-//! most common way to generate connection IDs. The connection ID is generated
-//! using a time based algorithm and it is valid for a certain amount of time
-//! (usually two minutes). The connection ID is generated using the following:
+//! The connection ID is an encrypted, opaque cookie held by the client. Since the same server that generates the cookie also validates it, endianness is not a concern.
 //!
-//! ```text
-//! connection ID = hash(client IP + current time slot + secret seed)
-//! ```
+//! **Connection ID Generation Algorithm:**
 //!
-//! Time slots are two minute intervals since the Unix epoch. The secret seed is
-//! a random number that is generated when the server starts. And the client IP
-//! is used in order generate a unique connection ID for each client.
+//! 1. **Issue Time (`issue_at`):**
+//!    - Obtain a 64-bit floating-point number (`f64`), this number should be a normal number.
 //!
-//! The BEP-15 recommends a two-minute time slot.
+//! 2. **Fingerprint:**
+//!    - Use an 8-byte fingerprint unique to the client (e.g., derived from the client's IP address).
 //!
-//! ```text
-//! Timestamp (seconds from Unix epoch):
-//! |------------|------------|------------|------------|
-//! 0            120          240          360          480
-//! Time slots (two-minutes time extents from Unix epoch):
-//! |------------|------------|------------|------------|
-//! 0            1            2            3            4
-//! Peer connections:
-//! Peer A       |-------------------------|
-//! Peer B                    |-------------------------|
-//! Peer C              |------------------|
-//! Peer A connects at timestamp 120 slot 1 -> connection ID will be valid from timestamp 120 to 360
-//! Peer B connects at timestamp 240 slot 2 -> connection ID will be valid from timestamp 240 to 480
-//! Peer C connects at timestamp 180 slot 1 -> connection ID will be valid from timestamp 180 to 360
-//! ```
-//! > **NOTICE**: connection ID is always the same for a given peer
-//! > (socket address) and time slot.
+//! 3. **Assemble Cookie Value:**
+//!    - Interpret the bytes of `issue_at` as a 64-bit integer (`i64`) without altering the bit pattern.
+//!    - Similarly, interpret the fingerprint bytes as an `i64`.
+//!    - Compute the cookie value:
+//!      ```rust,ignore
+//!      let cookie_value = issue_at_i64.wrapping_add(fingerprint_i64);
+//!      ```
+//!      - *Note:* Wrapping addition handles potential integer overflows gracefully.
 //!
-//! > **NOTICE**: connection ID will be valid for two time extents, **not two
-//! > minutes**. It'll be valid for the the current time extent and the next one.
+//! 4. **Encrypt Cookie Value:**
+//!    - Encrypt `cookie_value` using a symmetric block cipher obtained from `Current::get_cipher()`.
+//!    - The encrypted `cookie_value` becomes the connection ID sent to the client.
 //!
-//! Refer to [`Connect`](crate::servers::udp#connect) for more information about
-//! the connection process.
+//! **Connection ID Verification Algorithm:**
 //!
-//! ## Advantages
+//! When a client sends a request with a connection ID, the server verifies it using the following steps:
 //!
-//! - It consumes less memory than storing a hash table of connection IDs.
-//! - It's easy to implement.
-//! - It's fast.
+//! 1. **Decrypt Connection ID:**
+//!    - Decrypt the received connection ID using the same cipher to retrieve `cookie_value`.
+//!    - *Important:* The decryption is non-authenticated, meaning it does not verify the integrity or authenticity of the ciphertext. The decrypted `cookie_value` can be any byte sequence, including manipulated data.
 //!
-//! ## Disadvantages
+//! 2. **Recover Issue Time:**
+//!    - Interpret the fingerprint bytes as `i64`.
+//!    - Compute the issue time:
+//!      ```rust,ignore
+//!      let issue_at_i64 = cookie_value.wrapping_sub(fingerprint_i64);
+//!      ```
+//!      - *Note:* Wrapping subtraction handles potential integer underflows gracefully.
+//!    - Reinterpret `issue_at_i64` bytes as an `f64` to get `issue_time`.
 //!
-//! - It's not very flexible. The connection ID is only valid for a certain amount of time.
-//! - It's not very accurate. The connection ID is valid for more than two minutes.
-use std::net::SocketAddr;
-use std::panic::Location;
+//! 3. **Validate Issue Time:**
+//!    - **Handling Arbitrary `issue_time` Values:**
+//!        - Since the decrypted `cookie_value` may be arbitrary, `issue_time` can be any `f64` value, including special values like `NaN`, positive or negative infinity, and subnormal numbers.
+//!    - **Validation Steps:**
+//!        - **Step 1:** Check if `issue_time` is finite using `issue_time.is_finite()`.
+//!            - If `issue_time` is `NaN` or infinite, it is considered invalid.
+//!        - **Step 2:** If `issue_time` is finite, perform range checks:
+//!            - Verify that `min <= issue_time <= max`.
+//!    - If `issue_time` passes these checks, accept the connection ID; otherwise, reject it with an appropriate error.
+//!
+//! **Security Considerations:**
+//!
+//! - **Non-Authenticated Encryption:**
+//!   - Due to protocol constraints (an 8-byte connection ID), using an authenticated encryption algorithm is not feasible.
+//!   - As a result, attackers might attempt to forge or manipulate connection IDs.
+//!   - However, the probability of an arbitrary 64-bit value decrypting to a valid `issue_time` within the acceptable range is extremely low, effectively serving as a form of authentication.
+//!
+//! - **Handling Special `f64` Values:**
+//!   - By checking `issue_time.is_finite()`, the implementation excludes `NaN` and infinite values, ensuring that only valid, finite timestamps are considered.
+//!
+//! - **Probability of Successful Attack:**
+//!   - Given the narrow valid time window (usually around 2 minutes) compared to the vast range of `f64` values, the chance of successfully guessing a valid `issue_time` is negligible.
+//!
+//! **Key Points:**
+//!
+//! - The server maintains a stateless design, reducing resource consumption and complexity.
+//! - Wrapping arithmetic ensures that the addition and subtraction of `i64` values are safe from overflow or underflow issues.
+//! - The validation process is robust against malformed or malicious connection IDs due to stringent checks on the deserialized `issue_time`.
+//! - The module leverages existing cryptographic primitives while acknowledging and addressing the limitations imposed by the protocol's specifications.
+//!
 
-use aquatic_udp_protocol::ConnectionId;
-use torrust_tracker_clock::time_extent::{Extent, TimeExtent};
-use zerocopy::network_endian::I64;
+use aquatic_udp_protocol::ConnectionId as Cookie;
+use cookie_builder::{assemble, decode, disassemble, encode};
 use zerocopy::AsBytes;
 
 use super::error::Error;
-
-pub type Cookie = [u8; 8];
-
-pub type SinceUnixEpochTimeExtent = TimeExtent;
-
-pub const COOKIE_LIFETIME: TimeExtent = TimeExtent::from_sec(2, &60);
-
-/// Converts a connection ID into a connection cookie.
-#[must_use]
-pub fn from_connection_id(connection_id: &ConnectionId) -> Cookie {
-    let mut cookie = [0u8; 8];
-    connection_id.write_to(&mut cookie);
-    cookie
-}
-
-/// Converts a connection cookie into a connection ID.
-#[must_use]
-pub fn into_connection_id(connection_cookie: &Cookie) -> ConnectionId {
-    ConnectionId(I64::new(i64::from_be_bytes(*connection_cookie)))
-}
+use crate::shared::crypto::keys::CipherArrayBlowfish;
 
 /// Generates a new connection cookie.
-#[must_use]
-pub fn make(remote_address: &SocketAddr) -> Cookie {
-    let time_extent = cookie_builder::get_last_time_extent();
-
-    //println!("remote_address: {remote_address:?}, time_extent: {time_extent:?}, cookie: {cookie:?}");
-    cookie_builder::build(remote_address, &time_extent)
-}
-
-/// Checks if the supplied `connection_cookie` is valid.
-///
-/// # Panics
-///
-/// It would panic if the `COOKIE_LIFETIME` constant would be an unreasonably large number.
 ///
 /// # Errors
 ///
-/// Will return a `ServerError::InvalidConnectionId` if the supplied `connection_cookie` fails to verify.
-pub fn check(remote_address: &SocketAddr, connection_cookie: &Cookie) -> Result<SinceUnixEpochTimeExtent, Error> {
-    // we loop backwards testing each time_extent until we find one that matches.
-    // (or the lifetime of time_extents is exhausted)
-    for offset in 0..=COOKIE_LIFETIME.amount {
-        let checking_time_extent = cookie_builder::get_last_time_extent().decrease(offset).unwrap();
-
-        let checking_cookie = cookie_builder::build(remote_address, &checking_time_extent);
-        //println!("remote_address: {remote_address:?}, time_extent: {checking_time_extent:?}, cookie: {checking_cookie:?}");
-
-        if *connection_cookie == checking_cookie {
-            return Ok(checking_time_extent);
-        }
+/// It would error if the supplied `issue_at` value is a zero, infinite, subnormal, or NaN.
+///
+/// # Panics
+///
+/// It would panic if the cookie is not exactly 8 bytes is size.
+///
+pub fn make(fingerprint: u64, issue_at: f64) -> Result<Cookie, Error> {
+    if !issue_at.is_normal() {
+        return Err(Error::InvalidCookieIssueTime { invalid_value: issue_at });
     }
-    Err(Error::InvalidConnectionId {
-        location: Location::caller(),
-    })
+
+    let cookie = assemble(fingerprint, issue_at);
+    let cookie = encode(cookie);
+
+    // using `read_from` as the array may be not correctly aligned
+    Ok(zerocopy::FromBytes::read_from(cookie.as_slice()).expect("it should be the same size"))
+}
+
+use std::ops::Range;
+
+/// Checks if the supplied `connection_cookie` is valid.
+///
+/// # Errors
+///
+/// It would error if the connection cookie is somehow invalid or expired.
+///
+/// # Panics
+///
+/// It would panic if the range start is not smaller than it's end.
+pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Result<f64, Error> {
+    assert!(valid_range.start <= valid_range.end, "range start is larger than range end");
+
+    let cookie_bytes = CipherArrayBlowfish::from_slice(cookie.0.as_bytes());
+    let cookie_bytes = decode(*cookie_bytes);
+
+    let issue_time = disassemble(fingerprint, cookie_bytes);
+
+    if !issue_time.is_normal() {
+        return Err(Error::ConnectionIdNotNormal {
+            not_normal_value: issue_time,
+        });
+    }
+
+    if issue_time < valid_range.start {
+        return Err(Error::ConnectionIdExpired {
+            expired_value: issue_time,
+            min_value: valid_range.start,
+        });
+    }
+
+    if issue_time > valid_range.end {
+        return Err(Error::ConnectionIdFromFuture {
+            future_value: issue_time,
+            max_value: valid_range.end,
+        });
+    }
+
+    Ok(issue_time)
 }
 
 mod cookie_builder {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    use std::net::SocketAddr;
+    use cipher::{BlockDecrypt, BlockEncrypt};
+    use tracing::{instrument, Level};
+    use zerocopy::{byteorder, AsBytes as _, NativeEndian};
 
-    use torrust_tracker_clock::time_extent::{Extent, Make, TimeExtent};
+    pub type CookiePlainText = CipherArrayBlowfish;
+    pub type CookieCipherText = CipherArrayBlowfish;
 
-    use super::{Cookie, SinceUnixEpochTimeExtent, COOKIE_LIFETIME};
-    use crate::shared::crypto::keys::seeds::{Current, Keeper};
-    use crate::DefaultTimeExtentMaker;
+    use crate::shared::crypto::keys::{CipherArrayBlowfish, Current, Keeper};
 
-    pub(super) fn get_last_time_extent() -> SinceUnixEpochTimeExtent {
-        DefaultTimeExtentMaker::now(&COOKIE_LIFETIME.increment)
-            .unwrap()
-            .unwrap()
-            .increase(COOKIE_LIFETIME.amount)
-            .unwrap()
+    #[instrument(ret(level = Level::TRACE))]
+    pub(super) fn assemble(fingerprint: u64, issue_at: f64) -> CookiePlainText {
+        let issue_at: byteorder::I64<NativeEndian> =
+            *zerocopy::FromBytes::ref_from(&issue_at.to_ne_bytes()).expect("it should be aligned");
+        let fingerprint: byteorder::I64<NativeEndian> =
+            *zerocopy::FromBytes::ref_from(&fingerprint.to_ne_bytes()).expect("it should be aligned");
+
+        let cookie = issue_at.get().wrapping_add(fingerprint.get());
+        let cookie: byteorder::I64<NativeEndian> =
+            *zerocopy::FromBytes::ref_from(&cookie.to_ne_bytes()).expect("it should be aligned");
+
+        *CipherArrayBlowfish::from_slice(cookie.as_bytes())
     }
 
-    pub(super) fn build(remote_address: &SocketAddr, time_extent: &TimeExtent) -> Cookie {
-        let seed = Current::get_seed();
+    #[instrument(ret(level = Level::TRACE))]
+    pub(super) fn disassemble(fingerprint: u64, cookie: CookiePlainText) -> f64 {
+        let fingerprint: byteorder::I64<NativeEndian> =
+            *zerocopy::FromBytes::ref_from(&fingerprint.to_ne_bytes()).expect("it should be aligned");
 
-        let mut hasher = DefaultHasher::new();
+        // the array may be not aligned, so we read instead of reference.
+        let cookie: byteorder::I64<NativeEndian> =
+            zerocopy::FromBytes::read_from(cookie.as_bytes()).expect("it should be the same size");
 
-        remote_address.hash(&mut hasher);
-        time_extent.hash(&mut hasher);
-        seed.hash(&mut hasher);
+        let issue_time_bytes = cookie.get().wrapping_sub(fingerprint.get()).to_ne_bytes();
 
-        hasher.finish().to_le_bytes()
+        let issue_time: byteorder::F64<NativeEndian> =
+            *zerocopy::FromBytes::ref_from(&issue_time_bytes).expect("it should be aligned");
+
+        issue_time.get()
+    }
+
+    #[instrument(ret(level = Level::TRACE))]
+    pub(super) fn encode(mut cookie: CookiePlainText) -> CookieCipherText {
+        let cipher = Current::get_cipher_blowfish();
+
+        cipher.encrypt_block(&mut cookie);
+
+        cookie
+    }
+
+    #[instrument(ret(level = Level::TRACE))]
+    pub(super) fn decode(mut cookie: CookieCipherText) -> CookiePlainText {
+        let cipher = Current::get_cipher_blowfish();
+
+        cipher.decrypt_block(&mut cookie);
+
+        cookie
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-    use torrust_tracker_clock::clock::stopped::Stopped as _;
-    use torrust_tracker_clock::clock::{self};
-    use torrust_tracker_clock::time_extent::{self, Extent};
-
-    use super::cookie_builder::{self};
-    use crate::servers::udp::connection_cookie::{check, make, Cookie, COOKIE_LIFETIME};
-
-    // #![feature(const_socketaddr)]
-    // const REMOTE_ADDRESS_IPV4_ZERO: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
+    use super::*;
 
     #[test]
     fn it_should_make_a_connection_cookie() {
-        // Note: This constant may need to be updated in the future as the hash
-        // is not guaranteed to to be stable between versions.
-        const ID_COOKIE_OLD_HASHER: Cookie = [41, 166, 45, 246, 249, 24, 108, 203];
-        const ID_COOKIE_NEW_HASHER: Cookie = [185, 122, 191, 238, 6, 43, 2, 198];
+        let fingerprint = 1_000_000;
+        let issue_at = 1000.0;
+        let cookie = make(fingerprint, issue_at).unwrap().0.get();
 
-        clock::Stopped::local_set_to_unix_epoch();
-
-        let cookie = make(&SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0));
-
-        assert!(cookie == ID_COOKIE_OLD_HASHER || cookie == ID_COOKIE_NEW_HASHER);
+        // Expected connection ID derived through experimentation
+        assert_eq!(cookie.to_le_bytes(), [10, 130, 175, 211, 244, 253, 230, 210]);
     }
 
     #[test]
-    fn it_should_make_the_same_connection_cookie_for_the_same_input_data() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-        let time_extent_zero = time_extent::ZERO;
+    fn it_should_create_same_cookie_for_same_input() {
+        let fingerprint = 1_000_000;
+        let issue_at = 1000.0;
+        let cookie1 = make(fingerprint, issue_at).unwrap();
+        let cookie2 = make(fingerprint, issue_at).unwrap();
 
-        let cookie = cookie_builder::build(&remote_address, &time_extent_zero);
-        let cookie_2 = cookie_builder::build(&remote_address, &time_extent_zero);
-
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie:?}");
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie_2:?}");
-
-        //remote_address: 127.0.0.1:8080, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [212, 9, 204, 223, 176, 190, 150, 153]
-        //remote_address: 127.0.0.1:8080, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [212, 9, 204, 223, 176, 190, 150, 153]
-
-        assert_eq!(cookie, cookie_2);
+        assert_eq!(cookie1, cookie2);
     }
 
     #[test]
-    fn it_should_make_the_different_connection_cookie_for_different_ip() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-        let remote_address_2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::BROADCAST), 0);
-        let time_extent_zero = time_extent::ZERO;
+    fn it_should_create_different_cookies_for_different_fingerprints() {
+        let fingerprint1 = 1_000_000;
+        let fingerprint2 = 2_000_000;
+        let issue_at = 1000.0;
+        let cookie1 = make(fingerprint1, issue_at).unwrap();
+        let cookie2 = make(fingerprint2, issue_at).unwrap();
 
-        let cookie = cookie_builder::build(&remote_address, &time_extent_zero);
-        let cookie_2 = cookie_builder::build(&remote_address_2, &time_extent_zero);
-
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie:?}");
-        println!("remote_address: {remote_address_2:?}, time_extent: {time_extent_zero:?}, cookie: {cookie_2:?}");
-
-        //remote_address: 0.0.0.0:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [151, 130, 30, 157, 190, 41, 179, 135]
-        //remote_address: 255.255.255.255:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [217, 87, 239, 178, 182, 126, 66, 166]
-
-        assert_ne!(cookie, cookie_2);
+        assert_ne!(cookie1, cookie2);
     }
 
     #[test]
-    fn it_should_make_the_different_connection_cookie_for_different_ip_version() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-        let remote_address_2 = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0);
-        let time_extent_zero = time_extent::ZERO;
+    fn it_should_create_different_cookies_for_different_issue_times() {
+        let fingerprint = 1_000_000;
+        let issue_at1 = 1000.0;
+        let issue_at2 = 2000.0;
+        let cookie1 = make(fingerprint, issue_at1).unwrap();
+        let cookie2 = make(fingerprint, issue_at2).unwrap();
 
-        let cookie = cookie_builder::build(&remote_address, &time_extent_zero);
-        let cookie_2 = cookie_builder::build(&remote_address_2, &time_extent_zero);
-
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie:?}");
-        println!("remote_address: {remote_address_2:?}, time_extent: {time_extent_zero:?}, cookie: {cookie_2:?}");
-
-        //remote_address: 0.0.0.0:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [151, 130, 30, 157, 190, 41, 179, 135]
-        //remote_address: [::]:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [99, 119, 230, 177, 20, 220, 163, 187]
-
-        assert_ne!(cookie, cookie_2);
+        assert_ne!(cookie1, cookie2);
     }
 
     #[test]
-    fn it_should_make_the_different_connection_cookie_for_different_socket() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-        let remote_address_2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 1);
-        let time_extent_zero = time_extent::ZERO;
+    fn it_should_validate_a_valid_cookie() {
+        let fingerprint = 1_000_000;
+        let issue_at = 1_000_000_000_f64;
+        let cookie = make(fingerprint, issue_at).unwrap();
 
-        let cookie = cookie_builder::build(&remote_address, &time_extent_zero);
-        let cookie_2 = cookie_builder::build(&remote_address_2, &time_extent_zero);
+        let min = issue_at - 10.0;
+        let max = issue_at + 10.0;
 
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie:?}");
-        println!("remote_address: {remote_address_2:?}, time_extent: {time_extent_zero:?}, cookie: {cookie_2:?}");
+        let result = check(&cookie, fingerprint, min..max).unwrap();
 
-        //remote_address: 0.0.0.0:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [151, 130, 30, 157, 190, 41, 179, 135]
-        //remote_address: 0.0.0.0:1, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [38, 8, 0, 102, 92, 170, 220, 11]
-
-        assert_ne!(cookie, cookie_2);
+        // we should have exactly the same bytes returned
+        assert_eq!(result.to_ne_bytes(), issue_at.to_ne_bytes());
     }
 
     #[test]
-    fn it_should_make_the_different_connection_cookie_for_different_time_extents() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-        let time_extent_zero = time_extent::ZERO;
-        let time_extent_max = time_extent::MAX;
+    fn it_should_reject_an_expired_cookie() {
+        let fingerprint = 1_000_000;
+        let issue_at = 1_000_000_000_f64;
+        let cookie = make(fingerprint, issue_at).unwrap();
 
-        let cookie = cookie_builder::build(&remote_address, &time_extent_zero);
-        let cookie_2 = cookie_builder::build(&remote_address, &time_extent_max);
+        let min = issue_at + 10.0;
+        let max = issue_at + 20.0;
 
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_zero:?}, cookie: {cookie:?}");
-        println!("remote_address: {remote_address:?}, time_extent: {time_extent_max:?}, cookie: {cookie_2:?}");
+        let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
-        //remote_address: 0.0.0.0:0, time_extent: TimeExtent { increment: 0ns, amount: 0 }, cookie: [151, 130, 30, 157, 190, 41, 179, 135]
-        //remote_address: 0.0.0.0:0, time_extent: TimeExtent { increment: 18446744073709551615.999999999s, amount: 18446744073709551615 }, cookie: [87, 111, 109, 125, 182, 206, 3, 201]
-
-        assert_ne!(cookie, cookie_2);
+        match result {
+            Error::ConnectionIdExpired { .. } => {} // Expected error
+            _ => panic!("Expected ConnectionIdExpired error"),
+        }
     }
 
     #[test]
-    fn it_should_make_different_cookies_for_the_next_time_extent() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
+    fn it_should_reject_a_cookie_from_the_future() {
+        let fingerprint = 1_000_000;
+        let issue_at = 1_000_000_000_f64;
 
-        let cookie = make(&remote_address);
+        let cookie = make(fingerprint, issue_at).unwrap();
 
-        clock::Stopped::local_add(&COOKIE_LIFETIME.increment).unwrap();
+        let min = issue_at - 20.0;
+        let max = issue_at - 10.0;
 
-        let cookie_next = make(&remote_address);
+        let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
-        assert_ne!(cookie, cookie_next);
-    }
-
-    #[test]
-    fn it_should_be_valid_for_this_time_extent() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-
-        let cookie = make(&remote_address);
-
-        check(&remote_address, &cookie).unwrap();
-    }
-
-    #[test]
-    fn it_should_be_valid_for_the_next_time_extent() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-
-        let cookie = make(&remote_address);
-
-        clock::Stopped::local_add(&COOKIE_LIFETIME.increment).unwrap();
-
-        check(&remote_address, &cookie).unwrap();
-    }
-
-    #[test]
-    fn it_should_be_valid_for_the_last_time_extent() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-
-        clock::Stopped::local_set_to_unix_epoch();
-
-        let cookie = make(&remote_address);
-
-        clock::Stopped::local_set(&COOKIE_LIFETIME.total().unwrap().unwrap());
-
-        check(&remote_address, &cookie).unwrap();
-    }
-
-    #[test]
-    #[should_panic = "InvalidConnectionId"]
-    fn it_should_be_not_valid_after_their_last_time_extent() {
-        let remote_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-
-        let cookie = make(&remote_address);
-
-        clock::Stopped::local_set(&COOKIE_LIFETIME.total_next().unwrap().unwrap());
-
-        check(&remote_address, &cookie).unwrap();
+        match result {
+            Error::ConnectionIdFromFuture { .. } => {} // Expected error
+            _ => panic!("Expected ConnectionIdFromFuture error"),
+        }
     }
 }

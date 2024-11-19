@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use derive_more::derive::Display;
 use derive_more::Constructor;
@@ -62,14 +63,19 @@ impl Server<Stopped> {
     /// It panics if unable to receive the bound socket address from service.
     ///
     #[instrument(skip(self, tracker, form), err, ret(Display, level = Level::INFO))]
-    pub async fn start(self, tracker: Arc<Tracker>, form: ServiceRegistrationForm) -> Result<Server<Running>, std::io::Error> {
+    pub async fn start(
+        self,
+        tracker: Arc<Tracker>,
+        form: ServiceRegistrationForm,
+        cookie_lifetime: Duration,
+    ) -> Result<Server<Running>, std::io::Error> {
         let (tx_start, rx_start) = tokio::sync::oneshot::channel::<Started>();
         let (tx_halt, rx_halt) = tokio::sync::oneshot::channel::<Halted>();
 
         assert!(!tx_halt.is_closed(), "Halt channel for UDP tracker should be open");
 
         // May need to wrap in a task to about a tokio bug.
-        let task = self.state.spawner.spawn_launcher(tracker, tx_start, rx_halt);
+        let task = self.state.spawner.spawn_launcher(tracker, cookie_lifetime, tx_start, rx_halt);
 
         let local_addr = rx_start.await.expect("it should be able to start the service").address;
 

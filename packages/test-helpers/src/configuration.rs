@@ -1,6 +1,7 @@
 //! Tracker configuration factories for testing.
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::time::Duration;
 
 use torrust_tracker_configuration::{Configuration, HttpApi, HttpTracker, Threshold, UdpTracker};
 
@@ -47,6 +48,7 @@ pub fn ephemeral() -> Configuration {
     let udp_port = 0u16;
     config.udp_trackers = Some(vec![UdpTracker {
         bind_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), udp_port),
+        cookie_lifetime: Duration::from_secs(120),
     }]);
 
     // Ephemeral socket address for HTTP tracker

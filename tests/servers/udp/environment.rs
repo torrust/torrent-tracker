@@ -55,11 +55,16 @@ impl Environment<Stopped> {
 
     #[allow(dead_code)]
     pub async fn start(self) -> Environment<Running> {
+        let cookie_lifetime = self.config.cookie_lifetime;
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
             registar: self.registar.clone(),
-            server: self.server.start(self.tracker, self.registar.give_form()).await.unwrap(),
+            server: self
+                .server
+                .start(self.tracker, self.registar.give_form(), cookie_lifetime)
+                .await
+                .unwrap(),
         }
     }
 }

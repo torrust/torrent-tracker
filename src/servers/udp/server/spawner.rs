@@ -1,6 +1,7 @@
 //! A thin wrapper for tokio spawn to launch the UDP server launcher as a new task.
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use derive_more::derive::Display;
 use derive_more::Constructor;
@@ -27,13 +28,14 @@ impl Spawner {
     pub fn spawn_launcher(
         &self,
         tracker: Arc<Tracker>,
+        cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
         rx_halt: oneshot::Receiver<Halted>,
     ) -> JoinHandle<Spawner> {
         let spawner = Self::new(self.bind_to);
 
         tokio::spawn(async move {
-            Launcher::run_with_graceful_shutdown(tracker, spawner.bind_to, tx_start, rx_halt).await;
+            Launcher::run_with_graceful_shutdown(tracker, spawner.bind_to, cookie_lifetime, tx_start, rx_halt).await;
             spawner
         })
     }

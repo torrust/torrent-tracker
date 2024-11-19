@@ -7,22 +7,34 @@ use tracing::{instrument, Level};
 
 use super::bound_socket::BoundSocket;
 use crate::core::Tracker;
+use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
     tracker: Arc<Tracker>,
+    cookie_lifetime: f64,
 }
 
 impl Processor {
-    pub fn new(socket: Arc<BoundSocket>, tracker: Arc<Tracker>) -> Self {
-        Self { socket, tracker }
+    pub fn new(socket: Arc<BoundSocket>, tracker: Arc<Tracker>, cookie_lifetime: f64) -> Self {
+        Self {
+            socket,
+            tracker,
+            cookie_lifetime,
+        }
     }
 
     #[instrument(skip(self, request))]
     pub async fn process_request(self, request: RawRequest) {
         let from = request.from;
-        let response = handlers::handle_packet(request, &self.tracker, self.socket.address()).await;
+        let response = handlers::handle_packet(
+            request,
+            &self.tracker,
+            self.socket.address(),
+            CookieTimeValues::new(self.cookie_lifetime),
+        )
+        .await;
         self.send_response(from, response).await;
     }
 
