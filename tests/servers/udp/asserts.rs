@@ -1,9 +1,9 @@
 use aquatic_udp_protocol::{Response, TransactionId};
 
-pub fn is_error_response(response: &Response, error_message: &str) -> bool {
+pub fn get_error_response_message(response: &Response) -> Option<String> {
     match response {
-        Response::Error(error_response) => error_response.message.starts_with(error_message),
-        _ => false,
+        Response::Error(error_response) => Some(error_response.message.to_string()),
+        _ => None,
     }
 }
 

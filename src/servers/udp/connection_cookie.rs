@@ -79,6 +79,7 @@
 
 use aquatic_udp_protocol::ConnectionId as Cookie;
 use cookie_builder::{assemble, decode, disassemble, encode};
+use tracing::instrument;
 use zerocopy::AsBytes;
 
 use super::error::Error;
@@ -94,9 +95,12 @@ use crate::shared::crypto::keys::CipherArrayBlowfish;
 ///
 /// It would panic if the cookie is not exactly 8 bytes is size.
 ///
+#[instrument(err)]
 pub fn make(fingerprint: u64, issue_at: f64) -> Result<Cookie, Error> {
     if !issue_at.is_normal() {
-        return Err(Error::InvalidCookieIssueTime { invalid_value: issue_at });
+        return Err(Error::CookieValueNotNormal {
+            not_normal_value: issue_at,
+        });
     }
 
     let cookie = assemble(fingerprint, issue_at);
@@ -117,6 +121,7 @@ use std::ops::Range;
 /// # Panics
 ///
 /// It would panic if the range start is not smaller than it's end.
+#[instrument(err)]
 pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Result<f64, Error> {
     assert!(valid_range.start <= valid_range.end, "range start is larger than range end");
 
@@ -126,20 +131,20 @@ pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Resu
     let issue_time = disassemble(fingerprint, cookie_bytes);
 
     if !issue_time.is_normal() {
-        return Err(Error::ConnectionIdNotNormal {
+        return Err(Error::CookieValueNotNormal {
             not_normal_value: issue_time,
         });
     }
 
     if issue_time < valid_range.start {
-        return Err(Error::ConnectionIdExpired {
+        return Err(Error::CookieValueExpired {
             expired_value: issue_time,
             min_value: valid_range.start,
         });
     }
 
     if issue_time > valid_range.end {
-        return Err(Error::ConnectionIdFromFuture {
+        return Err(Error::CookieValueFromFuture {
             future_value: issue_time,
             max_value: valid_range.end,
         });
@@ -150,7 +155,7 @@ pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Resu
 
 mod cookie_builder {
     use cipher::{BlockDecrypt, BlockEncrypt};
-    use tracing::{instrument, Level};
+    use tracing::instrument;
     use zerocopy::{byteorder, AsBytes as _, NativeEndian};
 
     pub type CookiePlainText = CipherArrayBlowfish;
@@ -158,7 +163,7 @@ mod cookie_builder {
 
     use crate::shared::crypto::keys::{CipherArrayBlowfish, Current, Keeper};
 
-    #[instrument(ret(level = Level::TRACE))]
+    #[instrument()]
     pub(super) fn assemble(fingerprint: u64, issue_at: f64) -> CookiePlainText {
         let issue_at: byteorder::I64<NativeEndian> =
             *zerocopy::FromBytes::ref_from(&issue_at.to_ne_bytes()).expect("it should be aligned");
@@ -172,7 +177,7 @@ mod cookie_builder {
         *CipherArrayBlowfish::from_slice(cookie.as_bytes())
     }
 
-    #[instrument(ret(level = Level::TRACE))]
+    #[instrument()]
     pub(super) fn disassemble(fingerprint: u64, cookie: CookiePlainText) -> f64 {
         let fingerprint: byteorder::I64<NativeEndian> =
             *zerocopy::FromBytes::ref_from(&fingerprint.to_ne_bytes()).expect("it should be aligned");
@@ -189,7 +194,7 @@ mod cookie_builder {
         issue_time.get()
     }
 
-    #[instrument(ret(level = Level::TRACE))]
+    #[instrument()]
     pub(super) fn encode(mut cookie: CookiePlainText) -> CookieCipherText {
         let cipher = Current::get_cipher_blowfish();
 
@@ -198,7 +203,7 @@ mod cookie_builder {
         cookie
     }
 
-    #[instrument(ret(level = Level::TRACE))]
+    #[instrument()]
     pub(super) fn decode(mut cookie: CookieCipherText) -> CookiePlainText {
         let cipher = Current::get_cipher_blowfish();
 
@@ -282,7 +287,7 @@ mod tests {
         let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
         match result {
-            Error::ConnectionIdExpired { .. } => {} // Expected error
+            Error::CookieValueExpired { .. } => {} // Expected error
             _ => panic!("Expected ConnectionIdExpired error"),
         }
     }
@@ -300,7 +305,7 @@ mod tests {
         let result = check(&cookie, fingerprint, min..max).unwrap_err();
 
         match result {
-            Error::ConnectionIdFromFuture { .. } => {} // Expected error
+            Error::CookieValueFromFuture { .. } => {} // Expected error
             _ => panic!("Expected ConnectionIdFromFuture error"),
         }
     }

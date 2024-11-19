@@ -641,7 +641,6 @@ use std::net::SocketAddr;
 pub mod connection_cookie;
 pub mod error;
 pub mod handlers;
-pub mod logging;
 pub mod peer_builder;
 pub mod server;
 

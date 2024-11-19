@@ -47,9 +47,11 @@ pub enum Event {
     Udp4Connect,
     Udp4Announce,
     Udp4Scrape,
+    Udp4Error,
     Udp6Connect,
     Udp6Announce,
     Udp6Scrape,
+    Udp6Error,
 }
 
 /// Metrics collected by the tracker.
@@ -82,12 +84,16 @@ pub struct Metrics {
     pub udp4_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) `error` requests from IPv4 peers.
+    pub udp4_errors_handled: u64,
     /// Total number of UDP (UDP tracker) `connection` requests from IPv6 peers.
     pub udp6_connections_handled: u64,
     /// Total number of UDP (UDP tracker) `announce` requests from IPv6 peers.
     pub udp6_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
     pub udp6_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) `error` requests from IPv6 peers.
+    pub udp6_errors_handled: u64,
 }
 
 /// The service responsible for keeping tracker metrics (listening to statistics events and handle them).
@@ -168,6 +174,9 @@ async fn event_handler(event: Event, stats_repository: &Repo) {
         Event::Udp4Scrape => {
             stats_repository.increase_udp4_scrapes().await;
         }
+        Event::Udp4Error => {
+            stats_repository.increase_udp4_errors().await;
+        }
 
         // UDP6
         Event::Udp6Connect => {
@@ -178,6 +187,9 @@ async fn event_handler(event: Event, stats_repository: &Repo) {
         }
         Event::Udp6Scrape => {
             stats_repository.increase_udp6_scrapes().await;
+        }
+        Event::Udp6Error => {
+            stats_repository.increase_udp6_errors().await;
         }
     }
 
@@ -282,6 +294,12 @@ impl Repo {
         drop(stats_lock);
     }
 
+    pub async fn increase_udp4_errors(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp4_errors_handled += 1;
+        drop(stats_lock);
+    }
+
     pub async fn increase_udp6_connections(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp6_connections_handled += 1;
@@ -297,6 +315,12 @@ impl Repo {
     pub async fn increase_udp6_scrapes(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp6_scrapes_handled += 1;
+        drop(stats_lock);
+    }
+
+    pub async fn increase_udp6_errors(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp6_errors_handled += 1;
         drop(stats_lock);
     }
 }

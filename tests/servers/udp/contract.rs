@@ -13,7 +13,7 @@ use torrust_tracker_test_helpers::configuration;
 use tracing::level_filters::LevelFilter;
 
 use crate::common::logging::{tracing_stderr_init, INIT};
-use crate::servers::udp::asserts::is_error_response;
+use crate::servers::udp::asserts::get_error_response_message;
 use crate::servers::udp::Started;
 
 fn empty_udp_request() -> [u8; MAX_PACKET_SIZE] {
@@ -64,7 +64,7 @@ async fn should_return_a_bad_request_response_when_the_client_sends_an_empty_req
 
     let response = Response::parse_bytes(&response, true).unwrap();
 
-    assert!(is_error_response(&response, "bad request"));
+    assert_eq!(get_error_response_message(&response).unwrap(), "Protocol identifier missing");
 
     env.stop().await;
 }
