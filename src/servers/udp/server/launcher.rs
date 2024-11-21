@@ -30,7 +30,9 @@ impl Launcher {
     /// # Panics
     ///
     /// It panics if unable to bind to udp socket, and get the address from the udp socket.
-    /// It also panics if unable to send address of socket.
+    /// It panics if unable to send address of socket.
+    /// It panics if the udp server is loaded when the tracker is private.
+    ///
     #[instrument(skip(tracker, bind_to, tx_start, rx_halt))]
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
@@ -40,6 +42,11 @@ impl Launcher {
         rx_halt: oneshot::Receiver<Halted>,
     ) {
         tracing::info!(target: UDP_TRACKER_LOG_TARGET, "Starting on: {bind_to}");
+
+        if tracker.requires_authentication() {
+            tracing::error!("udp services cannot be used for private trackers");
+            panic!("it should not use udp if using authentication");
+        }
 
         let socket = tokio::time::timeout(Duration::from_millis(5000), BoundSocket::new(bind_to))
             .await

@@ -38,12 +38,16 @@ pub struct Stats {
     pub udp4_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
+    pub udp4_errors_handled: u64,
     /// Total number of UDP (UDP tracker) `connection` requests from IPv6 peers.
     pub udp6_connections_handled: u64,
     /// Total number of UDP (UDP tracker) `announce` requests from IPv6 peers.
     pub udp6_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
     pub udp6_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
+    pub udp6_errors_handled: u64,
 }
 
 impl From<TrackerMetrics> for Stats {
@@ -62,9 +66,11 @@ impl From<TrackerMetrics> for Stats {
             udp4_connections_handled: metrics.protocol_metrics.udp4_connections_handled,
             udp4_announces_handled: metrics.protocol_metrics.udp4_announces_handled,
             udp4_scrapes_handled: metrics.protocol_metrics.udp4_scrapes_handled,
+            udp4_errors_handled: metrics.protocol_metrics.udp4_errors_handled,
             udp6_connections_handled: metrics.protocol_metrics.udp6_connections_handled,
             udp6_announces_handled: metrics.protocol_metrics.udp6_announces_handled,
             udp6_scrapes_handled: metrics.protocol_metrics.udp6_scrapes_handled,
+            udp6_errors_handled: metrics.protocol_metrics.udp6_errors_handled,
         }
     }
 }
@@ -97,9 +103,11 @@ mod tests {
                     udp4_connections_handled: 11,
                     udp4_announces_handled: 12,
                     udp4_scrapes_handled: 13,
-                    udp6_connections_handled: 14,
-                    udp6_announces_handled: 15,
-                    udp6_scrapes_handled: 16
+                    udp4_errors_handled: 14,
+                    udp6_connections_handled: 15,
+                    udp6_announces_handled: 16,
+                    udp6_scrapes_handled: 17,
+                    udp6_errors_handled: 18
                 }
             }),
             Stats {
@@ -116,9 +124,11 @@ mod tests {
                 udp4_connections_handled: 11,
                 udp4_announces_handled: 12,
                 udp4_scrapes_handled: 13,
-                udp6_connections_handled: 14,
-                udp6_announces_handled: 15,
-                udp6_scrapes_handled: 16
+                udp4_errors_handled: 14,
+                udp6_connections_handled: 15,
+                udp6_announces_handled: 16,
+                udp6_scrapes_handled: 17,
+                udp6_errors_handled: 18
             }
         );
     }

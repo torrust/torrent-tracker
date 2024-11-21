@@ -76,9 +76,11 @@ pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
             udp4_connections_handled: stats.udp4_connections_handled,
             udp4_announces_handled: stats.udp4_announces_handled,
             udp4_scrapes_handled: stats.udp4_scrapes_handled,
+            udp4_errors_handled: stats.udp4_errors_handled,
             udp6_connections_handled: stats.udp6_connections_handled,
             udp6_announces_handled: stats.udp6_announces_handled,
             udp6_scrapes_handled: stats.udp6_scrapes_handled,
+            udp6_errors_handled: stats.udp6_errors_handled,
         },
     }
 }

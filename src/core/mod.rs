@@ -470,6 +470,7 @@ use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
+use tracing::instrument;
 
 use self::auth::Key;
 use self::error::Error;
@@ -1092,6 +1093,7 @@ impl Tracker {
     ///
     /// Will return an error if the tracker is running in `listed` mode
     /// and the infohash is not whitelisted.
+    #[instrument(skip(self, info_hash), err)]
     pub async fn authorize(&self, info_hash: &InfoHash) -> Result<(), Error> {
         if !self.is_listed() {
             return Ok(());
