@@ -137,7 +137,7 @@ mod tests {
 
         assert_error_response(
             &response,
-            "Cannot parse query params for announce request: missing query params for announce request",
+            "Bad request. Cannot parse query params for announce request: missing query params for announce request",
         );
     }
 
@@ -146,13 +146,13 @@ mod tests {
         let invalid_query = "param1=value1=value2";
         let response = extract_announce_from(Some(invalid_query)).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params");
+        assert_error_response(&response, "Bad request. Cannot parse query params");
     }
 
     #[test]
     fn it_should_reject_a_request_with_a_query_that_cannot_be_parsed_into_an_announce_request() {
         let response = extract_announce_from(Some("param1=value1")).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params for announce request");
+        assert_error_response(&response, "Bad request. Cannot parse query params for announce request");
     }
 }

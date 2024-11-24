@@ -226,7 +226,7 @@ impl FromStr for Compact {
 impl From<ParseQueryError> for responses::error::Error {
     fn from(err: ParseQueryError) -> Self {
         responses::error::Error {
-            failure_reason: format!("Cannot parse query params: {err}"),
+            failure_reason: format!("Bad request. Cannot parse query params: {err}"),
         }
     }
 }
@@ -234,7 +234,7 @@ impl From<ParseQueryError> for responses::error::Error {
 impl From<ParseAnnounceQueryError> for responses::error::Error {
     fn from(err: ParseAnnounceQueryError) -> Self {
         responses::error::Error {
-            failure_reason: format!("Cannot parse query params for announce request: {err}"),
+            failure_reason: format!("Bad request. Cannot parse query params for announce request: {err}"),
         }
     }
 }
