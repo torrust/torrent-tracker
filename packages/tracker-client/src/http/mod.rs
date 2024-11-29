@@ -1,5 +1,4 @@
 pub mod client;
-pub mod url_encoding;
 
 use percent_encoding::NON_ALPHANUMERIC;
 

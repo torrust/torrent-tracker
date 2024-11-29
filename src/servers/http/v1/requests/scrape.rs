@@ -3,11 +3,11 @@
 //! Data structures and logic for parsing the `scrape` request.
 use std::panic::Location;
 
+use bittorrent_http_protocol::percent_encoding::percent_decode_info_hash;
 use bittorrent_primitives::info_hash::{self, InfoHash};
 use thiserror::Error;
 use torrust_tracker_located_error::{Located, LocatedError};
 
-use crate::servers::http::percent_encoding::percent_decode_info_hash;
 use crate::servers::http::v1::query::Query;
 use crate::servers::http::v1::responses;
 

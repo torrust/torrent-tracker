@@ -55,6 +55,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: "${{ secrets.TORRUST_UPDATE_CARGO_REGISTRY_TOKEN }}"
         run: |
+          cargo publish -p bittorrent-http-protocol
           cargo publish -p bittorrent-tracker-client
           cargo publish -p torrust-tracker
           cargo publish -p torrust-tracker-client
