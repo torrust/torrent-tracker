@@ -582,7 +582,6 @@ name = "bittorrent-tracker-client"
 version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
- "bittorrent-http-protocol",
  "bittorrent-primitives",
  "derive_more",
  "hyper",
