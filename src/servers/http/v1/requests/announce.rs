@@ -6,12 +6,12 @@ use std::panic::Location;
 use std::str::FromStr;
 
 use aquatic_udp_protocol::{NumberOfBytes, PeerId};
+use bittorrent_http_protocol::percent_encoding::{percent_decode_info_hash, percent_decode_peer_id};
 use bittorrent_primitives::info_hash::{self, InfoHash};
 use thiserror::Error;
 use torrust_tracker_located_error::{Located, LocatedError};
 use torrust_tracker_primitives::peer;
 
-use crate::servers::http::percent_encoding::{percent_decode_info_hash, percent_decode_peer_id};
 use crate::servers::http::v1::query::{ParseQueryError, Query};
 use crate::servers::http::v1::responses;
 

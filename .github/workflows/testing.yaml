@@ -140,7 +140,7 @@ jobs:
 
       - id: test-docs
         name: Run Documentation Tests
-        run: cargo test --doc
+        run: cargo test --doc --workspace
 
       - id: test
         name: Run Unit Tests

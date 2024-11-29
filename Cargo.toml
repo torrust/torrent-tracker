@@ -36,6 +36,7 @@ axum = { version = "0", features = ["macros"] }
 axum-client-ip = "0"
 axum-extra = { version = "0", features = ["query"] }
 axum-server = { version = "0", features = ["tls-rustls-no-provider"] }
+bittorrent-http-protocol = { version = "3.0.0-develop", path = "packages/http-protocol" }
 bittorrent-primitives = "0.1.0"
 bittorrent-tracker-client = { version = "3.0.0-develop", path = "packages/tracker-client" }
 blowfish = "0"

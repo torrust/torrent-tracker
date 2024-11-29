@@ -1,0 +1,21 @@
+[package]
+description = "A library with the primitive types and functions for the BitTorrent HTTP tracker protocol."
+keywords = ["api", "library", "primitives"]
+name = "bittorrent-http-protocol"
+readme = "README.md"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+aquatic_udp_protocol = "0"
+bittorrent-primitives = "0.1.0"
+percent-encoding = "2"
+torrust-tracker-primitives = { version = "3.0.0-develop", path = "../primitives" }
