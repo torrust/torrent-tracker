@@ -5,9 +5,9 @@
 //! Decoding bencoded data:
 //!
 //! ```rust
-//!     extern crate bencode;
+//!     extern crate torrust_tracker_contrib_bencode;
 //!
-//!     use bencode::{BencodeRef, BRefAccess, BDecodeOpt};
+//!     use torrust_tracker_contrib_bencode::{BencodeRef, BRefAccess, BDecodeOpt};
 //!
 //!     fn main() {
 //!         let data = b"d12:lucky_numberi7ee"; // cspell:disable-line
@@ -22,7 +22,7 @@
 //!
 //! ```rust
 //!     #[macro_use]
-//!     extern crate bencode;
+//!     extern crate torrust_tracker_contrib_bencode;
 //!
 //!     fn main() {
 //!         let message = (ben_map!{
