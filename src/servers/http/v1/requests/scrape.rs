@@ -39,7 +39,7 @@ pub enum ParseScrapeQueryError {
 impl From<ParseScrapeQueryError> for responses::error::Error {
     fn from(err: ParseScrapeQueryError) -> Self {
         responses::error::Error {
-            failure_reason: format!("Cannot parse query params for scrape request: {err}"),
+            failure_reason: format!("Bad request. Cannot parse query params for scrape request: {err}"),
         }
     }
 }

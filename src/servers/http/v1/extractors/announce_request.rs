@@ -19,13 +19,13 @@
 //! Missing query params for `announce` request: <http://0.0.0.0:7070/announce>
 //!
 //! ```text
-//! d14:failure reason149:Cannot parse query params for announce request: missing query params for announce request in src/servers/http/v1/extractors/announce_request.rs:54:23e
+//! d14:failure reason149:Bad request. Cannot parse query params for announce request: missing query params for announce request in src/servers/http/v1/extractors/announce_request.rs:54:23e
 //! ```
 //!
 //! Invalid query param (`info_hash`): <http://0.0.0.0:7070/announce?info_hash=invalid&peer_addr=2.137.87.41&downloaded=0&uploaded=0&peer_id=-qB00000000000000001&port=17548&left=0&event=completed&compact=0>
 //!
 //! ```text
-//! d14:failure reason240:Cannot parse query params for announce request: invalid param value invalid for info_hash in not enough bytes for infohash: got 7 bytes, expected 20 src/shared/bit_torrent/info_hash.rs:240:27, src/servers/http/v1/requests/announce.rs:182:42e
+//! d14:failure reason240:Bad request. Cannot parse query params for announce request: invalid param value invalid for info_hash in not enough bytes for infohash: got 7 bytes, expected 20 src/shared/bit_torrent/info_hash.rs:240:27, src/servers/http/v1/requests/announce.rs:182:42e
 //! ```
 use std::panic::Location;
 
@@ -137,7 +137,7 @@ mod tests {
 
         assert_error_response(
             &response,
-            "Cannot parse query params for announce request: missing query params for announce request",
+            "Bad request. Cannot parse query params for announce request: missing query params for announce request",
         );
     }
 
@@ -146,13 +146,13 @@ mod tests {
         let invalid_query = "param1=value1=value2";
         let response = extract_announce_from(Some(invalid_query)).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params");
+        assert_error_response(&response, "Bad request. Cannot parse query params");
     }
 
     #[test]
     fn it_should_reject_a_request_with_a_query_that_cannot_be_parsed_into_an_announce_request() {
         let response = extract_announce_from(Some("param1=value1")).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params for announce request");
+        assert_error_response(&response, "Bad request. Cannot parse query params for announce request");
     }
 }
