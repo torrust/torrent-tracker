@@ -19,13 +19,13 @@
 //! Missing query params for scrape request: <http://0.0.0.0:7070/scrape>
 //!
 //! ```text
-//! d14:failure reason143:Cannot parse query params for scrape request: missing query params for scrape request in src/servers/http/v1/extractors/scrape_request.rs:52:23e
+//! d14:failure reason143:Bad request. Cannot parse query params for scrape request: missing query params for scrape request in src/servers/http/v1/extractors/scrape_request.rs:52:23e
 //! ```
 //!
 //! Invalid query params for scrape request: <http://0.0.0.0:7070/scrape?info_hash=invalid>
 //!
 //! ```text
-//! d14:failure reason235:Cannot parse query params for scrape request: invalid param value invalid for info_hash in not enough bytes for infohash: got 7 bytes, expected 20 src/shared/bit_torrent/info_hash.rs:240:27, src/servers/http/v1/requests/scrape.rs:66:46e
+//! d14:failure reason235:Bad request. Cannot parse query params for scrape request: invalid param value invalid for info_hash in not enough bytes for infohash: got 7 bytes, expected 20 src/shared/bit_torrent/info_hash.rs:240:27, src/servers/http/v1/requests/scrape.rs:66:46e
 //! ```
 use std::panic::Location;
 
@@ -158,7 +158,7 @@ mod tests {
 
         assert_error_response(
             &response,
-            "Cannot parse query params for scrape request: missing query params for scrape request",
+            "Bad request. Cannot parse query params for scrape request: missing query params for scrape request",
         );
     }
 
@@ -167,13 +167,13 @@ mod tests {
         let invalid_query = "param1=value1=value2";
         let response = extract_scrape_from(Some(invalid_query)).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params");
+        assert_error_response(&response, "Bad request. Cannot parse query params");
     }
 
     #[test]
     fn it_should_reject_a_request_with_a_query_that_cannot_be_parsed_into_a_scrape_request() {
         let response = extract_scrape_from(Some("param1=value1")).unwrap_err();
 
-        assert_error_response(&response, "Cannot parse query params for scrape request");
+        assert_error_response(&response, "Bad request. Cannot parse query params for scrape request");
     }
 }

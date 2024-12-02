@@ -133,7 +133,7 @@ pub async fn assert_cannot_parse_query_params_error_response(response: Response,
 
     assert_bencoded_error(
         &response.text().await.unwrap(),
-        &format!("Cannot parse query params{failure}"),
+        &format!("Bad request. Cannot parse query params{failure}"),
         Location::caller(),
     );
 }
