@@ -3,8 +3,10 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use aquatic_udp_protocol::Response;
+use tokio::sync::RwLock;
 use tracing::{instrument, Level};
 
+use super::banning::BanService;
 use super::bound_socket::BoundSocket;
 use crate::core::{statistics, Tracker};
 use crate::servers::udp::handlers::CookieTimeValues;
@@ -25,16 +27,18 @@ impl Processor {
         }
     }
 
-    #[instrument(skip(self, request))]
-    pub async fn process_request(self, request: RawRequest) {
+    #[instrument(skip(self, request, ban_service))]
+    pub async fn process_request(self, request: RawRequest, ban_service: Arc<RwLock<BanService>>) {
         let from = request.from;
         let response = handlers::handle_packet(
             request,
             &self.tracker,
             self.socket.address(),
             CookieTimeValues::new(self.cookie_lifetime),
+            ban_service,
         )
         .await;
+
         self.send_response(from, response).await;
     }
 

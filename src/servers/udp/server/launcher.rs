@@ -6,9 +6,11 @@ use bittorrent_tracker_client::udp::client::check;
 use derive_more::Constructor;
 use futures_util::StreamExt;
 use tokio::select;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, RwLock};
+use tokio::time::interval;
 use tracing::instrument;
 
+use super::banning::BanService;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
 use crate::core::{statistics, Tracker};
@@ -19,6 +21,11 @@ use crate::servers::udp::server::bound_socket::BoundSocket;
 use crate::servers::udp::server::processor::Processor;
 use crate::servers::udp::server::receiver::Receiver;
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
+
+/// The maximum number of connection id errors per ip. Clients will be banned if
+/// they exceed this limit.
+const MAX_CONNECTION_ID_ERRORS_PER_IP: u32 = 10;
+const IP_BANS_RESET_INTERVAL_IN_SECS: u64 = 120;
 
 /// A UDP server instance launcher.
 #[derive(Constructor)]
@@ -115,13 +122,30 @@ impl Launcher {
         let active_requests = &mut ActiveRequests::default();
 
         let addr = receiver.bound_socket_address();
+
         let local_addr = format!("udp://{addr}");
 
         let cookie_lifetime = cookie_lifetime.as_secs_f64();
 
-        loop {
-            let processor = Processor::new(receiver.socket.clone(), tracker.clone(), cookie_lifetime);
+        let ban_service = Arc::new(RwLock::new(BanService::new(
+            MAX_CONNECTION_ID_ERRORS_PER_IP,
+            local_addr.parse().unwrap(),
+        )));
 
+        let ban_cleaner = ban_service.clone();
+
+        tokio::spawn(async move {
+            let mut cleaner_interval = interval(Duration::from_secs(IP_BANS_RESET_INTERVAL_IN_SECS));
+
+            cleaner_interval.tick().await;
+
+            loop {
+                cleaner_interval.tick().await;
+                ban_cleaner.write().await.reset_bans();
+            }
+        });
+
+        loop {
             if let Some(req) = {
                 tracing::trace!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_udp_server (wait for request)");
                 receiver.next().await
@@ -149,18 +173,26 @@ impl Launcher {
                     }
                 }
 
-                // We spawn the new task even if there active requests buffer is
-                // full. This could seem counterintuitive because we are accepting
-                // more request and consuming more memory even if the server is
-                // already busy. However, we "force_push" the new tasks in the
-                // buffer. That means, in the worst scenario we will abort a
-                // running task to make place for the new task.
-                //
-                // Once concern could be to reach an starvation point were we
-                // are only adding and removing tasks without given them the
-                // chance to finish. However, the buffer is yielding before
-                // aborting one tasks, giving it the chance to finish.
-                let abort_handle: tokio::task::AbortHandle = tokio::task::spawn(processor.process_request(req)).abort_handle();
+                if ban_service.read().await.is_banned(&req.from.ip()) {
+                    tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr,  "Udp::run_udp_server::loop continue: (banned ip)");
+                    continue;
+                }
+
+                let processor = Processor::new(receiver.socket.clone(), tracker.clone(), cookie_lifetime);
+
+                /* We spawn the new task even if the active requests buffer is
+                full. This could seem counterintuitive because we are accepting
+                more request and consuming more memory even if the server is
+                already busy. However, we "force_push" the new tasks in the
+                buffer. That means, in the worst scenario we will abort a
+                running task to make place for the new task.
+
+                Once concern could be to reach an starvation point were we are
+                only adding and removing tasks without given them the chance to
+                finish. However, the buffer is yielding before aborting one
+                tasks, giving it the chance to finish. */
+                let abort_handle: tokio::task::AbortHandle =
+                    tokio::task::spawn(processor.process_request(req, ban_service.clone())).abort_handle();
 
                 if abort_handle.is_finished() {
                     continue;

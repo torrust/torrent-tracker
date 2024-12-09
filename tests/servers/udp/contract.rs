@@ -130,10 +130,31 @@ mod receiving_an_announce_request {
     use crate::servers::udp::contract::send_connection_request;
     use crate::servers::udp::Started;
 
-    pub async fn send_and_get_announce(tx_id: TransactionId, c_id: ConnectionId, client: &UdpTrackerClient) {
-        // Send announce request
+    pub async fn assert_send_and_get_announce(tx_id: TransactionId, c_id: ConnectionId, client: &UdpTrackerClient) {
+        let response = send_and_get_announce(tx_id, c_id, client).await;
+        assert!(is_ipv4_announce_response(&response));
+    }
 
-        let announce_request = AnnounceRequest {
+    pub async fn send_and_get_announce(
+        tx_id: TransactionId,
+        c_id: ConnectionId,
+        client: &UdpTrackerClient,
+    ) -> aquatic_udp_protocol::Response {
+        let announce_request = build_sample_announce_request(tx_id, c_id, client.client.socket.local_addr().unwrap().port());
+
+        match client.send(announce_request.into()).await {
+            Ok(_) => (),
+            Err(err) => panic!("{err}"),
+        };
+
+        match client.receive().await {
+            Ok(response) => response,
+            Err(err) => panic!("{err}"),
+        }
+    }
+
+    fn build_sample_announce_request(tx_id: TransactionId, c_id: ConnectionId, port: u16) -> AnnounceRequest {
+        AnnounceRequest {
             connection_id: ConnectionId(c_id.0),
             action_placeholder: AnnounceActionPlaceholder::default(),
             transaction_id: tx_id,
@@ -146,22 +167,8 @@ mod receiving_an_announce_request {
             ip_address: Ipv4Addr::new(0, 0, 0, 0).into(),
             key: PeerKey::new(0i32),
             peers_wanted: NumberOfPeers(1i32.into()),
-            port: Port(client.client.socket.local_addr().unwrap().port().into()),
-        };
-
-        match client.send(announce_request.into()).await {
-            Ok(_) => (),
-            Err(err) => panic!("{err}"),
-        };
-
-        let response = match client.receive().await {
-            Ok(response) => response,
-            Err(err) => panic!("{err}"),
-        };
-
-        // println!("test response {response:?}");
-
-        assert!(is_ipv4_announce_response(&response));
+            port: Port(port.into()),
+        }
     }
 
     #[tokio::test]
@@ -181,7 +188,7 @@ mod receiving_an_announce_request {
 
         let c_id = send_connection_request(tx_id, &client).await;
 
-        send_and_get_announce(tx_id, c_id, &client).await;
+        assert_send_and_get_announce(tx_id, c_id, &client).await;
 
         env.stop().await;
     }
@@ -205,8 +212,50 @@ mod receiving_an_announce_request {
 
         for x in 0..1000 {
             tracing::info!("req no: {x}");
-            send_and_get_announce(tx_id, c_id, &client).await;
+            assert_send_and_get_announce(tx_id, c_id, &client).await;
         }
+
+        env.stop().await;
+    }
+
+    #[tokio::test]
+    async fn should_ban_the_client_ip_if_it_sends_more_than_10_requests_with_a_cookie_value_not_normal() {
+        INIT.call_once(|| {
+            tracing_stderr_init(LevelFilter::ERROR);
+        });
+
+        let env = Started::new(&configuration::ephemeral().into()).await;
+
+        let client = match UdpTrackerClient::new(env.bind_address(), DEFAULT_TIMEOUT).await {
+            Ok(udp_tracker_client) => udp_tracker_client,
+            Err(err) => panic!("{err}"),
+        };
+
+        let tx_id = TransactionId::new(123);
+
+        // The eleven first requests should be fine
+
+        let invalid_connection_id = ConnectionId::new(0); // Zero is one of the not normal values.
+
+        for x in 0..=10 {
+            tracing::info!("req no: {x}");
+            send_and_get_announce(tx_id, invalid_connection_id, &client).await;
+        }
+
+        // The twelfth request should be banned (timeout error)
+
+        let announce_request = build_sample_announce_request(
+            tx_id,
+            invalid_connection_id,
+            client.client.socket.local_addr().unwrap().port(),
+        );
+
+        match client.send(announce_request.into()).await {
+            Ok(_) => (),
+            Err(err) => panic!("{err}"),
+        };
+
+        assert!(client.receive().await.is_err());
 
         env.stop().await;
     }
