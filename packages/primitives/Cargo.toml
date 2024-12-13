@@ -22,5 +22,5 @@ derive_more = { version = "1", features = ["constructor"] }
 serde = { version = "1", features = ["derive"] }
 tdyne-peer-id = "1"
 tdyne-peer-id-registry = "0"
-thiserror = "1"
+thiserror = "2"
 zerocopy = "0.7"

@@ -591,7 +591,7 @@ dependencies = [
  "serde_bencode",
  "serde_bytes",
  "serde_repr",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "tokio",
  "torrust-tracker-configuration",
  "torrust-tracker-located-error",
@@ -4018,7 +4018,7 @@ dependencies = [
  "serde_bencode",
  "serde_bytes",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "tokio",
  "torrust-tracker-configuration",
  "tracing",
@@ -4045,7 +4045,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "toml",
  "torrust-tracker-located-error",
  "url",
@@ -4057,14 +4057,14 @@ name = "torrust-tracker-contrib-bencode"
 version = "3.0.0-develop"
 dependencies = [
  "criterion",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
 ]
 
 [[package]]
 name = "torrust-tracker-located-error"
 version = "3.0.0-develop"
 dependencies = [
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "tracing",
 ]
 
@@ -4079,7 +4079,7 @@ dependencies = [
  "serde",
  "tdyne-peer-id",
  "tdyne-peer-id-registry",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "zerocopy",
 ]
 
