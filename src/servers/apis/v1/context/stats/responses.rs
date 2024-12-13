@@ -47,6 +47,7 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         tracker_metrics.protocol_metrics.tcp6_scrapes_handled
     ));
 
+    lines.push(format!("udp4_requests {}", tracker_metrics.protocol_metrics.udp4_requests));
     lines.push(format!(
         "udp4_connections_handled {}",
         tracker_metrics.protocol_metrics.udp4_connections_handled
@@ -64,6 +65,7 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         tracker_metrics.protocol_metrics.udp4_errors_handled
     ));
 
+    lines.push(format!("udp6_requests {}", tracker_metrics.protocol_metrics.udp6_requests));
     lines.push(format!(
         "udp6_connections_handled {}",
         tracker_metrics.protocol_metrics.udp6_connections_handled

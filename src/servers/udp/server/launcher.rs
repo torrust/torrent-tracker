@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ use tracing::instrument;
 
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
-use crate::core::Tracker;
+use crate::core::{statistics, Tracker};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
 use crate::servers::signals::{shutdown_signal_with_message, Halted};
@@ -139,6 +139,15 @@ impl Launcher {
                         break;
                     }
                 };
+
+                match req.from.ip() {
+                    IpAddr::V4(_) => {
+                        tracker.send_stats_event(statistics::Event::Udp4Request).await;
+                    }
+                    IpAddr::V6(_) => {
+                        tracker.send_stats_event(statistics::Event::Udp6Request).await;
+                    }
+                }
 
                 // We spawn the new task even if there active requests buffer is
                 // full. This could seem counterintuitive because we are accepting
