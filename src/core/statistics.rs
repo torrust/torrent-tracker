@@ -44,6 +44,7 @@ pub enum Event {
     Tcp4Scrape,
     Tcp6Announce,
     Tcp6Scrape,
+    Udp4RequestAborted,
     Udp4Request,
     Udp4Connect,
     Udp4Announce,
@@ -83,6 +84,9 @@ pub struct Metrics {
     pub tcp6_announces_handled: u64,
     /// Total number of TCP (HTTP tracker) `scrape` requests from IPv6 peers.
     pub tcp6_scrapes_handled: u64,
+
+    /// Total number of UDP (UDP tracker) requests aborted.
+    pub udp_requests_aborted: u64,
 
     /// Total number of UDP (UDP tracker) requests from IPv4 peers.
     pub udp4_requests: u64,
@@ -177,6 +181,11 @@ async fn event_handler(event: Event, stats_repository: &Repo) {
         Event::Tcp6Scrape => {
             stats_repository.increase_tcp6_scrapes().await;
             stats_repository.increase_tcp6_connections().await;
+        }
+
+        // UDP
+        Event::Udp4RequestAborted => {
+            stats_repository.increase_udp_requests_aborted().await;
         }
 
         // UDP4
@@ -300,6 +309,12 @@ impl Repo {
     pub async fn increase_tcp6_scrapes(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.tcp6_scrapes_handled += 1;
+        drop(stats_lock);
+    }
+
+    pub async fn increase_udp_requests_aborted(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp_requests_aborted += 1;
         drop(stats_lock);
     }
 

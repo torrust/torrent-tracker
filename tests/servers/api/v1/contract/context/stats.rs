@@ -34,12 +34,15 @@ async fn should_allow_getting_tracker_statistics() {
             seeders: 1,
             completed: 0,
             leechers: 0,
+            // TCP
             tcp4_connections_handled: 0,
             tcp4_announces_handled: 0,
             tcp4_scrapes_handled: 0,
             tcp6_connections_handled: 0,
             tcp6_announces_handled: 0,
             tcp6_scrapes_handled: 0,
+            // UDP
+            udp_requests_aborted: 0,
             udp4_requests: 0,
             udp4_connections_handled: 0,
             udp4_announces_handled: 0,

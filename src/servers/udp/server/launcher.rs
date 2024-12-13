@@ -166,7 +166,12 @@ impl Launcher {
                     continue;
                 }
 
-                active_requests.force_push(abort_handle, &local_addr).await;
+                let old_request_aborted = active_requests.force_push(abort_handle, &local_addr).await;
+
+                if old_request_aborted {
+                    // Evicted task from active requests buffer was aborted.
+                    tracker.send_stats_event(statistics::Event::Udp4RequestAborted).await;
+                }
             } else {
                 tokio::task::yield_now().await;
 

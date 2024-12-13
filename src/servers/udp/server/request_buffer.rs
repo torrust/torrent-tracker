@@ -41,6 +41,8 @@ impl ActiveRequests {
     /// 1. Removing finished tasks.
     /// 2. Removing the oldest unfinished task if no finished tasks are found.
     ///
+    /// Returns `true` if a task was removed, `false` otherwise.
+    ///
     /// # Panics
     ///
     /// This method will panic if it cannot make space for adding a new handle.
@@ -49,17 +51,19 @@ impl ActiveRequests {
     ///
     /// * `abort_handle` - The `AbortHandle` for the UDP request processor task.
     /// * `local_addr` - A string slice representing the local address for logging.
-    pub async fn force_push(&mut self, new_task: AbortHandle, local_addr: &str) {
+    pub async fn force_push(&mut self, new_task: AbortHandle, local_addr: &str) -> bool {
         // Attempt to add the new handle to the buffer.
         match self.rb.try_push(new_task) {
             Ok(()) => {
                 // Successfully added the task, no further action needed.
+                false
             }
             Err(new_task) => {
                 // Buffer is full, attempt to make space.
 
                 let mut finished: u64 = 0;
                 let mut unfinished_task = None;
+                let mut old_task_aborted = false;
 
                 for old_task in self.rb.pop_iter() {
                     // We found a finished tasks ... increase the counter and
@@ -96,6 +100,7 @@ impl ActiveRequests {
                     if finished == 0 {
                         // We make place aborting this task.
                         old_task.abort();
+                        old_task_aborted = true;
 
                         tracing::warn!(
                             target: UDP_TRACKER_LOG_TARGET,
@@ -134,7 +139,9 @@ impl ActiveRequests {
                 if !new_task.is_finished() {
                     self.rb.try_push(new_task).expect("it should have space for this new task.");
                 }
+
+                old_task_aborted
             }
-        };
+        }
     }
 }
