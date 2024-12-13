@@ -48,11 +48,13 @@ pub enum Event {
     Udp4Connect,
     Udp4Announce,
     Udp4Scrape,
+    Udp4Response,
     Udp4Error,
     Udp6Request,
     Udp6Connect,
     Udp6Announce,
     Udp6Scrape,
+    Udp6Response,
     Udp6Error,
 }
 
@@ -90,10 +92,12 @@ pub struct Metrics {
     pub udp4_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) responses from IPv4 peers.
+    pub udp4_responses: u64,
     /// Total number of UDP (UDP tracker) `error` requests from IPv4 peers.
     pub udp4_errors_handled: u64,
 
-    /// Total number of UDP (UDP tracker) requests from IPv4 peers.
+    /// Total number of UDP (UDP tracker) requests from IPv6 peers.
     pub udp6_requests: u64,
     /// Total number of UDP (UDP tracker) `connection` requests from IPv6 peers.
     pub udp6_connections_handled: u64,
@@ -101,6 +105,8 @@ pub struct Metrics {
     pub udp6_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
     pub udp6_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) responses from IPv6 peers.
+    pub udp6_responses: u64,
     /// Total number of UDP (UDP tracker) `error` requests from IPv6 peers.
     pub udp6_errors_handled: u64,
 }
@@ -186,6 +192,9 @@ async fn event_handler(event: Event, stats_repository: &Repo) {
         Event::Udp4Scrape => {
             stats_repository.increase_udp4_scrapes().await;
         }
+        Event::Udp4Response => {
+            stats_repository.increase_udp4_responses().await;
+        }
         Event::Udp4Error => {
             stats_repository.increase_udp4_errors().await;
         }
@@ -202,6 +211,9 @@ async fn event_handler(event: Event, stats_repository: &Repo) {
         }
         Event::Udp6Scrape => {
             stats_repository.increase_udp6_scrapes().await;
+        }
+        Event::Udp6Response => {
+            stats_repository.increase_udp6_responses().await;
         }
         Event::Udp6Error => {
             stats_repository.increase_udp6_errors().await;
@@ -315,6 +327,12 @@ impl Repo {
         drop(stats_lock);
     }
 
+    pub async fn increase_udp4_responses(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp4_responses += 1;
+        drop(stats_lock);
+    }
+
     pub async fn increase_udp4_errors(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp4_errors_handled += 1;
@@ -342,6 +360,12 @@ impl Repo {
     pub async fn increase_udp6_scrapes(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp6_scrapes_handled += 1;
+        drop(stats_lock);
+    }
+
+    pub async fn increase_udp6_responses(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp6_responses += 1;
         drop(stats_lock);
     }
 

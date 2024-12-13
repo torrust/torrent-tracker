@@ -44,11 +44,13 @@ async fn should_allow_getting_tracker_statistics() {
             udp4_connections_handled: 0,
             udp4_announces_handled: 0,
             udp4_scrapes_handled: 0,
+            udp4_responses: 0,
             udp4_errors_handled: 0,
             udp6_requests: 0,
             udp6_connections_handled: 0,
             udp6_announces_handled: 0,
             udp6_scrapes_handled: 0,
+            udp6_responses: 0,
             udp6_errors_handled: 0,
         },
     )
