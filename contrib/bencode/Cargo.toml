@@ -16,7 +16,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-thiserror = "1"
+thiserror = "2"
 
 [dev-dependencies]
 criterion = "0"

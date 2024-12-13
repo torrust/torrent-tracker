@@ -18,4 +18,4 @@ version.workspace = true
 tracing = "0"
 
 [dev-dependencies]
-thiserror = "1"
+thiserror = "2"
