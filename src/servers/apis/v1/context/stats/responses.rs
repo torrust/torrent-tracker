@@ -48,6 +48,12 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
     ));
 
     lines.push(format!(
+        "udp_requests_aborted {}",
+        tracker_metrics.protocol_metrics.udp_requests_aborted
+    ));
+
+    lines.push(format!("udp4_requests {}", tracker_metrics.protocol_metrics.udp4_requests));
+    lines.push(format!(
         "udp4_connections_handled {}",
         tracker_metrics.protocol_metrics.udp4_connections_handled
     ));
@@ -59,11 +65,13 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         "udp4_scrapes_handled {}",
         tracker_metrics.protocol_metrics.udp4_scrapes_handled
     ));
+    lines.push(format!("udp4_responses {}", tracker_metrics.protocol_metrics.udp4_responses));
     lines.push(format!(
         "udp4_errors_handled {}",
         tracker_metrics.protocol_metrics.udp4_errors_handled
     ));
 
+    lines.push(format!("udp6_requests {}", tracker_metrics.protocol_metrics.udp6_requests));
     lines.push(format!(
         "udp6_connections_handled {}",
         tracker_metrics.protocol_metrics.udp6_connections_handled
@@ -76,6 +84,7 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         "udp6_scrapes_handled {}",
         tracker_metrics.protocol_metrics.udp6_scrapes_handled
     ));
+    lines.push(format!("udp6_responses {}", tracker_metrics.protocol_metrics.udp6_responses));
     lines.push(format!(
         "udp6_errors_handled {}",
         tracker_metrics.protocol_metrics.udp6_errors_handled

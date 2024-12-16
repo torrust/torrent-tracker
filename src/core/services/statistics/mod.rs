@@ -67,19 +67,26 @@ pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
     TrackerMetrics {
         torrents_metrics,
         protocol_metrics: Metrics {
+            // TCP
             tcp4_connections_handled: stats.tcp4_connections_handled,
             tcp4_announces_handled: stats.tcp4_announces_handled,
             tcp4_scrapes_handled: stats.tcp4_scrapes_handled,
             tcp6_connections_handled: stats.tcp6_connections_handled,
             tcp6_announces_handled: stats.tcp6_announces_handled,
             tcp6_scrapes_handled: stats.tcp6_scrapes_handled,
+            // UDP
+            udp_requests_aborted: stats.udp_requests_aborted,
+            udp4_requests: stats.udp4_requests,
             udp4_connections_handled: stats.udp4_connections_handled,
             udp4_announces_handled: stats.udp4_announces_handled,
             udp4_scrapes_handled: stats.udp4_scrapes_handled,
+            udp4_responses: stats.udp4_responses,
             udp4_errors_handled: stats.udp4_errors_handled,
+            udp6_requests: stats.udp6_requests,
             udp6_connections_handled: stats.udp6_connections_handled,
             udp6_announces_handled: stats.udp6_announces_handled,
             udp6_scrapes_handled: stats.udp6_scrapes_handled,
+            udp6_responses: stats.udp6_responses,
             udp6_errors_handled: stats.udp6_errors_handled,
         },
     }

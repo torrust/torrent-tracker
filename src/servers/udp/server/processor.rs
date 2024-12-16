@@ -1,12 +1,12 @@
 use std::io::Cursor;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use aquatic_udp_protocol::Response;
 use tracing::{instrument, Level};
 
 use super::bound_socket::BoundSocket;
-use crate::core::Tracker;
+use crate::core::{statistics, Tracker};
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
@@ -63,6 +63,15 @@ impl Processor {
                             tracing::debug!(%bytes_count, %sent_bytes, ?payload, "sent {response_type}");
                         } else {
                             tracing::debug!(%bytes_count, %sent_bytes, "sent {response_type}");
+                        }
+
+                        match target.ip() {
+                            IpAddr::V4(_) => {
+                                self.tracker.send_stats_event(statistics::Event::Udp4Response).await;
+                            }
+                            IpAddr::V6(_) => {
+                                self.tracker.send_stats_event(statistics::Event::Udp6Response).await;
+                            }
                         }
                     }
                     Err(error) => tracing::warn!(%bytes_count, %error, ?payload, "failed to send"),

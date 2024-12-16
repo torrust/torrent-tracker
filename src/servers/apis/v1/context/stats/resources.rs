@@ -26,26 +26,40 @@ pub struct Stats {
     pub tcp4_announces_handled: u64,
     /// Total number of TCP (HTTP tracker) `scrape` requests from IPv4 peers.
     pub tcp4_scrapes_handled: u64,
+
     /// Total number of TCP (HTTP tracker) connections from IPv6 peers.
     pub tcp6_connections_handled: u64,
     /// Total number of TCP (HTTP tracker) `announce` requests from IPv6 peers.
     pub tcp6_announces_handled: u64,
     /// Total number of TCP (HTTP tracker) `scrape` requests from IPv6 peers.
     pub tcp6_scrapes_handled: u64,
+
+    /// Total number of UDP (UDP tracker) requests aborted.
+    pub udp_requests_aborted: u64,
+
+    /// Total number of UDP (UDP tracker) requests from IPv4 peers.
+    pub udp4_requests: u64,
     /// Total number of UDP (UDP tracker) connections from IPv4 peers.
     pub udp4_connections_handled: u64,
     /// Total number of UDP (UDP tracker) `announce` requests from IPv4 peers.
     pub udp4_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) responses from IPv4 peers.
+    pub udp4_responses: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_errors_handled: u64,
+
+    /// Total number of UDP (UDP tracker) requests from IPv6 peers.
+    pub udp6_requests: u64,
     /// Total number of UDP (UDP tracker) `connection` requests from IPv6 peers.
     pub udp6_connections_handled: u64,
     /// Total number of UDP (UDP tracker) `announce` requests from IPv6 peers.
     pub udp6_announces_handled: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
     pub udp6_scrapes_handled: u64,
+    /// Total number of UDP (UDP tracker) responses from IPv6 peers.
+    pub udp6_responses: u64,
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv6 peers.
     pub udp6_errors_handled: u64,
 }
@@ -57,19 +71,26 @@ impl From<TrackerMetrics> for Stats {
             seeders: metrics.torrents_metrics.complete,
             completed: metrics.torrents_metrics.downloaded,
             leechers: metrics.torrents_metrics.incomplete,
+            // TCP
             tcp4_connections_handled: metrics.protocol_metrics.tcp4_connections_handled,
             tcp4_announces_handled: metrics.protocol_metrics.tcp4_announces_handled,
             tcp4_scrapes_handled: metrics.protocol_metrics.tcp4_scrapes_handled,
             tcp6_connections_handled: metrics.protocol_metrics.tcp6_connections_handled,
             tcp6_announces_handled: metrics.protocol_metrics.tcp6_announces_handled,
             tcp6_scrapes_handled: metrics.protocol_metrics.tcp6_scrapes_handled,
+            // UDP
+            udp_requests_aborted: metrics.protocol_metrics.udp_requests_aborted,
+            udp4_requests: metrics.protocol_metrics.udp4_requests,
             udp4_connections_handled: metrics.protocol_metrics.udp4_connections_handled,
             udp4_announces_handled: metrics.protocol_metrics.udp4_announces_handled,
             udp4_scrapes_handled: metrics.protocol_metrics.udp4_scrapes_handled,
+            udp4_responses: metrics.protocol_metrics.udp4_responses,
             udp4_errors_handled: metrics.protocol_metrics.udp4_errors_handled,
+            udp6_requests: metrics.protocol_metrics.udp6_requests,
             udp6_connections_handled: metrics.protocol_metrics.udp6_connections_handled,
             udp6_announces_handled: metrics.protocol_metrics.udp6_announces_handled,
             udp6_scrapes_handled: metrics.protocol_metrics.udp6_scrapes_handled,
+            udp6_responses: metrics.protocol_metrics.udp6_responses,
             udp6_errors_handled: metrics.protocol_metrics.udp6_errors_handled,
         }
     }
@@ -94,20 +115,27 @@ mod tests {
                     torrents: 4
                 },
                 protocol_metrics: Metrics {
+                    // TCP
                     tcp4_connections_handled: 5,
                     tcp4_announces_handled: 6,
                     tcp4_scrapes_handled: 7,
                     tcp6_connections_handled: 8,
                     tcp6_announces_handled: 9,
                     tcp6_scrapes_handled: 10,
-                    udp4_connections_handled: 11,
-                    udp4_announces_handled: 12,
-                    udp4_scrapes_handled: 13,
-                    udp4_errors_handled: 14,
-                    udp6_connections_handled: 15,
-                    udp6_announces_handled: 16,
-                    udp6_scrapes_handled: 17,
-                    udp6_errors_handled: 18
+                    // UDP
+                    udp_requests_aborted: 11,
+                    udp4_requests: 12,
+                    udp4_connections_handled: 13,
+                    udp4_announces_handled: 14,
+                    udp4_scrapes_handled: 15,
+                    udp4_responses: 16,
+                    udp4_errors_handled: 17,
+                    udp6_requests: 18,
+                    udp6_connections_handled: 19,
+                    udp6_announces_handled: 20,
+                    udp6_scrapes_handled: 21,
+                    udp6_responses: 22,
+                    udp6_errors_handled: 23
                 }
             }),
             Stats {
@@ -115,20 +143,27 @@ mod tests {
                 seeders: 1,
                 completed: 2,
                 leechers: 3,
+                // TCP
                 tcp4_connections_handled: 5,
                 tcp4_announces_handled: 6,
                 tcp4_scrapes_handled: 7,
                 tcp6_connections_handled: 8,
                 tcp6_announces_handled: 9,
                 tcp6_scrapes_handled: 10,
-                udp4_connections_handled: 11,
-                udp4_announces_handled: 12,
-                udp4_scrapes_handled: 13,
-                udp4_errors_handled: 14,
-                udp6_connections_handled: 15,
-                udp6_announces_handled: 16,
-                udp6_scrapes_handled: 17,
-                udp6_errors_handled: 18
+                // UDP
+                udp_requests_aborted: 11,
+                udp4_requests: 12,
+                udp4_connections_handled: 13,
+                udp4_announces_handled: 14,
+                udp4_scrapes_handled: 15,
+                udp4_responses: 16,
+                udp4_errors_handled: 17,
+                udp6_requests: 18,
+                udp6_connections_handled: 19,
+                udp6_announces_handled: 20,
+                udp6_scrapes_handled: 21,
+                udp6_responses: 22,
+                udp6_errors_handled: 23
             }
         );
     }
