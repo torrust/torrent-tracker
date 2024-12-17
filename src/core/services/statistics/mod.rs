@@ -3,14 +3,14 @@
 //! It includes:
 //!
 //! - A [`factory`](crate::core::services::statistics::setup::factory) function to build the structs needed to collect the tracker metrics.
-//! - A [`get_metrics`] service to get the [`tracker metrics`](crate::core::statistics::Metrics).
+//! - A [`get_metrics`] service to get the tracker [`metrics`](crate::core::statistics::metrics::Metrics).
 //!
 //! Tracker metrics are collected using a Publisher-Subscribe pattern.
 //!
 //! The factory function builds two structs:
 //!
-//! - An statistics [`EventSender`](crate::core::statistics::EventSender)
-//! - An statistics [`Repo`](crate::core::statistics::Repo)
+//! - An statistics event [`Sender`](crate::core::statistics::event::sender::Sender)
+//! - An statistics [`Repository`](crate::core::statistics::repository::Repository)
 //!
 //! ```text
 //! let (stats_event_sender, stats_repository) = factory(tracker_usage_statistics);
@@ -21,7 +21,7 @@
 //! There is an event listener that is receiving all the events and processing them with an event handler.
 //! Then, the event handler updates the metrics depending on the received event.
 //!
-//! For example, if you send the event [`Event::Udp4Connect`](crate::core::statistics::Event::Udp4Connect):
+//! For example, if you send the event [`Event::Udp4Connect`](crate::core::statistics::event::Event::Udp4Connect):
 //!
 //! ```text
 //! let result = event_sender.send_event(Event::Udp4Connect).await;
@@ -42,7 +42,7 @@ use std::sync::Arc;
 
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
-use crate::core::statistics::Metrics;
+use crate::core::statistics::metrics::Metrics;
 use crate::core::Tracker;
 
 /// All the metrics collected by the tracker.
@@ -118,7 +118,7 @@ mod tests {
             tracker_metrics,
             TrackerMetrics {
                 torrents_metrics: TorrentsMetrics::default(),
-                protocol_metrics: core::statistics::Metrics::default(),
+                protocol_metrics: core::statistics::metrics::Metrics::default(),
             }
         );
     }
