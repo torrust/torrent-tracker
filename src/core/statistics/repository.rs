@@ -1,13 +1,12 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-use tokio::sync::{RwLock, RwLockReadGuard};
 
 use super::metrics::Metrics;
 
 /// A repository for the tracker metrics.
 #[derive(Clone)]
 pub struct Repository {
-    pub stats: Arc<RwLock<Metrics>>,
+    atomic_stats: Arc<AtomicMetrics>,
 }
 
 impl Default for Repository {
@@ -20,125 +19,131 @@ impl Repository {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            stats: Arc::new(RwLock::new(Metrics::default())),
+            atomic_stats: Arc::new(AtomicMetrics::default()),
         }
     }
 
-    pub async fn get_stats(&self) -> RwLockReadGuard<'_, Metrics> {
-        self.stats.read().await
+    #[must_use]
+    pub fn get_stats(&self) -> Metrics {
+        Metrics {
+            tcp4_connections_handled: self.atomic_stats.tcp4_connections_handled.load(Ordering::SeqCst),
+            tcp4_announces_handled: self.atomic_stats.tcp4_announces_handled.load(Ordering::SeqCst),
+            tcp4_scrapes_handled: self.atomic_stats.tcp4_scrapes_handled.load(Ordering::SeqCst),
+            tcp6_connections_handled: self.atomic_stats.tcp6_connections_handled.load(Ordering::SeqCst),
+            tcp6_announces_handled: self.atomic_stats.tcp6_announces_handled.load(Ordering::SeqCst),
+            tcp6_scrapes_handled: self.atomic_stats.tcp6_scrapes_handled.load(Ordering::SeqCst),
+            udp_requests_aborted: self.atomic_stats.udp_requests_aborted.load(Ordering::SeqCst),
+            udp4_requests: self.atomic_stats.udp4_requests.load(Ordering::SeqCst),
+            udp4_connections_handled: self.atomic_stats.udp4_connections_handled.load(Ordering::SeqCst),
+            udp4_announces_handled: self.atomic_stats.udp4_announces_handled.load(Ordering::SeqCst),
+            udp4_scrapes_handled: self.atomic_stats.udp4_scrapes_handled.load(Ordering::SeqCst),
+            udp4_responses: self.atomic_stats.udp4_responses.load(Ordering::SeqCst),
+            udp4_errors_handled: self.atomic_stats.udp4_errors_handled.load(Ordering::SeqCst),
+            udp6_requests: self.atomic_stats.udp6_requests.load(Ordering::SeqCst),
+            udp6_connections_handled: self.atomic_stats.udp6_connections_handled.load(Ordering::SeqCst),
+            udp6_announces_handled: self.atomic_stats.udp6_announces_handled.load(Ordering::SeqCst),
+            udp6_scrapes_handled: self.atomic_stats.udp6_scrapes_handled.load(Ordering::SeqCst),
+            udp6_responses: self.atomic_stats.udp6_responses.load(Ordering::SeqCst),
+            udp6_errors_handled: self.atomic_stats.udp6_errors_handled.load(Ordering::SeqCst),
+        }
     }
 
-    pub async fn increase_tcp4_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_announces_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp4_announces(&self) {
+        self.atomic_stats.tcp4_announces_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_tcp4_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_connections_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp4_connections(&self) {
+        self.atomic_stats.tcp4_connections_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_tcp4_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_scrapes_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp4_scrapes(&self) {
+        self.atomic_stats.tcp4_scrapes_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_tcp6_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_announces_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp6_announces(&self) {
+        self.atomic_stats.tcp6_announces_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_tcp6_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_connections_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp6_connections(&self) {
+        self.atomic_stats.tcp6_connections_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_tcp6_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_scrapes_handled += 1;
-        drop(stats_lock);
+    pub fn increase_tcp6_scrapes(&self) {
+        self.atomic_stats.tcp6_scrapes_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp_requests_aborted(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp_requests_aborted += 1;
-        drop(stats_lock);
+    pub fn increase_udp_requests_aborted(&self) {
+        self.atomic_stats.udp_requests_aborted.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_requests(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_requests += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_requests(&self) {
+        self.atomic_stats.udp4_requests.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_connections_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_connections(&self) {
+        self.atomic_stats.udp4_connections_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_announces_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_announces(&self) {
+        self.atomic_stats.udp4_announces_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_scrapes_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_scrapes(&self) {
+        self.atomic_stats.udp4_scrapes_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_responses(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_responses += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_responses(&self) {
+        self.atomic_stats.udp4_responses.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp4_errors(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp4_errors_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp4_errors(&self) {
+        self.atomic_stats.udp4_errors_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_requests(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_requests += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_requests(&self) {
+        self.atomic_stats.udp6_requests.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_connections_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_connections(&self) {
+        self.atomic_stats.udp6_connections_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_announces_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_announces(&self) {
+        self.atomic_stats.udp6_announces_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_scrapes_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_scrapes(&self) {
+        self.atomic_stats.udp6_scrapes_handled.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_responses(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_responses += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_responses(&self) {
+        self.atomic_stats.udp6_responses.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub async fn increase_udp6_errors(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.udp6_errors_handled += 1;
-        drop(stats_lock);
+    pub fn increase_udp6_errors(&self) {
+        self.atomic_stats.udp6_errors_handled.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+#[derive(Debug, Default)]
+struct AtomicMetrics {
+    pub tcp4_connections_handled: AtomicU64,
+    pub tcp4_announces_handled: AtomicU64,
+    pub tcp4_scrapes_handled: AtomicU64,
+    pub tcp6_connections_handled: AtomicU64,
+    pub tcp6_announces_handled: AtomicU64,
+    pub tcp6_scrapes_handled: AtomicU64,
+    pub udp_requests_aborted: AtomicU64,
+    pub udp4_requests: AtomicU64,
+    pub udp4_connections_handled: AtomicU64,
+    pub udp4_announces_handled: AtomicU64,
+    pub udp4_scrapes_handled: AtomicU64,
+    pub udp4_responses: AtomicU64,
+    pub udp4_errors_handled: AtomicU64,
+    pub udp6_requests: AtomicU64,
+    pub udp6_connections_handled: AtomicU64,
+    pub udp6_announces_handled: AtomicU64,
+    pub udp6_scrapes_handled: AtomicU64,
+    pub udp6_responses: AtomicU64,
+    pub udp6_errors_handled: AtomicU64,
 }

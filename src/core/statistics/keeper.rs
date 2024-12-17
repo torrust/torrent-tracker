@@ -59,7 +59,7 @@ mod tests {
     async fn should_contain_the_tracker_statistics() {
         let stats_tracker = Keeper::new();
 
-        let stats = stats_tracker.repository.get_stats().await;
+        let stats = stats_tracker.repository.get_stats();
 
         assert_eq!(stats.tcp4_announces_handled, Metrics::default().tcp4_announces_handled);
     }

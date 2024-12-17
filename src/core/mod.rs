@@ -1210,8 +1210,8 @@ impl Tracker {
     /// It return the `Tracker` [`statistics::metrics::Metrics`].
     ///
     /// # Context: Statistics
-    pub async fn get_stats(&self) -> tokio::sync::RwLockReadGuard<'_, statistics::metrics::Metrics> {
-        self.stats_repository.get_stats().await
+    pub fn get_stats(&self) -> statistics::metrics::Metrics {
+        self.stats_repository.get_stats()
     }
 
     /// It allows to send a statistic events which eventually will be used to update [`statistics::metrics::Metrics`].

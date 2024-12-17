@@ -62,7 +62,7 @@ pub struct TrackerMetrics {
 /// It returns all the [`TrackerMetrics`]
 pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
     let torrents_metrics = tracker.get_torrents_metrics();
-    let stats = tracker.get_stats().await;
+    let stats = tracker.get_stats();
 
     TrackerMetrics {
         torrents_metrics,
