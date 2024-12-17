@@ -166,10 +166,10 @@ impl Launcher {
 
                 match req.from.ip() {
                     IpAddr::V4(_) => {
-                        tracker.send_stats_event(statistics::Event::Udp4Request).await;
+                        tracker.send_stats_event(statistics::event::Event::Udp4Request).await;
                     }
                     IpAddr::V6(_) => {
-                        tracker.send_stats_event(statistics::Event::Udp6Request).await;
+                        tracker.send_stats_event(statistics::event::Event::Udp6Request).await;
                     }
                 }
 
@@ -202,7 +202,7 @@ impl Launcher {
 
                 if old_request_aborted {
                     // Evicted task from active requests buffer was aborted.
-                    tracker.send_stats_event(statistics::Event::Udp4RequestAborted).await;
+                    tracker.send_stats_event(statistics::event::Event::Udp4RequestAborted).await;
                 }
             } else {
                 tokio::task::yield_now().await;

@@ -6,7 +6,7 @@
 //! and it returns the [`AnnounceData`] returned
 //! by the [`Tracker`].
 //!
-//! It also sends an [`statistics::Event`]
+//! It also sends an [`statistics::event::Event`]
 //! because events are specific for the HTTP tracker.
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -39,10 +39,10 @@ pub async fn invoke(
 
     match original_peer_ip {
         IpAddr::V4(_) => {
-            tracker.send_stats_event(statistics::Event::Tcp4Announce).await;
+            tracker.send_stats_event(statistics::event::Event::Tcp4Announce).await;
         }
         IpAddr::V6(_) => {
-            tracker.send_stats_event(statistics::Event::Tcp6Announce).await;
+            tracker.send_stats_event(statistics::event::Event::Tcp6Announce).await;
         }
     }
 
@@ -132,10 +132,10 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_announce_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = statistics::MockEventSender::new();
+            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
             stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::Event::Tcp4Announce))
+                .with(eq(statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -144,7 +144,7 @@ mod tests {
                 Tracker::new(
                     &configuration::ephemeral().core,
                     Some(stats_event_sender),
-                    statistics::Repo::new(),
+                    statistics::repository::Repository::new(),
                 )
                 .unwrap(),
             );
@@ -154,13 +154,18 @@ mod tests {
             let _announce_data = invoke(tracker, sample_info_hash(), &mut peer, &PeersWanted::All).await;
         }
 
-        fn tracker_with_an_ipv6_external_ip(stats_event_sender: Box<dyn statistics::EventSender>) -> Tracker {
+        fn tracker_with_an_ipv6_external_ip(stats_event_sender: Box<dyn statistics::event::sender::Sender>) -> Tracker {
             let mut configuration = configuration::ephemeral();
             configuration.core.net.external_ip = Some(IpAddr::V6(Ipv6Addr::new(
                 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969,
             )));
 
-            Tracker::new(&configuration.core, Some(stats_event_sender), statistics::Repo::new()).unwrap()
+            Tracker::new(
+                &configuration.core,
+                Some(stats_event_sender),
+                statistics::repository::Repository::new(),
+            )
+            .unwrap()
         }
 
         fn peer_with_the_ipv4_loopback_ip() -> peer::Peer {
@@ -176,10 +181,10 @@ mod tests {
             // Tracker changes the peer IP to the tracker external IP when the peer is using the loopback IP.
 
             // Assert that the event sent is a TCP4 event
-            let mut stats_event_sender_mock = statistics::MockEventSender::new();
+            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
             stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::Event::Tcp4Announce))
+                .with(eq(statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -198,10 +203,10 @@ mod tests {
         #[tokio::test]
         async fn it_should_send_the_tcp_6_announce_event_when_the_peer_uses_ipv6_even_if_the_tracker_changes_the_peer_ip_to_ipv4()
         {
-            let mut stats_event_sender_mock = statistics::MockEventSender::new();
+            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
             stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::Event::Tcp6Announce))
+                .with(eq(statistics::event::Event::Tcp6Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -210,7 +215,7 @@ mod tests {
                 Tracker::new(
                     &configuration::ephemeral().core,
                     Some(stats_event_sender),
-                    statistics::Repo::new(),
+                    statistics::repository::Repository::new(),
                 )
                 .unwrap(),
             );

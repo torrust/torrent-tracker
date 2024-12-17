@@ -422,7 +422,7 @@
 //! For example, the HTTP tracker would send an event like the following when it handles an `announce` request received from a peer using IP version 4.
 //!
 //! ```text
-//! tracker.send_stats_event(statistics::Event::Tcp4Announce).await
+//! tracker.send_stats_event(statistics::event::Event::Tcp4Announce).await
 //! ```
 //!
 //! Refer to [`statistics`] module for more information about statistics.
@@ -505,10 +505,10 @@ pub struct Tracker {
     torrents: Arc<Torrents>,
 
     /// Service to send stats events.
-    stats_event_sender: Option<Box<dyn statistics::EventSender>>,
+    stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
 
     /// The in-memory stats repo.
-    stats_repository: statistics::Repo,
+    stats_repository: statistics::repository::Repository,
 }
 
 /// Structure that holds the data returned by the `announce` request.
@@ -624,8 +624,8 @@ impl Tracker {
     /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
     pub fn new(
         config: &Core,
-        stats_event_sender: Option<Box<dyn statistics::EventSender>>,
-        stats_repository: statistics::Repo,
+        stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
+        stats_repository: statistics::repository::Repository,
     ) -> Result<Tracker, databases::error::Error> {
         let driver = match config.database.driver {
             database::Driver::Sqlite3 => Driver::Sqlite3,
@@ -1207,17 +1207,20 @@ impl Tracker {
         Ok(())
     }
 
-    /// It return the `Tracker` [`statistics::Metrics`].
+    /// It return the `Tracker` [`statistics::metrics::Metrics`].
     ///
     /// # Context: Statistics
-    pub async fn get_stats(&self) -> tokio::sync::RwLockReadGuard<'_, statistics::Metrics> {
+    pub async fn get_stats(&self) -> tokio::sync::RwLockReadGuard<'_, statistics::metrics::Metrics> {
         self.stats_repository.get_stats().await
     }
 
-    /// It allows to send a statistic events which eventually will be used to update [`statistics::Metrics`].
+    /// It allows to send a statistic events which eventually will be used to update [`statistics::metrics::Metrics`].
     ///
     /// # Context: Statistics
-    pub async fn send_stats_event(&self, event: statistics::Event) -> Option<Result<(), SendError<statistics::Event>>> {
+    pub async fn send_stats_event(
+        &self,
+        event: statistics::event::Event,
+    ) -> Option<Result<(), SendError<statistics::event::Event>>> {
         match &self.stats_event_sender {
             None => None,
             Some(stats_event_sender) => stats_event_sender.send_event(event).await,

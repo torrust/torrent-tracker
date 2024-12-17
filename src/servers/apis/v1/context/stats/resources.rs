@@ -102,7 +102,7 @@ mod tests {
 
     use super::Stats;
     use crate::core::services::statistics::TrackerMetrics;
-    use crate::core::statistics::Metrics;
+    use crate::core::statistics::metrics::Metrics;
 
     #[test]
     fn stats_resource_should_be_converted_from_tracker_metrics() {

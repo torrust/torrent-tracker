@@ -71,10 +71,10 @@ impl Processor {
 
                         match target.ip() {
                             IpAddr::V4(_) => {
-                                self.tracker.send_stats_event(statistics::Event::Udp4Response).await;
+                                self.tracker.send_stats_event(statistics::event::Event::Udp4Response).await;
                             }
                             IpAddr::V6(_) => {
-                                self.tracker.send_stats_event(statistics::Event::Udp6Response).await;
+                                self.tracker.send_stats_event(statistics::event::Event::Udp6Response).await;
                             }
                         }
                     }

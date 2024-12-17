@@ -7,16 +7,21 @@ use crate::core::statistics;
 ///
 /// It returns:
 ///
-/// - An statistics [`EventSender`](crate::core::statistics::EventSender) that allows you to send events related to statistics.
-/// - An statistics [`Repo`](crate::core::statistics::Repo) which is an in-memory repository for the tracker metrics.
+/// - An statistics event [`Sender`](crate::core::statistics::event::sender::Sender) that allows you to send events related to statistics.
+/// - An statistics [`Repository`](crate::core::statistics::repository::Repository) which is an in-memory repository for the tracker metrics.
 ///
 /// When the input argument `tracker_usage_statistics`is false the setup does not run the event listeners, consequently the statistics
 /// events are sent are received but not dispatched to the handler.
 #[must_use]
-pub fn factory(tracker_usage_statistics: bool) -> (Option<Box<dyn statistics::EventSender>>, statistics::Repo) {
+pub fn factory(
+    tracker_usage_statistics: bool,
+) -> (
+    Option<Box<dyn statistics::event::sender::Sender>>,
+    statistics::repository::Repository,
+) {
     let mut stats_event_sender = None;
 
-    let mut stats_tracker = statistics::Keeper::new();
+    let mut stats_tracker = statistics::keeper::Keeper::new();
 
     if tracker_usage_statistics {
         stats_event_sender = Some(stats_tracker.run_event_listener());

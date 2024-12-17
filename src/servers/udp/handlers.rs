@@ -155,10 +155,10 @@ pub async fn handle_connect(
     // send stats event
     match remote_addr {
         SocketAddr::V4(_) => {
-            tracker.send_stats_event(statistics::Event::Udp4Connect).await;
+            tracker.send_stats_event(statistics::event::Event::Udp4Connect).await;
         }
         SocketAddr::V6(_) => {
-            tracker.send_stats_event(statistics::Event::Udp6Connect).await;
+            tracker.send_stats_event(statistics::event::Event::Udp6Connect).await;
         }
     }
 
@@ -211,10 +211,10 @@ pub async fn handle_announce(
 
     match remote_client_ip {
         IpAddr::V4(_) => {
-            tracker.send_stats_event(statistics::Event::Udp4Announce).await;
+            tracker.send_stats_event(statistics::event::Event::Udp4Announce).await;
         }
         IpAddr::V6(_) => {
-            tracker.send_stats_event(statistics::Event::Udp6Announce).await;
+            tracker.send_stats_event(statistics::event::Event::Udp6Announce).await;
         }
     }
 
@@ -326,10 +326,10 @@ pub async fn handle_scrape(
     // send stats event
     match remote_addr {
         SocketAddr::V4(_) => {
-            tracker.send_stats_event(statistics::Event::Udp4Scrape).await;
+            tracker.send_stats_event(statistics::event::Event::Udp4Scrape).await;
         }
         SocketAddr::V6(_) => {
-            tracker.send_stats_event(statistics::Event::Udp6Scrape).await;
+            tracker.send_stats_event(statistics::event::Event::Udp6Scrape).await;
         }
     }
 
@@ -374,10 +374,10 @@ async fn handle_error(
         // send stats event
         match remote_addr {
             SocketAddr::V4(_) => {
-                tracker.send_stats_event(statistics::Event::Udp4Error).await;
+                tracker.send_stats_event(statistics::event::Event::Udp4Error).await;
             }
             SocketAddr::V6(_) => {
-                tracker.send_stats_event(statistics::Event::Udp6Error).await;
+                tracker.send_stats_event(statistics::event::Event::Udp6Error).await;
             }
         }
     }
@@ -602,10 +602,10 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_upd4_connect_event_when_a_client_tries_to_connect_using_a_ip4_socket_address() {
-            let mut stats_event_sender_mock = statistics::MockEventSender::new();
+            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
             stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::Event::Udp4Connect))
+                .with(eq(statistics::event::Event::Udp4Connect))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -616,7 +616,7 @@ mod tests {
                 core::Tracker::new(
                     &tracker_configuration().core,
                     Some(stats_event_sender),
-                    statistics::Repo::new(),
+                    statistics::repository::Repository::new(),
                 )
                 .unwrap(),
             );
@@ -631,10 +631,10 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_upd6_connect_event_when_a_client_tries_to_connect_using_a_ip6_socket_address() {
-            let mut stats_event_sender_mock = statistics::MockEventSender::new();
+            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
             stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::Event::Udp6Connect))
+                .with(eq(statistics::event::Event::Udp6Connect))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -643,7 +643,7 @@ mod tests {
                 core::Tracker::new(
                     &tracker_configuration().core,
                     Some(stats_event_sender),
-                    statistics::Repo::new(),
+                    statistics::repository::Repository::new(),
                 )
                 .unwrap(),
             );
@@ -892,10 +892,10 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd4_announce_event() {
-                let mut stats_event_sender_mock = statistics::MockEventSender::new();
+                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
-                    .with(eq(statistics::Event::Udp4Announce))
+                    .with(eq(statistics::event::Event::Udp4Announce))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -904,7 +904,7 @@ mod tests {
                     core::Tracker::new(
                         &tracker_configuration().core,
                         Some(stats_event_sender),
-                        statistics::Repo::new(),
+                        statistics::repository::Repository::new(),
                     )
                     .unwrap(),
                 );
@@ -1138,10 +1138,10 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd6_announce_event() {
-                let mut stats_event_sender_mock = statistics::MockEventSender::new();
+                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
-                    .with(eq(statistics::Event::Udp6Announce))
+                    .with(eq(statistics::event::Event::Udp6Announce))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -1150,7 +1150,7 @@ mod tests {
                     core::Tracker::new(
                         &tracker_configuration().core,
                         Some(stats_event_sender),
-                        statistics::Repo::new(),
+                        statistics::repository::Repository::new(),
                     )
                     .unwrap(),
                 );
@@ -1173,7 +1173,7 @@ mod tests {
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
 
                 use crate::core;
-                use crate::core::statistics::Keeper;
+                use crate::core::statistics::keeper::Keeper;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1434,10 +1434,10 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd4_scrape_event() {
-                let mut stats_event_sender_mock = statistics::MockEventSender::new();
+                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
-                    .with(eq(statistics::Event::Udp4Scrape))
+                    .with(eq(statistics::event::Event::Udp4Scrape))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -1447,7 +1447,7 @@ mod tests {
                     core::Tracker::new(
                         &tracker_configuration().core,
                         Some(stats_event_sender),
-                        statistics::Repo::new(),
+                        statistics::repository::Repository::new(),
                     )
                     .unwrap(),
                 );
@@ -1478,10 +1478,10 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd6_scrape_event() {
-                let mut stats_event_sender_mock = statistics::MockEventSender::new();
+                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
-                    .with(eq(statistics::Event::Udp6Scrape))
+                    .with(eq(statistics::event::Event::Udp6Scrape))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
@@ -1491,7 +1491,7 @@ mod tests {
                     core::Tracker::new(
                         &tracker_configuration().core,
                         Some(stats_event_sender),
-                        statistics::Repo::new(),
+                        statistics::repository::Repository::new(),
                     )
                     .unwrap(),
                 );
