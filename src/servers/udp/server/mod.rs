@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use super::RawRequest;
 
+pub mod banning;
 pub mod bound_socket;
 pub mod launcher;
 pub mod processor;

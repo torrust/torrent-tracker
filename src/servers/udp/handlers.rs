@@ -11,12 +11,14 @@ use aquatic_udp_protocol::{
     ResponsePeer, ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics, TransactionId,
 };
 use bittorrent_primitives::info_hash::InfoHash;
+use tokio::sync::RwLock;
 use torrust_tracker_clock::clock::Time as _;
 use tracing::{instrument, Level};
 use uuid::Uuid;
 use zerocopy::network_endian::I32;
 
 use super::connection_cookie::{check, make};
+use super::server::banning::BanService;
 use super::RawRequest;
 use crate::core::{statistics, PeersWanted, Tracker};
 use crate::servers::udp::error::Error;
@@ -51,12 +53,13 @@ impl CookieTimeValues {
 /// - Delegating the request to the correct handler depending on the request type.
 ///
 /// It will return an `Error` response if the request is invalid.
-#[instrument(fields(request_id), skip(udp_request, tracker, cookie_time_values), ret(level = Level::TRACE))]
+#[instrument(fields(request_id), skip(udp_request, tracker, cookie_time_values, ban_service), ret(level = Level::TRACE))]
 pub(crate) async fn handle_packet(
     udp_request: RawRequest,
     tracker: &Tracker,
     local_addr: SocketAddr,
     cookie_time_values: CookieTimeValues,
+    ban_service: Arc<RwLock<BanService>>,
 ) -> Response {
     tracing::Span::current().record("request_id", Uuid::new_v4().to_string());
     tracing::debug!("Handling Packets: {udp_request:?}");
@@ -68,6 +71,17 @@ pub(crate) async fn handle_packet(
             Ok(request) => match handle_request(request, udp_request.from, tracker, cookie_time_values.clone()).await {
                 Ok(response) => return response,
                 Err((e, transaction_id)) => {
+                    match &e {
+                        Error::CookieValueNotNormal { .. }
+                        | Error::CookieValueExpired { .. }
+                        | Error::CookieValueFromFuture { .. } => {
+                            // code-review: should we include `RequestParseError` and `BadRequest`?
+                            let mut ban_service = ban_service.write().await;
+                            ban_service.increase_counter(&udp_request.from.ip());
+                        }
+                        _ => {}
+                    }
+
                     handle_error(
                         udp_request.from,
                         tracker,

@@ -18,4 +18,4 @@ persistent_torrent_completed_stat = false
 remove_peerless_torrents = false
 
 [[udp_trackers]]
-bind_address = "0.0.0.0:6969"
+bind_address = "0.0.0.0:3000"

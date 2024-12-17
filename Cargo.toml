@@ -39,6 +39,7 @@ axum-server = { version = "0", features = ["tls-rustls-no-provider"] }
 bittorrent-http-protocol = { version = "3.0.0-develop", path = "packages/http-protocol" }
 bittorrent-primitives = "0.1.0"
 bittorrent-tracker-client = { version = "3.0.0-develop", path = "packages/tracker-client" }
+bloom = "0.3.2"
 blowfish = "0"
 camino = { version = "1", features = ["serde", "serde1"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
