@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -5,7 +6,7 @@ use torrust_tracker::core::auth::Key;
 use torrust_tracker_test_helpers::configuration;
 use tracing::level_filters::LevelFilter;
 
-use crate::common::logging::{tracing_stderr_init, INIT};
+use crate::common::logging::{tracing_init_with_capturer, tracing_stderr_init, LogCapturer, INIT};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{
     assert_auth_key_utf8, assert_failed_to_delete_key, assert_failed_to_generate_key, assert_failed_to_reload_keys,
@@ -250,8 +251,10 @@ async fn should_fail_deleting_an_auth_key_when_the_key_id_is_invalid() {
 
 #[tokio::test]
 async fn should_fail_when_the_auth_key_cannot_be_deleted() {
+    let log_capturer = Arc::new(Mutex::new(LogCapturer::new()));
+
     INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
+        tracing_init_with_capturer(LevelFilter::ERROR, log_capturer.clone());
     });
 
     let env = Started::new(&configuration::ephemeral().into()).await;
@@ -270,6 +273,11 @@ async fn should_fail_when_the_auth_key_cannot_be_deleted() {
         .await;
 
     assert_failed_to_delete_key(response).await;
+
+    // We expect to see a 500 error, it's the current API behavior
+    assert!(log_capturer.lock().unwrap().contains("ERROR"));
+    assert!(log_capturer.lock().unwrap().contains("tower_http"));
+    assert!(log_capturer.lock().unwrap().contains("500 Internal Server Error"));
 
     env.stop().await;
 }
