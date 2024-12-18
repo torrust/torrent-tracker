@@ -196,7 +196,7 @@ impl Key {
 
 /// Error returned when a key cannot be parsed from a string.
 ///
-/// ```rust,no_run
+/// ```text
 /// use torrust_tracker::core::auth::Key;
 /// use std::str::FromStr;
 ///

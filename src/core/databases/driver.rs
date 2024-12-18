@@ -29,7 +29,7 @@ pub enum Driver {
 ///
 /// Example for `SQLite3`:
 ///
-/// ```rust,no_run
+/// ```text
 /// use torrust_tracker::core::databases;
 /// use torrust_tracker::core::databases::driver::Driver;
 ///
@@ -40,7 +40,7 @@ pub enum Driver {
 ///
 /// Example for `MySQL`:
 ///
-/// ```rust,no_run
+/// ```text
 /// use torrust_tracker::core::databases;
 /// use torrust_tracker::core::databases::driver::Driver;
 ///

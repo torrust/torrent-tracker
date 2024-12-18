@@ -152,7 +152,7 @@ impl Into<Vec<u8>> for Compact {
 
 /// A [`NormalPeer`], for the [`Normal`] form.
 ///
-/// ```rust
+/// ```text
 /// use std::net::{IpAddr, Ipv4Addr};
 /// use torrust_tracker::servers::http::v1::responses::announce::{Normal, NormalPeer};
 ///
@@ -204,7 +204,7 @@ impl From<&NormalPeer> for BencodeMut<'_> {
 /// A part from reducing the size of the response, this format does not contain
 /// the peer's ID.
 ///
-/// ```rust
+/// ```text
 ///  use std::net::{IpAddr, Ipv4Addr};
 ///  use torrust_tracker::servers::http::v1::responses::announce::{Compact, CompactPeer, CompactPeerData};
 ///

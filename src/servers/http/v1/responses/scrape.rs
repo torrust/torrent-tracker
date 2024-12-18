@@ -11,7 +11,7 @@ use crate::core::ScrapeData;
 
 /// The `Scrape` response for the HTTP tracker.
 ///
-/// ```rust
+/// ```text
 /// use torrust_tracker::servers::http::v1::responses::scrape::Bencoded;
 /// use bittorrent_primitives::info_hash::InfoHash;
 /// use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
