@@ -59,7 +59,7 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker running on reverse proxy mode:
 ///
-/// ```rust
+/// ```text
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
@@ -81,7 +81,7 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker non running on reverse proxy mode:
 ///
-/// ```rust
+/// ```text
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///

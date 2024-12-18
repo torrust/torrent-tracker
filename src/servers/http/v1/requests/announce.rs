@@ -29,7 +29,7 @@ const NUMWANT: &str = "numwant";
 /// The `Announce` request. Fields use the domain types after parsing the
 /// query params of the request.
 ///
-/// ```rust
+/// ```text
 /// use aquatic_udp_protocol::{NumberOfBytes, PeerId};
 /// use torrust_tracker::servers::http::v1::requests::announce::{Announce, Compact, Event};
 /// use bittorrent_primitives::info_hash::InfoHash;

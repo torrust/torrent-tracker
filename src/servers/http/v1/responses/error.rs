@@ -26,7 +26,7 @@ pub struct Error {
 impl Error {
     /// Returns the bencoded representation of the `Error` struct.
     ///
-    /// ```rust
+    /// ```text
     /// use torrust_tracker::servers::http::v1::responses::error::Error;
     ///
     /// let err = Error {
