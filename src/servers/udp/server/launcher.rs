@@ -25,7 +25,7 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 /// The maximum number of connection id errors per ip. Clients will be banned if
 /// they exceed this limit.
 const MAX_CONNECTION_ID_ERRORS_PER_IP: u32 = 10;
-const IP_BANS_RESET_INTERVAL_IN_SECS: u64 = 120;
+const IP_BANS_RESET_INTERVAL_IN_SECS: u64 = 3600;
 
 /// A UDP server instance launcher.
 #[derive(Constructor)]
