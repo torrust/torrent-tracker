@@ -44,7 +44,10 @@ fn map_to_tracing_level_filter(threshold: &Threshold) -> LevelFilter {
 }
 
 fn tracing_stdout_init(filter: LevelFilter, style: &TraceStyle) {
-    let builder = tracing_subscriber::fmt().with_max_level(filter).with_ansi(true);
+    let builder = tracing_subscriber::fmt()
+        .with_max_level(filter)
+        .with_ansi(true)
+        .with_test_writer();
 
     let () = match style {
         TraceStyle::Default => builder.init(),
