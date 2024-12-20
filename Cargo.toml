@@ -73,7 +73,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_repr = "0"
 serde_with = { version = "3", features = ["json"] }
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "macros"] }
 torrust-tracker-clock = { version = "3.0.0-develop", path = "packages/clock" }
 torrust-tracker-configuration = { version = "3.0.0-develop", path = "packages/configuration" }
 torrust-tracker-contrib-bencode = { version = "3.0.0-develop", path = "contrib/bencode" }
@@ -84,6 +84,7 @@ tower = { version = "0", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["json"] }
+tracing-test = "0.2.5"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 zerocopy = "0.7"
