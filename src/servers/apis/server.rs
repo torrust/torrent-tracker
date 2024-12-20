@@ -34,7 +34,7 @@ use futures::future::BoxFuture;
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
 use torrust_tracker_configuration::AccessTokens;
-use tracing::{instrument, Level};
+use tracing::{debug, instrument, Level};
 
 use super::routes::router;
 use crate::bootstrap::jobs::Started;
@@ -129,12 +129,16 @@ impl ApiServer<Stopped> {
         form: ServiceRegistrationForm,
         access_tokens: Arc<AccessTokens>,
     ) -> Result<ApiServer<Running>, Error> {
+        debug!("Starting new API test environment ApiServer<Stopped>::start");
+
         let (tx_start, rx_start) = tokio::sync::oneshot::channel::<Started>();
         let (tx_halt, rx_halt) = tokio::sync::oneshot::channel::<Halted>();
 
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
+            debug!("Starting new API test environment ApiServer<Stopped>::start spawned task");
+
             tracing::debug!(target: API_LOG_TARGET, "Starting with launcher in spawned task ...");
 
             let _task = launcher.start(tracker, access_tokens, tx_start, rx_halt).await;

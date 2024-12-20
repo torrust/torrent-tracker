@@ -470,7 +470,7 @@ use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
-use tracing::instrument;
+use tracing::{error, instrument};
 
 use self::auth::Key;
 use self::error::Error;
@@ -480,7 +480,7 @@ use crate::CurrentClock;
 
 /// The domain layer tracker service.
 ///
-/// Its main responsibility is to handle the `announce` and `scrape` requests.
+/// Its main responsibility is to handle the `announce` and `scrape` requests.d
 /// But it's also a container for the `Tracker` configuration, persistence,
 /// authentication and other services.
 ///
@@ -966,6 +966,8 @@ impl Tracker {
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
     pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<auth::PeerKey, databases::error::Error> {
+        error!("This is being logged on the error level");
+
         let auth_key = auth::generate_key(lifetime);
 
         self.database.add_key_to_keys(&auth_key)?;

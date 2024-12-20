@@ -18,13 +18,13 @@ use tracing::level_filters::LevelFilter;
 pub static INIT: Once = Once::new();
 
 #[allow(dead_code)]
-pub fn tracing_stderr_init(filter: LevelFilter) {
-    let builder = tracing_subscriber::fmt()
+pub fn tracing_stderr_init(_filter: LevelFilter) {
+    /*let builder = tracing_subscriber::fmt()
         .with_max_level(filter)
         .with_ansi(true)
         .with_writer(std::io::stderr);
 
-    builder.pretty().with_file(true).init();
+    builder.pretty().with_file(true).init();*/
 
     tracing::info!("Logging initialized");
 }

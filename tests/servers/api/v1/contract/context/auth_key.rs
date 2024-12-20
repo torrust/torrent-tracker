@@ -2,8 +2,11 @@ use std::time::Duration;
 
 use serde::Serialize;
 use torrust_tracker::core::auth::Key;
+use torrust_tracker_configuration::Threshold;
 use torrust_tracker_test_helpers::configuration;
+use tracing::error;
 use tracing::level_filters::LevelFilter;
+use tracing_test::traced_test;
 
 use crate::common::logging::{tracing_stderr_init, INIT};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
@@ -249,12 +252,21 @@ async fn should_fail_deleting_an_auth_key_when_the_key_id_is_invalid() {
 }
 
 #[tokio::test]
+#[traced_test]
 async fn should_fail_when_the_auth_key_cannot_be_deleted() {
-    INIT.call_once(|| {
+    /*INIT.call_once(|| {
         tracing_stderr_init(LevelFilter::ERROR);
-    });
+    });*/
 
-    let env = Started::new(&configuration::ephemeral().into()).await;
+    std::env::set_var("RUNNING_IN_TEST", "true");
+
+    let mut config = configuration::ephemeral();
+
+    config.logging.threshold = Threshold::Trace;
+
+    let env = Started::new(&config.into()).await;
+
+    error!("after starting test env");
 
     let seconds_valid = 60;
     let auth_key = env
@@ -270,6 +282,15 @@ async fn should_fail_when_the_auth_key_cannot_be_deleted() {
         .await;
 
     assert_failed_to_delete_key(response).await;
+
+    logs_assert(|lines: &[&str]| {
+        for line in lines {
+            println!("{line}");
+        }
+        Ok(())
+    });
+
+    assert!(logs_contain("logged on the error level"));
 
     env.stop().await;
 }

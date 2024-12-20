@@ -11,6 +11,7 @@
 //! - `Trace`
 //!
 //! Refer to the [configuration crate documentation](https://docs.rs/torrust-tracker-configuration) to know how to change log settings.
+use std::env;
 use std::sync::Once;
 
 use torrust_tracker_configuration::{Configuration, Threshold};
@@ -21,6 +22,12 @@ static INIT: Once = Once::new();
 /// It redirects the log info to the standard output with the log threshold
 /// defined in the configuration.
 pub fn setup(cfg: &Configuration) {
+    // Check if we are running in test mode
+    if env::var("RUNNING_IN_TEST").unwrap_or_default() == "true" {
+        println!("Running in test mode. Skipping logging setup.");
+        return;
+    }
+
     let tracing_level = map_to_tracing_level_filter(&cfg.logging.threshold);
 
     if tracing_level == LevelFilter::OFF {

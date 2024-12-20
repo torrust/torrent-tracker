@@ -10,6 +10,7 @@ use torrust_tracker::servers::apis::server::{ApiServer, Launcher, Running, Stopp
 use torrust_tracker::servers::registar::Registar;
 use torrust_tracker_configuration::{Configuration, HttpApi};
 use torrust_tracker_primitives::peer;
+use tracing::debug;
 
 use super::connection_info::ConnectionInfo;
 
@@ -35,6 +36,8 @@ where
 
 impl Environment<Stopped> {
     pub fn new(configuration: &Arc<Configuration>) -> Self {
+        debug!("Creating new API test environment: Environment<Stopped>::new");
+
         let tracker = initialize_with_configuration(configuration);
 
         let config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));
@@ -54,6 +57,8 @@ impl Environment<Stopped> {
     }
 
     pub async fn start(self) -> Environment<Running> {
+        debug!("Starting new API test environment: Environment<Stopped>::start");
+
         let access_tokens = Arc::new(self.config.access_tokens.clone());
 
         Environment {
@@ -71,6 +76,8 @@ impl Environment<Stopped> {
 
 impl Environment<Running> {
     pub async fn new(configuration: &Arc<Configuration>) -> Self {
+        debug!("Creating new API test environment: Environment<Running>::new");
+
         Environment::<Stopped>::new(configuration).start().await
     }
 
