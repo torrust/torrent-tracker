@@ -29,7 +29,7 @@ pub fn ephemeral() -> Configuration {
 
     let mut config = Configuration::default();
 
-    config.logging.threshold = Threshold::Off; // It should always be off here, the tests manage their own logging.
+    config.logging.threshold = Threshold::Error;
 
     // Ephemeral socket address for API
     let api_port = 0u16;
