@@ -28,7 +28,7 @@ pub fn setup(cfg: &Configuration) {
     }
 
     INIT.call_once(|| {
-        tracing_stdout_init(tracing_level, &TraceStyle::Default);
+        tracing_init(tracing_level, &TraceStyle::Default);
     });
 }
 
@@ -43,7 +43,7 @@ fn map_to_tracing_level_filter(threshold: &Threshold) -> LevelFilter {
     }
 }
 
-fn tracing_stdout_init(filter: LevelFilter, style: &TraceStyle) {
+fn tracing_init(filter: LevelFilter, style: &TraceStyle) {
     let builder = tracing_subscriber::fmt()
         .with_max_level(filter)
         .with_ansi(true)
