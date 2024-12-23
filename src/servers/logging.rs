@@ -1,3 +1,8 @@
+use std::fmt;
+use std::time::Duration;
+
+use tower_http::LatencyUnit;
+
 /// This is the prefix used in logs to identify a started service.
 ///
 /// For example:
@@ -27,3 +32,27 @@ We should use something like:
 ```
 
 */
+
+pub struct Latency {
+    unit: LatencyUnit,
+    duration: Duration,
+}
+
+impl Latency {
+    #[must_use]
+    pub fn new(unit: LatencyUnit, duration: Duration) -> Self {
+        Self { unit, duration }
+    }
+}
+
+impl fmt::Display for Latency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.unit {
+            LatencyUnit::Seconds => write!(f, "{} s", self.duration.as_secs_f64()),
+            LatencyUnit::Millis => write!(f, "{} ms", self.duration.as_millis()),
+            LatencyUnit::Micros => write!(f, "{} μs", self.duration.as_micros()),
+            LatencyUnit::Nanos => write!(f, "{} ns", self.duration.as_nanos()),
+            _ => panic!("Invalid latency unit"),
+        }
+    }
+}

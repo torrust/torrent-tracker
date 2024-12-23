@@ -13,15 +13,18 @@ use hyper::{Request, StatusCode};
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
 use tower::timeout::TimeoutLayer;
 use tower::ServiceBuilder;
+use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::compression::CompressionLayer;
 use tower_http::propagate_header::PropagateHeaderLayer;
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
 use crate::core::Tracker;
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
+use crate::servers::logging::Latency;
 
 /// It adds the routes to the router.
 ///
@@ -72,7 +75,14 @@ pub fn router(tracker: Arc<Tracker>, server_socket_addr: SocketAddr) -> Router {
                     tracing::span!(
                         target: HTTP_TRACKER_LOG_TARGET,
                         tracing::Level::INFO, "response", server_socket_addr= %server_socket_addr, latency = %latency_ms, status = %status_code, request_id = %request_id);
-                }),
+                })
+                .on_failure(|failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                    let latency = Latency::new(
+                        LatencyUnit::Millis,
+                        latency,
+                    );
+                    tracing::error!(target: HTTP_TRACKER_LOG_TARGET, "response failed classification={failure_classification} latency={latency}");
+                })
         )
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
                 .layer(
