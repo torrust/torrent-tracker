@@ -50,7 +50,7 @@ pub fn router(tracker: Arc<Tracker>, server_socket_addr: SocketAddr) -> Router {
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                .on_request(move |request: &Request<axum::body::Body>, _span: &Span| {
+                .on_request(move |request: &Request<axum::body::Body>, span: &Span| {
                     let method = request.method().to_string();
                     let uri = request.uri().to_string();
                     let request_id = request
@@ -59,33 +59,45 @@ pub fn router(tracker: Arc<Tracker>, server_socket_addr: SocketAddr) -> Router {
                         .map(|v| v.to_str().unwrap_or_default())
                         .unwrap_or_default();
 
-                    tracing::span!(
+                    span.record("request_id", request_id);
+
+                    tracing::event!(
                         target: HTTP_TRACKER_LOG_TARGET,
-                        tracing::Level::INFO, "request", server_socket_addr= %server_socket_addr, method = %method, uri = %uri, request_id = %request_id);
+                        tracing::Level::INFO, %server_socket_addr, %method, %uri, %request_id, "request");
                 })
-                .on_response(move |response: &Response, latency: Duration, _span: &Span| {
+                .on_response(move |response: &Response, latency: Duration, span: &Span| {
+                    let latency_ms = latency.as_millis();
                     let status_code = response.status();
                     let request_id = response
                         .headers()
                         .get("x-request-id")
                         .map(|v| v.to_str().unwrap_or_default())
                         .unwrap_or_default();
-                    let latency_ms = latency.as_millis();
 
-                    tracing::span!(
-                        target: HTTP_TRACKER_LOG_TARGET,
-                        tracing::Level::INFO, "response", server_socket_addr= %server_socket_addr, latency = %latency_ms, status = %status_code, request_id = %request_id);
+                    span.record("request_id", request_id);
+
+                    if status_code.is_server_error() {
+                        tracing::event!(
+                            target: HTTP_TRACKER_LOG_TARGET,
+                            tracing::Level::ERROR, %server_socket_addr, %latency_ms, %status_code, %request_id, "response");
+                    } else {
+                        tracing::event!(
+                            target: HTTP_TRACKER_LOG_TARGET,
+                            tracing::Level::INFO, %server_socket_addr, %latency_ms, %status_code, %request_id, "response");
+                    }
                 })
-                .on_failure(|failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
-                    let latency = Latency::new(
-                        LatencyUnit::Millis,
-                        latency,
-                    );
-                    tracing::error!(target: HTTP_TRACKER_LOG_TARGET, "response failed classification={failure_classification} latency={latency}");
-                })
+                .on_failure(
+                    |failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                        let latency = Latency::new(LatencyUnit::Millis, latency);
+
+                        tracing::event!(
+                            target: HTTP_TRACKER_LOG_TARGET,
+                            tracing::Level::ERROR, %failure_classification, %latency, "response failed");
+                    },
+                ),
         )
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
-                .layer(
+        .layer(
             ServiceBuilder::new()
                 // this middleware goes above `TimeoutLayer` because it will receive
                 // errors returned by `TimeoutLayer`
