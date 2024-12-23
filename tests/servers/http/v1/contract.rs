@@ -1,9 +1,12 @@
 use torrust_tracker_test_helpers::configuration;
 
+use crate::common::logging;
 use crate::servers::http::Started;
 
 #[tokio::test]
 async fn environment_should_be_started_and_stopped() {
+    logging::setup();
+
     let env = Started::new(&configuration::ephemeral().into()).await;
 
     env.stop().await;
@@ -13,17 +16,14 @@ mod for_all_config_modes {
 
     use torrust_tracker::servers::http::v1::handlers::health_check::{Report, Status};
     use torrust_tracker_test_helpers::configuration;
-    use tracing::level_filters::LevelFilter;
 
-    use crate::common::logging::{tracing_stderr_init, INIT};
+    use crate::common::logging;
     use crate::servers::http::client::Client;
     use crate::servers::http::Started;
 
     #[tokio::test]
     async fn health_check_endpoint_should_return_ok_if_the_http_tracker_is_running() {
-        INIT.call_once(|| {
-            tracing_stderr_init(LevelFilter::ERROR);
-        });
+        logging::setup();
 
         let env = Started::new(&configuration::ephemeral_with_reverse_proxy().into()).await;
 
@@ -38,9 +38,8 @@ mod for_all_config_modes {
 
     mod and_running_on_reverse_proxy {
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging;
         use crate::servers::http::asserts::assert_could_not_find_remote_address_on_x_forwarded_for_header_error_response;
         use crate::servers::http::client::Client;
         use crate::servers::http::requests::announce::QueryBuilder;
@@ -48,9 +47,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_http_request_does_not_include_the_xff_http_request_header() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // If the tracker is running behind a reverse proxy, the peer IP is the
             // right most IP in the `X-Forwarded-For` HTTP header, which is the IP of the proxy's client.
@@ -68,9 +65,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_xff_http_request_header_contains_an_invalid_ip() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_with_reverse_proxy().into()).await;
 
@@ -109,10 +104,9 @@ mod for_all_config_modes {
         use tokio::net::TcpListener;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
         use crate::common::fixtures::invalid_info_hashes;
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging;
         use crate::servers::http::asserts::{
             assert_announce_response, assert_bad_announce_request_error_response, assert_cannot_parse_query_param_error_response,
             assert_cannot_parse_query_params_error_response, assert_compact_announce_response, assert_empty_announce_response,
@@ -125,9 +119,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn it_should_start_and_stop() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
             env.stop().await;
@@ -135,9 +127,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_respond_if_only_the_mandatory_fields_are_provided() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -154,9 +144,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_url_query_component_is_empty() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -169,9 +157,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_url_query_parameters_are_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -188,9 +174,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_a_mandatory_field_is_missing() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -229,9 +213,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_info_hash_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -250,9 +232,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_not_fail_when_the_peer_address_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // AnnounceQuery does not even contain the `peer_addr`
             // The peer IP is obtained in two ways:
@@ -274,9 +254,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_downloaded_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -297,9 +275,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_uploaded_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -320,9 +296,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_peer_id_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -350,9 +324,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_port_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -373,9 +345,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_left_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -396,9 +366,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_event_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -427,9 +395,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_compact_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -450,9 +416,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_numwant_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -473,9 +437,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_no_peers_if_the_announced_peer_is_the_first_one() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -506,9 +468,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_the_list_of_previously_announced_peers() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -550,9 +510,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_the_list_of_previously_announced_peers_including_peers_using_ipv4_and_ipv6() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -606,9 +564,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_consider_two_peers_to_be_the_same_when_they_have_the_same_peer_id_even_if_the_ip_is_different() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -634,9 +590,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_the_compact_response() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // Tracker Returns Compact Peer Lists
             // https://www.bittorrent.org/beps/bep_0023.html
@@ -677,9 +631,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_not_return_the_compact_response_by_default() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // code-review: the HTTP tracker does not return the compact response by default if the "compact"
             // param is not provided in the announce URL. The BEP 23 suggest to do so.
@@ -720,9 +672,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_of_tcp4_connections_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -741,9 +691,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_of_tcp6_connections_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             if TcpListener::bind(SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0))
                 .await
@@ -769,9 +717,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_not_increase_the_number_of_tcp6_connections_handled_if_the_client_is_not_using_an_ipv6_ip() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // The tracker ignores the peer address in the request param. It uses the client remote ip address.
 
@@ -796,9 +742,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_of_tcp4_announce_requests_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -817,9 +761,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_of_tcp6_announce_requests_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             if TcpListener::bind(SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0))
                 .await
@@ -845,9 +787,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_not_increase_the_number_of_tcp6_announce_requests_handled_if_the_client_is_not_using_an_ipv6_ip() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // The tracker ignores the peer address in the request param. It uses the client remote ip address.
 
@@ -872,9 +812,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_assign_to_the_peer_ip_the_remote_client_ip_instead_of_the_peer_address_in_the_request_param() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -905,9 +843,7 @@ mod for_all_config_modes {
         #[tokio::test]
         async fn when_the_client_ip_is_a_loopback_ipv4_it_should_assign_to_the_peer_ip_the_external_ip_in_the_tracker_configuration(
         ) {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             /*  We assume that both the client and tracker share the same public IP.
 
@@ -945,9 +881,7 @@ mod for_all_config_modes {
         #[tokio::test]
         async fn when_the_client_ip_is_a_loopback_ipv6_it_should_assign_to_the_peer_ip_the_external_ip_in_the_tracker_configuration(
         ) {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             /* We assume that both the client and tracker share the same public IP.
 
@@ -989,9 +923,7 @@ mod for_all_config_modes {
         #[tokio::test]
         async fn when_the_tracker_is_behind_a_reverse_proxy_it_should_assign_to_the_peer_ip_the_ip_in_the_x_forwarded_for_http_header(
         ) {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             /*
             client          <-> http proxy                       <-> tracker                   <-> Internet
@@ -1046,10 +978,9 @@ mod for_all_config_modes {
         use tokio::net::TcpListener;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
         use crate::common::fixtures::invalid_info_hashes;
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging;
         use crate::servers::http::asserts::{
             assert_cannot_parse_query_params_error_response, assert_missing_query_params_for_scrape_request_error_response,
             assert_scrape_response,
@@ -1062,9 +993,7 @@ mod for_all_config_modes {
         #[tokio::test]
         #[allow(dead_code)]
         async fn should_fail_when_the_request_is_empty() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
             let response = Client::new(*env.bind_address()).get("scrape").await;
@@ -1076,9 +1005,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_fail_when_the_info_hash_param_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1097,9 +1024,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_the_file_with_the_incomplete_peer_when_there_is_one_peer_with_bytes_pending_to_download() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1139,9 +1064,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_the_file_with_the_complete_peer_when_there_is_one_peer_with_no_bytes_pending_to_download() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1181,9 +1104,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_return_a_file_with_zeroed_values_when_there_are_no_peers() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1204,9 +1125,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_accept_multiple_infohashes() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1234,9 +1153,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_ot_tcp4_scrape_requests_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_public().into()).await;
 
@@ -1261,9 +1178,7 @@ mod for_all_config_modes {
 
         #[tokio::test]
         async fn should_increase_the_number_ot_tcp6_scrape_requests_handled_in_statistics() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             if TcpListener::bind(SocketAddrV6::new(Ipv6Addr::LOCALHOST, 0, 0, 0))
                 .await
@@ -1302,9 +1217,8 @@ mod configured_as_whitelisted {
 
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging::{self};
         use crate::servers::http::asserts::{assert_is_announce_response, assert_torrent_not_in_whitelist_error_response};
         use crate::servers::http::client::Client;
         use crate::servers::http::requests::announce::QueryBuilder;
@@ -1312,9 +1226,7 @@ mod configured_as_whitelisted {
 
         #[tokio::test]
         async fn should_fail_if_the_torrent_is_not_in_the_whitelist() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
@@ -1331,9 +1243,7 @@ mod configured_as_whitelisted {
 
         #[tokio::test]
         async fn should_allow_announcing_a_whitelisted_torrent() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
@@ -1361,9 +1271,8 @@ mod configured_as_whitelisted {
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging::{self};
         use crate::servers::http::asserts::assert_scrape_response;
         use crate::servers::http::client::Client;
         use crate::servers::http::responses::scrape::{File, ResponseBuilder};
@@ -1371,9 +1280,7 @@ mod configured_as_whitelisted {
 
         #[tokio::test]
         async fn should_return_the_zeroed_file_when_the_requested_file_is_not_whitelisted() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
@@ -1404,9 +1311,7 @@ mod configured_as_whitelisted {
 
         #[tokio::test]
         async fn should_return_the_file_stats_when_the_requested_file_is_whitelisted() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
@@ -1460,9 +1365,8 @@ mod configured_as_private {
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker::core::auth::Key;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging;
         use crate::servers::http::asserts::{assert_authentication_error_response, assert_is_announce_response};
         use crate::servers::http::client::Client;
         use crate::servers::http::requests::announce::QueryBuilder;
@@ -1470,9 +1374,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_respond_to_authenticated_peers() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1489,9 +1391,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_fail_if_the_peer_has_not_provided_the_authentication_key() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1508,9 +1408,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_fail_if_the_key_query_param_cannot_be_parsed() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1527,9 +1425,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_fail_if_the_peer_cannot_be_authenticated_with_the_provided_key() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1556,9 +1452,8 @@ mod configured_as_private {
         use torrust_tracker::core::auth::Key;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
-        use tracing::level_filters::LevelFilter;
 
-        use crate::common::logging::{tracing_stderr_init, INIT};
+        use crate::common::logging;
         use crate::servers::http::asserts::{assert_authentication_error_response, assert_scrape_response};
         use crate::servers::http::client::Client;
         use crate::servers::http::responses::scrape::{File, ResponseBuilder};
@@ -1566,9 +1461,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_fail_if_the_key_query_param_cannot_be_parsed() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1585,9 +1478,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_return_the_zeroed_file_when_the_client_is_not_authenticated() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1618,9 +1509,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_return_the_real_file_stats_when_the_client_is_authenticated() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
@@ -1662,9 +1551,7 @@ mod configured_as_private {
 
         #[tokio::test]
         async fn should_return_the_zeroed_file_when_the_authentication_key_provided_by_the_client_is_invalid() {
-            INIT.call_once(|| {
-                tracing_stderr_init(LevelFilter::ERROR);
-            });
+            logging::setup();
 
             // There is not authentication error
             // code-review: should this really be this way?

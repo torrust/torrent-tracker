@@ -29,7 +29,12 @@ pub fn ephemeral() -> Configuration {
 
     let mut config = Configuration::default();
 
-    config.logging.threshold = Threshold::Off; // It should always be off here, the tests manage their own logging.
+    // This have to be Off otherwise the tracing global subscriber
+    // initialization will panic because you can't set a global subscriber more
+    // than once. You can use enable logging in tests with:
+    // `crate::common::logging::setup(LevelFilter::ERROR);`
+    // That will also allow you to capture logs and write assertions on them.
+    config.logging.threshold = Threshold::Off;
 
     // Ephemeral socket address for API
     let api_port = 0u16;

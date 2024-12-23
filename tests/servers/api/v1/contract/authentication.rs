@@ -1,17 +1,14 @@
 use torrust_tracker_test_helpers::configuration;
-use tracing::level_filters::LevelFilter;
 
 use crate::common::http::{Query, QueryParam};
-use crate::common::logging::{tracing_stderr_init, INIT};
+use crate::common::logging::{self};
 use crate::servers::api::v1::asserts::{assert_token_not_valid, assert_unauthorized};
 use crate::servers::api::v1::client::Client;
 use crate::servers::api::Started;
 
 #[tokio::test]
 async fn should_authenticate_requests_by_using_a_token_query_param() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -28,9 +25,7 @@ async fn should_authenticate_requests_by_using_a_token_query_param() {
 
 #[tokio::test]
 async fn should_not_authenticate_requests_when_the_token_is_missing() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -45,9 +40,7 @@ async fn should_not_authenticate_requests_when_the_token_is_missing() {
 
 #[tokio::test]
 async fn should_not_authenticate_requests_when_the_token_is_empty() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -62,9 +55,7 @@ async fn should_not_authenticate_requests_when_the_token_is_empty() {
 
 #[tokio::test]
 async fn should_not_authenticate_requests_when_the_token_is_invalid() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -79,9 +70,7 @@ async fn should_not_authenticate_requests_when_the_token_is_invalid() {
 
 #[tokio::test]
 async fn should_allow_the_token_query_param_to_be_at_any_position_in_the_url_query() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 

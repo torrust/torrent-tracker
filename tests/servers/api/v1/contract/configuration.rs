@@ -7,18 +7,10 @@
 // use crate::common::app::setup_with_configuration;
 // use crate::servers::api::environment::stopped_environment;
 
-use tracing::level_filters::LevelFilter;
-
-use crate::common::logging::{tracing_stderr_init, INIT};
-
 #[tokio::test]
 #[ignore]
 #[should_panic = "Could not receive bind_address."]
 async fn should_fail_with_ssl_enabled_and_bad_ssl_config() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
-
     // let tracker = setup_with_configuration(&Arc::new(configuration::ephemeral()));
 
     // let config = tracker.config.http_api.clone();
@@ -36,6 +28,5 @@ async fn should_fail_with_ssl_enabled_and_bad_ssl_config() {
     //     };
 
     // let env = new_stopped(tracker, bind_to, tls);
-
     // env.start().await;
 }
