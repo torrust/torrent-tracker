@@ -17,10 +17,12 @@ use hyper::{Request, StatusCode};
 use torrust_tracker_configuration::{AccessTokens, DEFAULT_TIMEOUT};
 use tower::timeout::TimeoutLayer;
 use tower::ServiceBuilder;
+use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::compression::CompressionLayer;
 use tower_http::propagate_header::PropagateHeaderLayer;
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use super::v1;
@@ -28,6 +30,7 @@ use super::v1::context::health_check::handlers::health_check_handler;
 use super::v1::middlewares::auth::State;
 use crate::core::Tracker;
 use crate::servers::apis::API_LOG_TARGET;
+use crate::servers::logging::Latency;
 
 /// Add all API routes to the router.
 #[allow(clippy::needless_pass_by_value)]
@@ -75,7 +78,14 @@ pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>) -> Router
                     tracing::span!(
                         target: API_LOG_TARGET,
                         tracing::Level::INFO, "response", latency = %latency_ms, status = %status_code, request_id = %request_id);
-                }),
+                })
+                .on_failure(|failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                    let latency = Latency::new(
+                        LatencyUnit::Millis,
+                        latency,
+                    );
+                    tracing::error!(target: API_LOG_TARGET, "response failed classification={failure_classification} latency={latency}");
+                })
         )
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .layer(

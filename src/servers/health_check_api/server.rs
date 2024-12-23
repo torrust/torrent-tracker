@@ -14,15 +14,18 @@ use futures::Future;
 use hyper::Request;
 use serde_json::json;
 use tokio::sync::oneshot::{Receiver, Sender};
+use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::compression::CompressionLayer;
 use tower_http::propagate_header::PropagateHeaderLayer;
 use tower_http::request_id::{MakeRequestUuid, SetRequestIdLayer};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use crate::bootstrap::jobs::Started;
 use crate::servers::health_check_api::handlers::health_check_handler;
 use crate::servers::health_check_api::HEALTH_CHECK_API_LOG_TARGET;
+use crate::servers::logging::Latency;
 use crate::servers::registar::ServiceRegistry;
 use crate::servers::signals::{graceful_shutdown, Halted};
 
@@ -73,7 +76,14 @@ pub fn start(
                     tracing::span!(
                         target: HEALTH_CHECK_API_LOG_TARGET,
                         tracing::Level::INFO, "response", latency = %latency_ms, status = %status_code, request_id = %request_id);
-                }),
+                })
+                .on_failure(|failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                    let latency = Latency::new(
+                        LatencyUnit::Millis,
+                        latency,
+                    );
+                    tracing::error!(target: HEALTH_CHECK_API_LOG_TARGET, "response failed classification={failure_classification} latency={latency}");
+                })
         )
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid));
 
