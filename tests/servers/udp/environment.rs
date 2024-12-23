@@ -101,16 +101,13 @@ mod tests {
 
     use tokio::time::sleep;
     use torrust_tracker_test_helpers::configuration;
-    use tracing::level_filters::LevelFilter;
 
-    use crate::common::logging::{tracing_stderr_init, INIT};
+    use crate::common::logging;
     use crate::servers::udp::Started;
 
     #[tokio::test]
     async fn it_should_make_and_stop_udp_server() {
-        INIT.call_once(|| {
-            tracing_stderr_init(LevelFilter::ERROR);
-        });
+        logging::setup();
 
         let env = Started::new(&configuration::ephemeral().into()).await;
         sleep(Duration::from_secs(1)).await;

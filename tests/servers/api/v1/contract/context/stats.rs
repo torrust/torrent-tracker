@@ -4,9 +4,8 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker::servers::apis::v1::context::stats::resources::Stats;
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
-use tracing::level_filters::LevelFilter;
 
-use crate::common::logging::{tracing_stderr_init, INIT};
+use crate::common::logging::{self};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{assert_stats, assert_token_not_valid, assert_unauthorized};
 use crate::servers::api::v1::client::Client;
@@ -14,9 +13,7 @@ use crate::servers::api::Started;
 
 #[tokio::test]
 async fn should_allow_getting_tracker_statistics() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
@@ -64,9 +61,7 @@ async fn should_allow_getting_tracker_statistics() {
 
 #[tokio::test]
 async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 

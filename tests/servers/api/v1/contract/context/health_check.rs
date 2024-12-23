@@ -1,16 +1,13 @@
 use torrust_tracker::servers::apis::v1::context::health_check::resources::{Report, Status};
 use torrust_tracker_test_helpers::configuration;
-use tracing::level_filters::LevelFilter;
 
-use crate::common::logging::{tracing_stderr_init, INIT};
+use crate::common::logging;
 use crate::servers::api::v1::client::get;
 use crate::servers::api::Started;
 
 #[tokio::test]
 async fn health_check_endpoint_should_return_status_ok_if_api_is_running() {
-    INIT.call_once(|| {
-        tracing_stderr_init(LevelFilter::ERROR);
-    });
+    logging::setup();
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
