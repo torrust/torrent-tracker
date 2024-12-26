@@ -5,6 +5,7 @@
 //!
 //! All the API routes have the `/api` prefix and the version number as the
 //! first path segment. For example: `/api/v1/torrents`.
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,7 +36,7 @@ use crate::servers::logging::Latency;
 /// Add all API routes to the router.
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(tracker, access_tokens))]
-pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>) -> Router {
+pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>, server_socket_addr: SocketAddr) -> Router {
     let router = Router::new();
 
     let api_url_prefix = "/api";
@@ -68,7 +69,7 @@ pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>) -> Router
                         target: API_LOG_TARGET,
                         tracing::Level::INFO, %method, %uri, %request_id, "request");
                 })
-                .on_response(|response: &Response, latency: Duration, span: &Span| {
+                .on_response(move |response: &Response, latency: Duration, span: &Span| {
                     let latency_ms = latency.as_millis();
                     let status_code = response.status();
                     let request_id = response
@@ -82,20 +83,20 @@ pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>) -> Router
                     if status_code.is_server_error() {
                         tracing::event!(
                             target: API_LOG_TARGET,
-                            tracing::Level::ERROR, %latency_ms, %status_code, %request_id, "response");
+                            tracing::Level::ERROR, %latency_ms, %status_code, %server_socket_addr, %request_id, "response");
                     } else {
                         tracing::event!(
                             target: API_LOG_TARGET,
-                            tracing::Level::INFO, %latency_ms, %status_code, %request_id, "response");
+                            tracing::Level::INFO, %latency_ms, %status_code, %server_socket_addr, %request_id, "response");
                     }
                 })
                 .on_failure(
-                    |failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                    move |failure_classification: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
                         let latency = Latency::new(LatencyUnit::Millis, latency);
 
                         tracing::event!(
                             target: API_LOG_TARGET,
-                            tracing::Level::ERROR, %failure_classification, %latency, "response failed");
+                            tracing::Level::ERROR, %failure_classification, %latency, %server_socket_addr, "response failed");
                     },
                 ),
         )

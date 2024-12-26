@@ -243,9 +243,10 @@ impl Launcher {
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
     ) -> BoxFuture<'static, ()> {
-        let router = router(tracker, access_tokens);
         let socket = std::net::TcpListener::bind(self.bind_to).expect("Could not bind tcp_listener to address.");
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
+
+        let router = router(tracker, access_tokens, address);
 
         let handle = Handle::new();
 
