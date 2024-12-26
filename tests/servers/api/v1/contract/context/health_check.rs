@@ -13,7 +13,7 @@ async fn health_check_endpoint_should_return_status_ok_if_api_is_running() {
 
     let url = format!("http://{}/api/health_check", env.get_connection_info().bind_address);
 
-    let response = get(&url, None).await;
+    let response = get(&url, None, None).await;
 
     assert_eq!(response.status(), 200);
     assert_eq!(response.headers().get("content-type").unwrap(), "application/json");
