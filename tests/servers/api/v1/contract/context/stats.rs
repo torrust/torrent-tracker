@@ -4,11 +4,12 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker::servers::apis::v1::context::stats::resources::Stats;
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
+use uuid::Uuid;
 
-use crate::common::logging::{self};
+use crate::common::logging::{self, logs_contains_a_line_with};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{assert_stats, assert_token_not_valid, assert_unauthorized};
-use crate::servers::api::v1::client::Client;
+use crate::servers::api::v1::client::{headers_with_request_id, Client};
 use crate::servers::api::Started;
 
 #[tokio::test]
@@ -22,7 +23,11 @@ async fn should_allow_getting_tracker_statistics() {
         &PeerBuilder::default().into(),
     );
 
-    let response = Client::new(env.get_connection_info()).get_tracker_statistics().await;
+    let request_id = Uuid::new_v4();
+
+    let response = Client::new(env.get_connection_info())
+        .get_tracker_statistics(Some(headers_with_request_id(request_id)))
+        .await;
 
     assert_stats(
         response,
@@ -65,17 +70,31 @@ async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users()
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
-        .get_tracker_statistics()
+        .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 
     assert_token_not_valid(response).await;
 
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
+
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
-        .get_tracker_statistics()
+        .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 
     assert_unauthorized(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }

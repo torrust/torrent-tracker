@@ -30,11 +30,18 @@ async fn should_not_authenticate_requests_when_the_token_is_missing() {
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(env.get_connection_info())
-        .get_request_with_query("stats", Query::default(), None)
+        .get_request_with_query("stats", Query::default(), Some(headers_with_request_id(request_id)))
         .await;
 
     assert_unauthorized(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
@@ -57,12 +64,12 @@ async fn should_not_authenticate_requests_when_the_token_is_empty() {
 
     assert_token_not_valid(response).await;
 
-    env.stop().await;
-
     assert!(
         logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
         "Expected logs to contain: ERROR ... API ... request_id={request_id}"
     );
+
+    env.stop().await;
 }
 
 #[tokio::test]
@@ -71,15 +78,22 @@ async fn should_not_authenticate_requests_when_the_token_is_invalid() {
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(env.get_connection_info())
         .get_request_with_query(
             "stats",
             Query::params([QueryParam::new("token", "INVALID TOKEN")].to_vec()),
-            None,
+            Some(headers_with_request_id(request_id)),
         )
         .await;
 
     assert_token_not_valid(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }

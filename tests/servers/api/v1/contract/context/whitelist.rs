@@ -2,14 +2,15 @@ use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_test_helpers::configuration;
+use uuid::Uuid;
 
-use crate::common::logging::{self};
+use crate::common::logging::{self, logs_contains_a_line_with};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{
     assert_failed_to_reload_whitelist, assert_failed_to_remove_torrent_from_whitelist, assert_failed_to_whitelist_torrent,
     assert_invalid_infohash_param, assert_not_found, assert_ok, assert_token_not_valid, assert_unauthorized,
 };
-use crate::servers::api::v1::client::Client;
+use crate::servers::api::v1::client::{headers_with_request_id, Client};
 use crate::servers::api::v1::contract::fixtures::{
     invalid_infohashes_returning_bad_request, invalid_infohashes_returning_not_found,
 };
@@ -21,9 +22,12 @@ async fn should_allow_whitelisting_a_torrent() {
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
+    let request_id = Uuid::new_v4();
     let info_hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
 
-    let response = Client::new(env.get_connection_info()).whitelist_a_torrent(&info_hash).await;
+    let response = Client::new(env.get_connection_info())
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
+        .await;
 
     assert_ok(response).await;
     assert!(
@@ -45,10 +49,18 @@ async fn should_allow_whitelisting_a_torrent_that_has_been_already_whitelisted()
 
     let api_client = Client::new(env.get_connection_info());
 
-    let response = api_client.whitelist_a_torrent(&info_hash).await;
+    let request_id = Uuid::new_v4();
+
+    let response = api_client
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
+        .await;
     assert_ok(response).await;
 
-    let response = api_client.whitelist_a_torrent(&info_hash).await;
+    let request_id = Uuid::new_v4();
+
+    let response = api_client
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
+        .await;
     assert_ok(response).await;
 
     env.stop().await;
@@ -62,17 +74,31 @@ async fn should_not_allow_whitelisting_a_torrent_for_unauthenticated_users() {
 
     let info_hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
-        .whitelist_a_torrent(&info_hash)
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_token_not_valid(response).await;
 
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
+
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
-        .whitelist_a_torrent(&info_hash)
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_unauthorized(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
@@ -87,9 +113,18 @@ async fn should_fail_when_the_torrent_cannot_be_whitelisted() {
 
     force_database_error(&env.tracker);
 
-    let response = Client::new(env.get_connection_info()).whitelist_a_torrent(&info_hash).await;
+    let request_id = Uuid::new_v4();
+
+    let response = Client::new(env.get_connection_info())
+        .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
+        .await;
 
     assert_failed_to_whitelist_torrent(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
@@ -100,17 +135,21 @@ async fn should_fail_whitelisting_a_torrent_when_the_provided_infohash_is_invali
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
+    let request_id = Uuid::new_v4();
+
     for invalid_infohash in &invalid_infohashes_returning_bad_request() {
         let response = Client::new(env.get_connection_info())
-            .whitelist_a_torrent(invalid_infohash)
+            .whitelist_a_torrent(invalid_infohash, Some(headers_with_request_id(request_id)))
             .await;
 
         assert_invalid_infohash_param(response, invalid_infohash).await;
     }
 
+    let request_id = Uuid::new_v4();
+
     for invalid_infohash in &invalid_infohashes_returning_not_found() {
         let response = Client::new(env.get_connection_info())
-            .whitelist_a_torrent(invalid_infohash)
+            .whitelist_a_torrent(invalid_infohash, Some(headers_with_request_id(request_id)))
             .await;
 
         assert_not_found(response).await;
@@ -127,10 +166,13 @@ async fn should_allow_removing_a_torrent_from_the_whitelist() {
 
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
+
     env.tracker.add_torrent_to_whitelist(&info_hash).await.unwrap();
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(env.get_connection_info())
-        .remove_torrent_from_whitelist(&hash)
+        .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_ok(response).await;
@@ -147,8 +189,10 @@ async fn should_not_fail_trying_to_remove_a_non_whitelisted_torrent_from_the_whi
 
     let non_whitelisted_torrent_hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(env.get_connection_info())
-        .remove_torrent_from_whitelist(&non_whitelisted_torrent_hash)
+        .remove_torrent_from_whitelist(&non_whitelisted_torrent_hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_ok(response).await;
@@ -163,16 +207,20 @@ async fn should_fail_removing_a_torrent_from_the_whitelist_when_the_provided_inf
     let env = Started::new(&configuration::ephemeral().into()).await;
 
     for invalid_infohash in &invalid_infohashes_returning_bad_request() {
+        let request_id = Uuid::new_v4();
+
         let response = Client::new(env.get_connection_info())
-            .remove_torrent_from_whitelist(invalid_infohash)
+            .remove_torrent_from_whitelist(invalid_infohash, Some(headers_with_request_id(request_id)))
             .await;
 
         assert_invalid_infohash_param(response, invalid_infohash).await;
     }
 
     for invalid_infohash in &invalid_infohashes_returning_not_found() {
+        let request_id = Uuid::new_v4();
+
         let response = Client::new(env.get_connection_info())
-            .remove_torrent_from_whitelist(invalid_infohash)
+            .remove_torrent_from_whitelist(invalid_infohash, Some(headers_with_request_id(request_id)))
             .await;
 
         assert_not_found(response).await;
@@ -193,11 +241,18 @@ async fn should_fail_when_the_torrent_cannot_be_removed_from_the_whitelist() {
 
     force_database_error(&env.tracker);
 
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(env.get_connection_info())
-        .remove_torrent_from_whitelist(&hash)
+        .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_failed_to_remove_torrent_from_whitelist(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
@@ -212,18 +267,34 @@ async fn should_not_allow_removing_a_torrent_from_the_whitelist_for_unauthentica
     let info_hash = InfoHash::from_str(&hash).unwrap();
 
     env.tracker.add_torrent_to_whitelist(&info_hash).await.unwrap();
+
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
-        .remove_torrent_from_whitelist(&hash)
+        .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_token_not_valid(response).await;
 
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
+
     env.tracker.add_torrent_to_whitelist(&info_hash).await.unwrap();
+
+    let request_id = Uuid::new_v4();
+
     let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
-        .remove_torrent_from_whitelist(&hash)
+        .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 
     assert_unauthorized(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
@@ -238,7 +309,11 @@ async fn should_allow_reload_the_whitelist_from_the_database() {
     let info_hash = InfoHash::from_str(&hash).unwrap();
     env.tracker.add_torrent_to_whitelist(&info_hash).await.unwrap();
 
-    let response = Client::new(env.get_connection_info()).reload_whitelist().await;
+    let request_id = Uuid::new_v4();
+
+    let response = Client::new(env.get_connection_info())
+        .reload_whitelist(Some(headers_with_request_id(request_id)))
+        .await;
 
     assert_ok(response).await;
     /* todo: this assert fails because the whitelist has not been reloaded yet.
@@ -267,9 +342,18 @@ async fn should_fail_when_the_whitelist_cannot_be_reloaded_from_the_database() {
 
     force_database_error(&env.tracker);
 
-    let response = Client::new(env.get_connection_info()).reload_whitelist().await;
+    let request_id = Uuid::new_v4();
+
+    let response = Client::new(env.get_connection_info())
+        .reload_whitelist(Some(headers_with_request_id(request_id)))
+        .await;
 
     assert_failed_to_reload_whitelist(response).await;
+
+    assert!(
+        logs_contains_a_line_with(&["ERROR", "API", &format!("{request_id}")]),
+        "Expected logs to contain: ERROR ... API ... request_id={request_id}"
+    );
 
     env.stop().await;
 }
