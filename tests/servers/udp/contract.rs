@@ -118,8 +118,8 @@ mod receiving_an_announce_request {
     use torrust_tracker_configuration::DEFAULT_TIMEOUT;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::common::fixtures::random_info_hash;
-    use crate::common::logging;
+    use crate::common::fixtures::{random_info_hash, random_transaction_id};
+    use crate::common::logging::{self, logs_contains_a_line_with};
     use crate::servers::udp::asserts::is_ipv4_announce_response;
     use crate::servers::udp::contract::send_connection_request;
     use crate::servers::udp::Started;
@@ -235,8 +235,6 @@ mod receiving_an_announce_request {
             Err(err) => panic!("{err}"),
         };
 
-        let tx_id = TransactionId::new(123);
-
         // The eleven first requests should be fine
 
         let invalid_connection_id = ConnectionId::new(0); // Zero is one of the not normal values.
@@ -245,10 +243,22 @@ mod receiving_an_announce_request {
 
         for x in 0..=10 {
             tracing::info!("req no: {x}");
+
+            let tx_id = random_transaction_id();
+
             send_and_get_announce(tx_id, invalid_connection_id, info_hash, &client).await;
+
+            let transaction_id = tx_id.0.to_string();
+
+            assert!(
+                logs_contains_a_line_with(&["ERROR", "UDP TRACKER", &transaction_id.to_string()]),
+                "Expected logs to contain: ERROR ... UDP TRACKER ... transaction_id={transaction_id}"
+            );
         }
 
         // The twelfth request should be banned (timeout error)
+
+        let tx_id = random_transaction_id();
 
         let announce_request = build_sample_announce_request(
             tx_id,
@@ -257,6 +267,7 @@ mod receiving_an_announce_request {
             info_hash,
         );
 
+        // This should return a timeout error
         match client.send(announce_request.into()).await {
             Ok(_) => (),
             Err(err) => panic!("{err}"),

@@ -1,3 +1,4 @@
+use aquatic_udp_protocol::TransactionId;
 use bittorrent_primitives::info_hash::InfoHash;
 
 #[allow(dead_code)]
@@ -19,4 +20,10 @@ pub fn random_info_hash() -> InfoHash {
     let random_bytes: [u8; 20] = rand::Rng::gen(&mut rng);
 
     InfoHash::from_bytes(&random_bytes)
+}
+
+/// Returns a random transaction id.
+pub fn random_transaction_id() -> TransactionId {
+    let random_value = rand::Rng::gen::<i32>(&mut rand::thread_rng());
+    TransactionId::new(random_value)
 }
