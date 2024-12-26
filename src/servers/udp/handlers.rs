@@ -22,7 +22,7 @@ use super::server::banning::BanService;
 use super::RawRequest;
 use crate::core::{statistics, PeersWanted, Tracker};
 use crate::servers::udp::error::Error;
-use crate::servers::udp::peer_builder;
+use crate::servers::udp::{peer_builder, UDP_TRACKER_LOG_TARGET};
 use crate::shared::bit_torrent::common::MAX_SCRAPE_TORRENTS;
 use crate::CurrentClock;
 
@@ -61,7 +61,9 @@ pub(crate) async fn handle_packet(
     cookie_time_values: CookieTimeValues,
     ban_service: Arc<RwLock<BanService>>,
 ) -> Response {
-    tracing::Span::current().record("request_id", Uuid::new_v4().to_string());
+    let request_id = Uuid::new_v4();
+
+    tracing::Span::current().record("request_id", request_id.to_string());
     tracing::debug!("Handling Packets: {udp_request:?}");
 
     let start_time = Instant::now();
@@ -84,6 +86,8 @@ pub(crate) async fn handle_packet(
 
                     handle_error(
                         udp_request.from,
+                        local_addr,
+                        request_id,
                         tracker,
                         cookie_time_values.valid_range.clone(),
                         &e,
@@ -92,7 +96,18 @@ pub(crate) async fn handle_packet(
                     .await
                 }
             },
-            Err(e) => handle_error(udp_request.from, tracker, cookie_time_values.valid_range.clone(), &e, None).await,
+            Err(e) => {
+                handle_error(
+                    udp_request.from,
+                    local_addr,
+                    request_id,
+                    tracker,
+                    cookie_time_values.valid_range.clone(),
+                    &e,
+                    None,
+                )
+                .await
+            }
         };
 
     let latency = start_time.elapsed();
@@ -344,12 +359,24 @@ pub async fn handle_scrape(
 #[instrument(fields(transaction_id), skip(tracker), ret(level = Level::TRACE))]
 async fn handle_error(
     remote_addr: SocketAddr,
+    local_addr: SocketAddr,
+    request_id: Uuid,
     tracker: &Tracker,
     cookie_valid_range: Range<f64>,
     e: &Error,
     transaction_id: Option<TransactionId>,
 ) -> Response {
     tracing::trace!("handle error");
+
+    match transaction_id {
+        Some(transaction_id) => {
+            let transaction_id = transaction_id.0.to_string();
+            tracing::error!(target: UDP_TRACKER_LOG_TARGET, error = %e, %remote_addr, %local_addr, %request_id, %transaction_id, "response error");
+        }
+        None => {
+            tracing::error!(target: UDP_TRACKER_LOG_TARGET, error = %e, %remote_addr, %local_addr, %request_id, "response error");
+        }
+    }
 
     let e = if let Error::RequestParseError { request_parse_error } = e {
         match request_parse_error {
