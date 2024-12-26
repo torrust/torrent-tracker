@@ -1217,8 +1217,10 @@ mod configured_as_whitelisted {
 
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_test_helpers::configuration;
+        use uuid::Uuid;
 
-        use crate::common::logging::{self};
+        use crate::common::fixtures::random_info_hash;
+        use crate::common::logging::{self, logs_contains_a_line_with};
         use crate::servers::http::asserts::{assert_is_announce_response, assert_torrent_not_in_whitelist_error_response};
         use crate::servers::http::client::Client;
         use crate::servers::http::requests::announce::QueryBuilder;
@@ -1230,13 +1232,23 @@ mod configured_as_whitelisted {
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
-            let info_hash = InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap();
+            let request_id = Uuid::new_v4();
+            let info_hash = random_info_hash();
 
             let response = Client::new(*env.bind_address())
-                .announce(&QueryBuilder::default().with_info_hash(&info_hash).query())
+                .announce_with_header(
+                    &QueryBuilder::default().with_info_hash(&info_hash).query(),
+                    "x-request-id",
+                    &request_id.to_string(),
+                )
                 .await;
 
             assert_torrent_not_in_whitelist_error_response(response).await;
+
+            assert!(
+                logs_contains_a_line_with(&["ERROR", &format!("{info_hash}"), "is not whitelisted"]),
+                "Expected logs to contain: ERROR ... {info_hash} is not whitelisted"
+            );
 
             env.stop().await;
         }
@@ -1272,7 +1284,8 @@ mod configured_as_whitelisted {
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::common::logging::{self};
+        use crate::common::fixtures::random_info_hash;
+        use crate::common::logging::{self, logs_contains_a_line_with};
         use crate::servers::http::asserts::assert_scrape_response;
         use crate::servers::http::client::Client;
         use crate::servers::http::responses::scrape::{File, ResponseBuilder};
@@ -1284,7 +1297,7 @@ mod configured_as_whitelisted {
 
             let env = Started::new(&configuration::ephemeral_listed().into()).await;
 
-            let info_hash = InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap();
+            let info_hash = random_info_hash();
 
             env.add_torrent_peer(
                 &info_hash,
@@ -1305,6 +1318,11 @@ mod configured_as_whitelisted {
             let expected_scrape_response = ResponseBuilder::default().add_file(info_hash.bytes(), File::zeroed()).build();
 
             assert_scrape_response(response, &expected_scrape_response).await;
+
+            assert!(
+                logs_contains_a_line_with(&["ERROR", &format!("{info_hash}"), "is not whitelisted"]),
+                "Expected logs to contain: ERROR ... {info_hash} is not whitelisted"
+            );
 
             env.stop().await;
         }
