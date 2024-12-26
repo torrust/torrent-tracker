@@ -121,7 +121,7 @@ use std::ops::Range;
 /// # Panics
 ///
 /// It would panic if the range start is not smaller than it's end.
-#[instrument(err)]
+#[instrument]
 pub fn check(cookie: &Cookie, fingerprint: u64, valid_range: Range<f64>) -> Result<f64, Error> {
     assert!(valid_range.start <= valid_range.end, "range start is larger than range end");
 
