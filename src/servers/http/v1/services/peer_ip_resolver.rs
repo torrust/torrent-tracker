@@ -63,7 +63,7 @@ pub enum PeerIpResolutionError {
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = true;
 ///
@@ -85,7 +85,7 @@ pub enum PeerIpResolutionError {
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = false;
 ///

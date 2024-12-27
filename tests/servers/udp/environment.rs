@@ -2,13 +2,13 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use torrust_tracker::bootstrap::app::initialize_with_configuration;
-use torrust_tracker::core::Tracker;
-use torrust_tracker::servers::registar::Registar;
-use torrust_tracker::servers::udp::server::spawner::Spawner;
-use torrust_tracker::servers::udp::server::states::{Running, Stopped};
-use torrust_tracker::servers::udp::server::Server;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
+use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
+use torrust_tracker_lib::core::Tracker;
+use torrust_tracker_lib::servers::registar::Registar;
+use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
+use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};
+use torrust_tracker_lib::servers::udp::server::Server;
 use torrust_tracker_primitives::peer;
 
 pub struct Environment<S>

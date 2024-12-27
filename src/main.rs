@@ -1,4 +1,4 @@
-use torrust_tracker::{app, bootstrap};
+use torrust_tracker_lib::{app, bootstrap};
 
 #[tokio::main]
 async fn main() {

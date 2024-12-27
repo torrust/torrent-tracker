@@ -1,4 +1,4 @@
-use torrust_tracker::servers::udp::server::states::Running;
+use torrust_tracker_lib::servers::udp::server::states::Running;
 
 pub mod asserts;
 pub mod contract;

@@ -7,8 +7,8 @@ use core::panic;
 
 use aquatic_udp_protocol::{ConnectRequest, ConnectionId, Response, TransactionId};
 use bittorrent_tracker_client::udp::client::UdpTrackerClient;
-use torrust_tracker::shared::bit_torrent::tracker::udp::MAX_PACKET_SIZE;
 use torrust_tracker_configuration::DEFAULT_TIMEOUT;
+use torrust_tracker_lib::shared::bit_torrent::tracker::udp::MAX_PACKET_SIZE;
 use torrust_tracker_test_helpers::configuration;
 
 use crate::common::logging;

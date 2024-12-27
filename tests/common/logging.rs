@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::io;
 use std::sync::{Mutex, MutexGuard, Once, OnceLock};
 
-use torrust_tracker::bootstrap::logging::TraceStyle;
+use torrust_tracker_lib::bootstrap::logging::TraceStyle;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::fmt::MakeWriter;
 

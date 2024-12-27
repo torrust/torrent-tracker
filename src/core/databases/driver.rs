@@ -30,8 +30,8 @@ pub enum Driver {
 /// Example for `SQLite3`:
 ///
 /// ```text
-/// use torrust_tracker::core::databases;
-/// use torrust_tracker::core::databases::driver::Driver;
+/// use torrust_tracker_lib::core::databases;
+/// use torrust_tracker_lib::core::databases::driver::Driver;
 ///
 /// let db_driver = Driver::Sqlite3;
 /// let db_path = "./storage/tracker/lib/database/sqlite3.db".to_string();
@@ -41,8 +41,8 @@ pub enum Driver {
 /// Example for `MySQL`:
 ///
 /// ```text
-/// use torrust_tracker::core::databases;
-/// use torrust_tracker::core::databases::driver::Driver;
+/// use torrust_tracker_lib::core::databases;
+/// use torrust_tracker_lib::core::databases::driver::Driver;
 ///
 /// let db_driver = Driver::MySQL;
 /// let db_path = "mysql://db_user:db_user_secret_password@mysql:3306/torrust_tracker".to_string();

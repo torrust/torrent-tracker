@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use torrust_tracker::servers::apis::v1::context::torrent::resources::peer::Peer;
-use torrust_tracker::servers::apis::v1::context::torrent::resources::torrent::{self, Torrent};
+use torrust_tracker_lib::servers::apis::v1::context::torrent::resources::peer::Peer;
+use torrust_tracker_lib::servers::apis::v1::context::torrent::resources::torrent::{self, Torrent};
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
