@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use torrust_tracker::core::Tracker;
-use torrust_tracker::servers::apis::server;
+use torrust_tracker_lib::core::Tracker;
+use torrust_tracker_lib::servers::apis::server;
 
 pub mod connection_info;
 pub mod environment;

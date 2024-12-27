@@ -12,7 +12,7 @@
 //! Keys are stored in this struct:
 //!
 //! ```rust,no_run
-//! use torrust_tracker::core::auth::Key;
+//! use torrust_tracker_lib::core::auth::Key;
 //! use torrust_tracker_primitives::DurationSinceUnixEpoch;
 //!
 //! pub struct ExpiringKey {
@@ -26,7 +26,7 @@
 //! You can generate a new key valid for `9999` seconds and `0` nanoseconds from the current time with the following:
 //!
 //! ```rust,no_run
-//! use torrust_tracker::core::auth;
+//! use torrust_tracker_lib::core::auth;
 //! use std::time::Duration;
 //!
 //! let expiring_key = auth::generate_key(Some(Duration::new(9999, 0)));
@@ -197,7 +197,7 @@ impl Key {
 /// Error returned when a key cannot be parsed from a string.
 ///
 /// ```text
-/// use torrust_tracker::core::auth::Key;
+/// use torrust_tracker_lib::core::auth::Key;
 /// use std::str::FromStr;
 ///
 /// let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";

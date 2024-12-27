@@ -1,4 +1,4 @@
-use torrust_tracker::servers::apis::v1::context::health_check::resources::{Report, Status};
+use torrust_tracker_lib::servers::apis::v1::context::health_check::resources::{Report, Status};
 use torrust_tracker_test_helpers::configuration;
 
 use crate::common::logging;

@@ -8,7 +8,7 @@ pub mod v1;
 pub type Started = environment::Environment<server::Running>;
 
 use percent_encoding::NON_ALPHANUMERIC;
-use torrust_tracker::servers::http::server;
+use torrust_tracker_lib::servers::http::server;
 
 pub type ByteArray20 = [u8; 20];
 
