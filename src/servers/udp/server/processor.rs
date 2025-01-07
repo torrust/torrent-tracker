@@ -1,13 +1,16 @@
 use std::io::Cursor;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 
 use aquatic_udp_protocol::Response;
 use tokio::sync::RwLock;
+use tokio::time::Instant;
 use tracing::{instrument, Level};
 
 use super::banning::BanService;
 use super::bound_socket::BoundSocket;
+use crate::core::statistics::event::UdpResponseKind;
 use crate::core::{statistics, Tracker};
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
@@ -30,6 +33,9 @@ impl Processor {
     #[instrument(skip(self, request, ban_service))]
     pub async fn process_request(self, request: RawRequest, ban_service: Arc<RwLock<BanService>>) {
         let from = request.from;
+
+        let start_time = Instant::now();
+
         let response = handlers::handle_packet(
             request,
             &self.tracker,
@@ -39,11 +45,13 @@ impl Processor {
         )
         .await;
 
-        self.send_response(from, response).await;
+        let elapsed_time = start_time.elapsed();
+
+        self.send_response(from, response, elapsed_time).await;
     }
 
     #[instrument(skip(self))]
-    async fn send_response(self, target: SocketAddr, response: Response) {
+    async fn send_response(self, target: SocketAddr, response: Response, req_processing_time: Duration) {
         tracing::debug!("send response");
 
         let response_type = match &response {
@@ -52,6 +60,13 @@ impl Processor {
             Response::AnnounceIpv6(_) => "AnnounceIpv6".to_string(),
             Response::Scrape(_) => "Scrape".to_string(),
             Response::Error(e) => format!("Error: {e:?}"),
+        };
+
+        let response_kind = match &response {
+            Response::Connect(_) => UdpResponseKind::Connect,
+            Response::AnnounceIpv4(_) | Response::AnnounceIpv6(_) => UdpResponseKind::Announce,
+            Response::Scrape(_) => UdpResponseKind::Scrape,
+            Response::Error(_e) => UdpResponseKind::Error,
         };
 
         let mut writer = Cursor::new(Vec::with_capacity(200));
@@ -71,10 +86,20 @@ impl Processor {
 
                         match target.ip() {
                             IpAddr::V4(_) => {
-                                self.tracker.send_stats_event(statistics::event::Event::Udp4Response).await;
+                                self.tracker
+                                    .send_stats_event(statistics::event::Event::Udp4Response {
+                                        kind: response_kind,
+                                        req_processing_time,
+                                    })
+                                    .await;
                             }
                             IpAddr::V6(_) => {
-                                self.tracker.send_stats_event(statistics::event::Event::Udp6Response).await;
+                                self.tracker
+                                    .send_stats_event(statistics::event::Event::Udp6Response {
+                                        kind: response_kind,
+                                        req_processing_time,
+                                    })
+                                    .await;
                             }
                         }
                     }

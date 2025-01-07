@@ -44,7 +44,10 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         Event::Udp4Scrape => {
             stats_repository.increase_udp4_scrapes().await;
         }
-        Event::Udp4Response => {
+        Event::Udp4Response {
+            kind: _,
+            req_processing_time: _,
+        } => {
             stats_repository.increase_udp4_responses().await;
         }
         Event::Udp4Error => {
@@ -64,7 +67,10 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         Event::Udp6Scrape => {
             stats_repository.increase_udp6_scrapes().await;
         }
-        Event::Udp6Response => {
+        Event::Udp6Response {
+            kind: _,
+            req_processing_time: _,
+        } => {
             stats_repository.increase_udp6_responses().await;
         }
         Event::Udp6Error => {
