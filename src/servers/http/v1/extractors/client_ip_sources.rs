@@ -35,14 +35,13 @@
 //! `right_most_x_forwarded_for` = 126.0.0.2
 //! `connection_info_ip`         = 126.0.0.3
 //! ```
+use std::future::Future;
 use std::net::SocketAddr;
 
 use axum::extract::{ConnectInfo, FromRequestParts};
 use axum::http::request::Parts;
 use axum::response::Response;
 use axum_client_ip::RightmostXForwardedFor;
-use futures::future::BoxFuture;
-use futures::FutureExt;
 
 use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
@@ -56,17 +55,9 @@ where
 {
     type Rejection = Response;
 
-    #[must_use]
-    fn from_request_parts<'life0, 'life1, 'async_trait>(
-        parts: &'life0 mut Parts,
-        state: &'life1 S,
-    ) -> BoxFuture<'async_trait, Result<Self, Self::Rejection>>
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
-        async {
+    #[allow(clippy::manual_async_fn)]
+    fn from_request_parts(parts: &mut Parts, state: &S) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        async move {
             let right_most_x_forwarded_for = match RightmostXForwardedFor::from_request_parts(parts, state).await {
                 Ok(right_most_x_forwarded_for) => Some(right_most_x_forwarded_for.0),
                 Err(_) => None,
@@ -82,6 +73,5 @@ where
                 connection_info_ip,
             }))
         }
-        .boxed()
     }
 }
