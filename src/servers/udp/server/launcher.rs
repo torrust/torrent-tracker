@@ -202,7 +202,7 @@ impl Launcher {
 
                 if old_request_aborted {
                     // Evicted task from active requests buffer was aborted.
-                    tracker.send_stats_event(statistics::event::Event::Udp4RequestAborted).await;
+                    tracker.send_stats_event(statistics::event::Event::UdpRequestAborted).await;
                 }
             } else {
                 tokio::task::yield_now().await;

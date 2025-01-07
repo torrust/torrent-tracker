@@ -24,7 +24,7 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         }
 
         // UDP
-        Event::Udp4RequestAborted => {
+        Event::UdpRequestAborted => {
             stats_repository.increase_udp_requests_aborted().await;
         }
 
