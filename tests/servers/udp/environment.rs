@@ -2,10 +2,13 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
 use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::registar::Registar;
+use torrust_tracker_lib::servers::udp::server::banning::BanService;
+use torrust_tracker_lib::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
 use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};
 use torrust_tracker_lib::servers::udp::server::Server;
@@ -17,6 +20,7 @@ where
 {
     pub config: Arc<UdpTracker>,
     pub tracker: Arc<Tracker>,
+    pub ban_service: Arc<RwLock<BanService>>,
     pub registar: Registar,
     pub server: Server<S>,
 }
@@ -36,6 +40,7 @@ impl Environment<Stopped> {
     #[allow(dead_code)]
     pub fn new(configuration: &Arc<Configuration>) -> Self {
         let tracker = initialize_with_configuration(configuration);
+        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
         let udp_tracker = configuration.udp_trackers.clone().expect("missing UDP tracker configuration");
 
@@ -48,6 +53,7 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker,
+            ban_service,
             registar: Registar::default(),
             server,
         }
@@ -59,10 +65,11 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            ban_service: self.ban_service.clone(),
             registar: self.registar.clone(),
             server: self
                 .server
-                .start(self.tracker, self.registar.give_form(), cookie_lifetime)
+                .start(self.tracker, self.ban_service, self.registar.give_form(), cookie_lifetime)
                 .await
                 .unwrap(),
         }
@@ -85,6 +92,7 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            ban_service: self.ban_service,
             registar: Registar::default(),
             server: stopped.expect("it stop the udp tracker service"),
         }

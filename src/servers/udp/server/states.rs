@@ -5,9 +5,11 @@ use std::time::Duration;
 
 use derive_more::derive::Display;
 use derive_more::Constructor;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::{instrument, Level};
 
+use super::banning::BanService;
 use super::spawner::Spawner;
 use super::{Server, UdpError};
 use crate::bootstrap::jobs::Started;
@@ -62,10 +64,11 @@ impl Server<Stopped> {
     ///
     /// It panics if unable to receive the bound socket address from service.
     ///
-    #[instrument(skip(self, tracker, form), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, ban_service, form), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
         form: ServiceRegistrationForm,
         cookie_lifetime: Duration,
     ) -> Result<Server<Running>, std::io::Error> {
@@ -75,7 +78,10 @@ impl Server<Stopped> {
         assert!(!tx_halt.is_closed(), "Halt channel for UDP tracker should be open");
 
         // May need to wrap in a task to about a tokio bug.
-        let task = self.state.spawner.spawn_launcher(tracker, cookie_lifetime, tx_start, rx_halt);
+        let task = self
+            .state
+            .spawner
+            .spawn_launcher(tracker, ban_service, cookie_lifetime, tx_start, rx_halt);
 
         let local_addr = rx_start.await.expect("it should be able to start the service").address;
 

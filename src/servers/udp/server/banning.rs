@@ -20,7 +20,6 @@ use std::net::IpAddr;
 
 use bloom::{CountingBloomFilter, ASMS};
 use tokio::time::Instant;
-use url::Url;
 
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 
@@ -28,16 +27,14 @@ pub struct BanService {
     max_connection_id_errors_per_ip: u32,
     fuzzy_error_counter: CountingBloomFilter,
     accurate_error_counter: HashMap<IpAddr, u32>,
-    local_addr: Url,
     last_connection_id_errors_reset: Instant,
 }
 
 impl BanService {
     #[must_use]
-    pub fn new(max_connection_id_errors_per_ip: u32, local_addr: Url) -> Self {
+    pub fn new(max_connection_id_errors_per_ip: u32) -> Self {
         Self {
             max_connection_id_errors_per_ip,
-            local_addr,
             fuzzy_error_counter: CountingBloomFilter::with_rate(4, 0.01, 100),
             accurate_error_counter: HashMap::new(),
             last_connection_id_errors_reset: tokio::time::Instant::now(),
@@ -82,8 +79,7 @@ impl BanService {
 
         self.last_connection_id_errors_reset = Instant::now();
 
-        let local_addr = self.local_addr.to_string();
-        tracing::info!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_udp_server::loop (connection id errors filter cleared)");
+        tracing::info!(target: UDP_TRACKER_LOG_TARGET, "Udp::run_udp_server::loop (connection id errors filter cleared)");
     }
 }
 
@@ -95,8 +91,7 @@ mod tests {
 
     /// Sample service with one day ban duration.
     fn ban_service(counter_limit: u32) -> BanService {
-        let udp_tracker_url = "udp://127.0.0.1".parse().unwrap();
-        BanService::new(counter_limit, udp_tracker_url)
+        BanService::new(counter_limit)
     }
 
     #[test]
