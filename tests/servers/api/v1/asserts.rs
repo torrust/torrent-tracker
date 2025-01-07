@@ -117,7 +117,7 @@ pub async fn assert_unprocessable_auth_key_duration_param(response: Response, _i
 pub async fn assert_invalid_key_duration_param(response: Response, invalid_key_duration: &str) {
     assert_bad_request(
         response,
-        &format!("Invalid URL: Cannot parse `\"{invalid_key_duration}\"` to a `u64`"),
+        &format!("Invalid URL: Cannot parse `{invalid_key_duration}` to a `u64`"),
     )
     .await;
 }
