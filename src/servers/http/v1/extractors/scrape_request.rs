@@ -27,12 +27,12 @@
 //! ```text
 //! d14:failure reason235:Bad request. Cannot parse query params for scrape request: invalid param value invalid for info_hash in not enough bytes for infohash: got 7 bytes, expected 20 src/shared/bit_torrent/info_hash.rs:240:27, src/servers/http/v1/requests/scrape.rs:66:46e
 //! ```
+use std::future::Future;
 use std::panic::Location;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
-use futures::future::BoxFuture;
 use futures::FutureExt;
 
 use crate::servers::http::v1::query::Query;
@@ -49,16 +49,7 @@ where
 {
     type Rejection = Response;
 
-    #[must_use]
-    fn from_request_parts<'life0, 'life1, 'async_trait>(
-        parts: &'life0 mut Parts,
-        _state: &'life1 S,
-    ) -> BoxFuture<'async_trait, Result<Self, Self::Rejection>>
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
+    fn from_request_parts(parts: &mut Parts, _state: &S) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
         async {
             match extract_scrape_from(parts.uri.query()) {
                 Ok(scrape_request) => Ok(ExtractRequest(scrape_request)),

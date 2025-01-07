@@ -27,7 +27,7 @@ pub fn add(prefix: &str, router: Router, tracker: Arc<Tracker>) -> Router {
             //
             // The POST /key/:seconds_valid has been deprecated and it will removed in the future.
             // Use POST /keys
-            &format!("{prefix}/key/:seconds_valid_or_key"),
+            &format!("{prefix}/key/{{seconds_valid_or_key}}"),
             post(generate_auth_key_handler)
                 .with_state(tracker.clone())
                 .delete(delete_auth_key_handler)

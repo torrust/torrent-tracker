@@ -42,14 +42,13 @@
 //! > Neither [The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html)
 //! > nor [The Private Torrents](https://www.bittorrent.org/beps/bep_0027.html)
 //! > specifications specify any HTTP status code for authentication errors.
+use std::future::Future;
 use std::panic::Location;
 
 use axum::extract::rejection::PathRejection;
 use axum::extract::{FromRequestParts, Path};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
-use futures::future::BoxFuture;
-use futures::FutureExt;
 use serde::Deserialize;
 
 use crate::core::auth::Key;
@@ -71,21 +70,13 @@ impl KeyParam {
 
 impl<S> FromRequestParts<S> for Extract
 where
-    S: Send + Sync,
+    S: Send + Sync + 'static,
 {
     type Rejection = Response;
 
-    #[must_use]
-    fn from_request_parts<'life0, 'life1, 'async_trait>(
-        parts: &'life0 mut Parts,
-        state: &'life1 S,
-    ) -> BoxFuture<'async_trait, Result<Self, Self::Rejection>>
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        Self: 'async_trait,
-    {
-        async {
+    #[allow(clippy::manual_async_fn)]
+    fn from_request_parts(parts: &mut Parts, state: &S) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        async move {
             // Extract `key` from URL path with Axum `Path` extractor
             let maybe_path_with_key = Path::<KeyParam>::from_request_parts(parts, state).await;
 
@@ -94,7 +85,6 @@ where
                 Err(error) => Err(error.into_response()),
             }
         }
-        .boxed()
     }
 }
 

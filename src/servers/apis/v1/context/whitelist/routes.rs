@@ -20,11 +20,11 @@ pub fn add(prefix: &str, router: Router, tracker: Arc<Tracker>) -> Router {
     router
         // Whitelisted torrents
         .route(
-            &format!("{prefix}/:info_hash"),
+            &format!("{prefix}/{{info_hash}}"),
             post(add_torrent_to_whitelist_handler).with_state(tracker.clone()),
         )
         .route(
-            &format!("{prefix}/:info_hash"),
+            &format!("{prefix}/{{info_hash}}"),
             delete(remove_torrent_from_whitelist_handler).with_state(tracker.clone()),
         )
         // Whitelist commands
