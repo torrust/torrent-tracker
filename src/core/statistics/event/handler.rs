@@ -27,6 +27,9 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         Event::UdpRequestAborted => {
             stats_repository.increase_udp_requests_aborted().await;
         }
+        Event::UdpRequestBanned => {
+            stats_repository.increase_udp_requests_banned().await;
+        }
 
         // UDP4
         Event::Udp4Request => {

@@ -76,6 +76,7 @@ pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
             tcp6_scrapes_handled: stats.tcp6_scrapes_handled,
             // UDP
             udp_requests_aborted: stats.udp_requests_aborted,
+            udp_requests_banned: stats.udp_requests_banned,
             udp4_requests: stats.udp4_requests,
             udp4_connections_handled: stats.udp4_connections_handled,
             udp4_announces_handled: stats.udp4_announces_handled,

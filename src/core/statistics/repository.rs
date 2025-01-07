@@ -70,6 +70,12 @@ impl Repository {
         drop(stats_lock);
     }
 
+    pub async fn increase_udp_requests_banned(&self) {
+        let mut stats_lock = self.stats.write().await;
+        stats_lock.udp_requests_banned += 1;
+        drop(stats_lock);
+    }
+
     pub async fn increase_udp4_requests(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp4_requests += 1;

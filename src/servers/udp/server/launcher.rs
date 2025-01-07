@@ -175,6 +175,9 @@ impl Launcher {
 
                 if ban_service.read().await.is_banned(&req.from.ip()) {
                     tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr,  "Udp::run_udp_server::loop continue: (banned ip)");
+
+                    tracker.send_stats_event(statistics::event::Event::UdpRequestBanned).await;
+
                     continue;
                 }
 

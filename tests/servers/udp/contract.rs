@@ -229,6 +229,7 @@ mod receiving_an_announce_request {
         logging::setup();
 
         let env = Started::new(&configuration::ephemeral().into()).await;
+        let tracker = env.tracker.clone();
 
         let client = match UdpTrackerClient::new(env.bind_address(), DEFAULT_TIMEOUT).await {
             Ok(udp_tracker_client) => udp_tracker_client,
@@ -267,6 +268,8 @@ mod receiving_an_announce_request {
             info_hash,
         );
 
+        let udp_requests_banned_before = tracker.get_stats().await.udp_requests_banned;
+
         // This should return a timeout error
         match client.send(announce_request.into()).await {
             Ok(_) => (),
@@ -274,6 +277,11 @@ mod receiving_an_announce_request {
         };
 
         assert!(client.receive().await.is_err());
+
+        let udp_requests_banned_after = tracker.get_stats().await.udp_requests_banned;
+
+        // UDP counter for banned requests should be increased by 1
+        assert_eq!(udp_requests_banned_after, udp_requests_banned_before + 1);
 
         env.stop().await;
     }

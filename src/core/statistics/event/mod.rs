@@ -19,6 +19,7 @@ pub enum Event {
     Tcp6Announce,
     Tcp6Scrape,
     UdpRequestAborted,
+    UdpRequestBanned,
     Udp4Request,
     Udp4Connect,
     Udp4Announce,

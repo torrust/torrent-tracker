@@ -31,6 +31,9 @@ pub struct Metrics {
     /// Total number of UDP (UDP tracker) requests aborted.
     pub udp_requests_aborted: u64,
 
+    /// Total number of UDP (UDP tracker) requests banned.
+    pub udp_requests_banned: u64,
+
     /// Total number of UDP (UDP tracker) requests from IPv4 peers.
     pub udp4_requests: u64,
 

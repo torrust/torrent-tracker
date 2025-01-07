@@ -45,6 +45,7 @@ async fn should_allow_getting_tracker_statistics() {
             tcp6_scrapes_handled: 0,
             // UDP
             udp_requests_aborted: 0,
+            udp_requests_banned: 0,
             udp4_requests: 0,
             udp4_connections_handled: 0,
             udp4_announces_handled: 0,
