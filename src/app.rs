@@ -113,6 +113,7 @@ pub async fn start(
         if let Some(job) = tracker_apis::start_job(
             http_api_config,
             tracker.clone(),
+            ban_service.clone(),
             registar.give_form(),
             servers::apis::Version::V1,
         )

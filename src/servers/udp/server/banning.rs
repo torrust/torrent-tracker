@@ -52,6 +52,11 @@ impl BanService {
     }
 
     #[must_use]
+    pub fn get_banned_ips_total(&self) -> usize {
+        self.accurate_error_counter.len()
+    }
+
+    #[must_use]
     pub fn get_estimate_count(&self, ip: &IpAddr) -> u32 {
         self.fuzzy_error_counter.estimate_count(&ip.to_string())
     }

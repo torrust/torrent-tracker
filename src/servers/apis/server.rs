@@ -33,6 +33,7 @@ use derive_more::Constructor;
 use futures::future::BoxFuture;
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
+use tokio::sync::RwLock;
 use torrust_tracker_configuration::AccessTokens;
 use tracing::{instrument, Level};
 
@@ -44,6 +45,7 @@ use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::{ServiceHealthCheckJob, ServiceRegistration, ServiceRegistrationForm};
 use crate::servers::signals::{graceful_shutdown, Halted};
+use crate::servers::udp::server::banning::BanService;
 
 /// Errors that can occur when starting or stopping the API server.
 #[derive(Debug, Error)]
@@ -122,10 +124,11 @@ impl ApiServer<Stopped> {
     /// # Panics
     ///
     /// It would panic if the bound socket address cannot be sent back to this starter.
-    #[instrument(skip(self, tracker, form, access_tokens), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, ban_service, form, access_tokens), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
         form: ServiceRegistrationForm,
         access_tokens: Arc<AccessTokens>,
     ) -> Result<ApiServer<Running>, Error> {
@@ -137,7 +140,7 @@ impl ApiServer<Stopped> {
         let task = tokio::spawn(async move {
             tracing::debug!(target: API_LOG_TARGET, "Starting with launcher in spawned task ...");
 
-            let _task = launcher.start(tracker, access_tokens, tx_start, rx_halt).await;
+            let _task = launcher.start(tracker, ban_service, access_tokens, tx_start, rx_halt).await;
 
             tracing::debug!(target: API_LOG_TARGET, "Started with launcher in spawned task");
 
@@ -235,10 +238,11 @@ impl Launcher {
     ///
     /// Will panic if unable to bind to the socket, or unable to get the address of the bound socket.
     /// Will also panic if unable to send message regarding the bound socket address.
-    #[instrument(skip(self, tracker, access_tokens, tx_start, rx_halt))]
+    #[instrument(skip(self, tracker, ban_service, access_tokens, tx_start, rx_halt))]
     pub fn start(
         &self,
         tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
         access_tokens: Arc<AccessTokens>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
@@ -246,7 +250,7 @@ impl Launcher {
         let socket = std::net::TcpListener::bind(self.bind_to).expect("Could not bind tcp_listener to address.");
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
-        let router = router(tracker, access_tokens, address);
+        let router = router(tracker, ban_service, access_tokens, address);
 
         let handle = Handle::new();
 
@@ -294,12 +298,15 @@ impl Launcher {
 mod tests {
     use std::sync::Arc;
 
+    use tokio::sync::RwLock;
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::make_rust_tls;
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
+    use crate::servers::udp::server::banning::BanService;
+    use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
     #[tokio::test]
     async fn it_should_be_able_to_start_and_stop() {
@@ -307,6 +314,7 @@ mod tests {
         let config = &cfg.http_api.clone().unwrap();
 
         let tracker = initialize_with_configuration(&cfg);
+        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
         let bind_to = config.bind_address;
 
@@ -321,7 +329,7 @@ mod tests {
         let register = &Registar::default();
 
         let started = stopped
-            .start(tracker, register.give_form(), access_tokens)
+            .start(tracker, ban_service, register.give_form(), access_tokens)
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

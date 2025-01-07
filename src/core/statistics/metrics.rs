@@ -34,6 +34,9 @@ pub struct Metrics {
     /// Total number of UDP (UDP tracker) requests banned.
     pub udp_requests_banned: u64,
 
+    /// Total number of banned IPs.
+    pub udp_banned_ips_total: u64,
+
     /// Total number of UDP (UDP tracker) requests from IPv4 peers.
     pub udp4_requests: u64,
 

@@ -15,6 +15,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::{middleware, BoxError, Router};
 use hyper::{Request, StatusCode};
+use tokio::sync::RwLock;
 use torrust_tracker_configuration::{AccessTokens, DEFAULT_TIMEOUT};
 use tower::timeout::TimeoutLayer;
 use tower::ServiceBuilder;
@@ -32,16 +33,22 @@ use super::v1::middlewares::auth::State;
 use crate::core::Tracker;
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::logging::Latency;
+use crate::servers::udp::server::banning::BanService;
 
 /// Add all API routes to the router.
 #[allow(clippy::needless_pass_by_value)]
-#[instrument(skip(tracker, access_tokens))]
-pub fn router(tracker: Arc<Tracker>, access_tokens: Arc<AccessTokens>, server_socket_addr: SocketAddr) -> Router {
+#[instrument(skip(tracker, ban_service, access_tokens))]
+pub fn router(
+    tracker: Arc<Tracker>,
+    ban_service: Arc<RwLock<BanService>>,
+    access_tokens: Arc<AccessTokens>,
+    server_socket_addr: SocketAddr,
+) -> Router {
     let router = Router::new();
 
     let api_url_prefix = "/api";
 
-    let router = v1::routes::add(api_url_prefix, router, tracker.clone());
+    let router = v1::routes::add(api_url_prefix, router, tracker.clone(), ban_service.clone());
 
     let state = State { access_tokens };
 

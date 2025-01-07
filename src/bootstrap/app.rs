@@ -47,11 +47,11 @@ pub fn setup() -> (Configuration, Arc<Tracker>, Arc<RwLock<BanService>>) {
 
     let tracker = initialize_with_configuration(&configuration);
 
-    let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+    let udp_ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
-    (configuration, tracker, ban_service)
+    (configuration, tracker, udp_ban_service)
 }
 
 /// checks if the seed is the instance seed in production.

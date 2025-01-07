@@ -38,6 +38,8 @@ pub struct Stats {
     pub udp_requests_aborted: u64,
     /// Total number of UDP (UDP tracker) requests banned.
     pub udp_requests_banned: u64,
+    /// Total number of IPs banned for UDP (UDP tracker) requests.
+    pub udp_banned_ips_total: u64,
 
     /// Total number of UDP (UDP tracker) requests from IPv4 peers.
     pub udp4_requests: u64,
@@ -83,6 +85,7 @@ impl From<TrackerMetrics> for Stats {
             // UDP
             udp_requests_aborted: metrics.protocol_metrics.udp_requests_aborted,
             udp_requests_banned: metrics.protocol_metrics.udp_requests_banned,
+            udp_banned_ips_total: metrics.protocol_metrics.udp_banned_ips_total,
             udp4_requests: metrics.protocol_metrics.udp4_requests,
             udp4_connections_handled: metrics.protocol_metrics.udp4_connections_handled,
             udp4_announces_handled: metrics.protocol_metrics.udp4_announces_handled,
@@ -128,18 +131,19 @@ mod tests {
                     // UDP
                     udp_requests_aborted: 11,
                     udp_requests_banned: 12,
-                    udp4_requests: 13,
-                    udp4_connections_handled: 14,
-                    udp4_announces_handled: 15,
-                    udp4_scrapes_handled: 16,
-                    udp4_responses: 17,
-                    udp4_errors_handled: 18,
-                    udp6_requests: 19,
-                    udp6_connections_handled: 20,
-                    udp6_announces_handled: 21,
-                    udp6_scrapes_handled: 22,
-                    udp6_responses: 23,
-                    udp6_errors_handled: 24
+                    udp_banned_ips_total: 13,
+                    udp4_requests: 14,
+                    udp4_connections_handled: 15,
+                    udp4_announces_handled: 16,
+                    udp4_scrapes_handled: 17,
+                    udp4_responses: 18,
+                    udp4_errors_handled: 19,
+                    udp6_requests: 20,
+                    udp6_connections_handled: 21,
+                    udp6_announces_handled: 22,
+                    udp6_scrapes_handled: 23,
+                    udp6_responses: 24,
+                    udp6_errors_handled: 25
                 }
             }),
             Stats {
@@ -157,18 +161,19 @@ mod tests {
                 // UDP
                 udp_requests_aborted: 11,
                 udp_requests_banned: 12,
-                udp4_requests: 13,
-                udp4_connections_handled: 14,
-                udp4_announces_handled: 15,
-                udp4_scrapes_handled: 16,
-                udp4_responses: 17,
-                udp4_errors_handled: 18,
-                udp6_requests: 19,
-                udp6_connections_handled: 20,
-                udp6_announces_handled: 21,
-                udp6_scrapes_handled: 22,
-                udp6_responses: 23,
-                udp6_errors_handled: 24
+                udp_banned_ips_total: 13,
+                udp4_requests: 14,
+                udp4_connections_handled: 15,
+                udp4_announces_handled: 16,
+                udp4_scrapes_handled: 17,
+                udp4_responses: 18,
+                udp4_errors_handled: 19,
+                udp6_requests: 20,
+                udp6_connections_handled: 21,
+                udp6_announces_handled: 22,
+                udp6_scrapes_handled: 23,
+                udp6_responses: 24,
+                udp6_errors_handled: 25
             }
         );
     }
