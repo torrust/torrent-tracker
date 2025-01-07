@@ -189,7 +189,11 @@ async fn should_fail_getting_torrents_when_the_offset_query_parameter_cannot_be_
             )
             .await;
 
-        assert_bad_request(response, "Failed to deserialize query string: offset: invalid digit found in string").await;
+        assert_bad_request(
+            response,
+            "Failed to deserialize query string: offset: invalid digit found in string",
+        )
+        .await;
     }
 
     env.stop().await;
@@ -213,7 +217,11 @@ async fn should_fail_getting_torrents_when_the_limit_query_parameter_cannot_be_p
             )
             .await;
 
-        assert_bad_request(response, "Failed to deserialize query string: limit: invalid digit found in string").await;
+        assert_bad_request(
+            response,
+            "Failed to deserialize query string: limit: invalid digit found in string",
+        )
+        .await;
     }
 
     env.stop().await;
