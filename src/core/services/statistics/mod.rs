@@ -70,10 +70,11 @@ pub async fn get_metrics(tracker: Arc<Tracker>, ban_service: Arc<RwLock<BanServi
     TrackerMetrics {
         torrents_metrics,
         protocol_metrics: Metrics {
-            // TCP
+            // TCPv4
             tcp4_connections_handled: stats.tcp4_connections_handled,
             tcp4_announces_handled: stats.tcp4_announces_handled,
             tcp4_scrapes_handled: stats.tcp4_scrapes_handled,
+            // TCPv6
             tcp6_connections_handled: stats.tcp6_connections_handled,
             tcp6_announces_handled: stats.tcp6_announces_handled,
             tcp6_scrapes_handled: stats.tcp6_scrapes_handled,
@@ -81,12 +82,17 @@ pub async fn get_metrics(tracker: Arc<Tracker>, ban_service: Arc<RwLock<BanServi
             udp_requests_aborted: stats.udp_requests_aborted,
             udp_requests_banned: stats.udp_requests_banned,
             udp_banned_ips_total: udp_banned_ips_total as u64,
+            udp_avg_connect_processing_time_ns: stats.udp_avg_connect_processing_time_ns,
+            udp_avg_announce_processing_time_ns: stats.udp_avg_announce_processing_time_ns,
+            udp_avg_scrape_processing_time_ns: stats.udp_avg_scrape_processing_time_ns,
+            // UDPv4
             udp4_requests: stats.udp4_requests,
             udp4_connections_handled: stats.udp4_connections_handled,
             udp4_announces_handled: stats.udp4_announces_handled,
             udp4_scrapes_handled: stats.udp4_scrapes_handled,
             udp4_responses: stats.udp4_responses,
             udp4_errors_handled: stats.udp4_errors_handled,
+            // UDPv6
             udp6_requests: stats.udp6_requests,
             udp6_connections_handled: stats.udp6_connections_handled,
             udp6_announces_handled: stats.udp6_announces_handled,

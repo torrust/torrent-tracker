@@ -47,12 +47,17 @@ async fn should_allow_getting_tracker_statistics() {
             udp_requests_aborted: 0,
             udp_requests_banned: 0,
             udp_banned_ips_total: 0,
+            udp_avg_connect_processing_time_ns: 0,
+            udp_avg_announce_processing_time_ns: 0,
+            udp_avg_scrape_processing_time_ns: 0,
+            // UDPv4
             udp4_requests: 0,
             udp4_connections_handled: 0,
             udp4_announces_handled: 0,
             udp4_scrapes_handled: 0,
             udp4_responses: 0,
             udp4_errors_handled: 0,
+            // UDPv6
             udp6_requests: 0,
             udp6_connections_handled: 0,
             udp6_announces_handled: 0,
