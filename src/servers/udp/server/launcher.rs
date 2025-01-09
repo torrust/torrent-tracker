@@ -24,7 +24,7 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 
 /// The maximum number of connection id errors per ip. Clients will be banned if
 /// they exceed this limit.
-const MAX_CONNECTION_ID_ERRORS_PER_IP: u32 = 10;
+pub const MAX_CONNECTION_ID_ERRORS_PER_IP: u32 = 10;
 const IP_BANS_RESET_INTERVAL_IN_SECS: u64 = 3600;
 
 /// A UDP server instance launcher.
@@ -40,9 +40,10 @@ impl Launcher {
     /// It panics if unable to send address of socket.
     /// It panics if the udp server is loaded when the tracker is private.
     ///
-    #[instrument(skip(tracker, bind_to, tx_start, rx_halt))]
+    #[instrument(skip(tracker, ban_service, bind_to, tx_start, rx_halt))]
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
         bind_to: SocketAddr,
         cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
@@ -80,7 +81,7 @@ impl Launcher {
             let local_addr = local_udp_url.clone();
             tokio::task::spawn(async move {
                 tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_with_graceful_shutdown::task (listening...)");
-                let () = Self::run_udp_server_main(receiver, tracker.clone(), cookie_lifetime).await;
+                let () = Self::run_udp_server_main(receiver, tracker.clone(), ban_service.clone(), cookie_lifetime).await;
             })
         };
 
@@ -117,8 +118,13 @@ impl Launcher {
         ServiceHealthCheckJob::new(binding, info, job)
     }
 
-    #[instrument(skip(receiver, tracker))]
-    async fn run_udp_server_main(mut receiver: Receiver, tracker: Arc<Tracker>, cookie_lifetime: Duration) {
+    #[instrument(skip(receiver, tracker, ban_service))]
+    async fn run_udp_server_main(
+        mut receiver: Receiver,
+        tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
+        cookie_lifetime: Duration,
+    ) {
         let active_requests = &mut ActiveRequests::default();
 
         let addr = receiver.bound_socket_address();
@@ -126,11 +132,6 @@ impl Launcher {
         let local_addr = format!("udp://{addr}");
 
         let cookie_lifetime = cookie_lifetime.as_secs_f64();
-
-        let ban_service = Arc::new(RwLock::new(BanService::new(
-            MAX_CONNECTION_ID_ERRORS_PER_IP,
-            local_addr.parse().unwrap(),
-        )));
 
         let ban_cleaner = ban_service.clone();
 
@@ -175,6 +176,9 @@ impl Launcher {
 
                 if ban_service.read().await.is_banned(&req.from.ip()) {
                     tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr,  "Udp::run_udp_server::loop continue: (banned ip)");
+
+                    tracker.send_stats_event(statistics::event::Event::UdpRequestBanned).await;
+
                     continue;
                 }
 
@@ -202,7 +206,7 @@ impl Launcher {
 
                 if old_request_aborted {
                     // Evicted task from active requests buffer was aborted.
-                    tracker.send_stats_event(statistics::event::Event::Udp4RequestAborted).await;
+                    tracker.send_stats_event(statistics::event::Event::UdpRequestAborted).await;
                 }
             } else {
                 tokio::task::yield_now().await;

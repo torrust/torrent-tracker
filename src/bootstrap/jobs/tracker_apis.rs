@@ -24,6 +24,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use torrust_tracker_configuration::{AccessTokens, HttpApi};
 use tracing::instrument;
@@ -33,6 +34,7 @@ use crate::core;
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
+use crate::servers::udp::server::banning::BanService;
 
 /// This is the message that the "launcher" spawned task sends to the main
 /// application process to notify the API server was successfully started.
@@ -54,10 +56,11 @@ pub struct ApiServerJobStarted();
 /// It would panic if unable to send the  `ApiServerJobStarted` notice.
 ///
 ///
-#[instrument(skip(config, tracker, form))]
+#[instrument(skip(config, tracker, ban_service, form))]
 pub async fn start_job(
     config: &HttpApi,
     tracker: Arc<core::Tracker>,
+    ban_service: Arc<RwLock<BanService>>,
     form: ServiceRegistrationForm,
     version: Version,
 ) -> Option<JoinHandle<()>> {
@@ -70,21 +73,22 @@ pub async fn start_job(
     let access_tokens = Arc::new(config.access_tokens.clone());
 
     match version {
-        Version::V1 => Some(start_v1(bind_to, tls, tracker.clone(), form, access_tokens).await),
+        Version::V1 => Some(start_v1(bind_to, tls, tracker.clone(), ban_service.clone(), form, access_tokens).await),
     }
 }
 
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(socket, tls, tracker, form, access_tokens))]
+#[instrument(skip(socket, tls, tracker, ban_service, form, access_tokens))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    ban_service: Arc<RwLock<BanService>>,
     form: ServiceRegistrationForm,
     access_tokens: Arc<AccessTokens>,
 ) -> JoinHandle<()> {
     let server = ApiServer::new(Launcher::new(socket, tls))
-        .start(tracker, form, access_tokens)
+        .start(tracker, ban_service, form, access_tokens)
         .await
         .expect("it should be able to start to the tracker api");
 
@@ -98,21 +102,25 @@ async fn start_v1(
 mod tests {
     use std::sync::Arc;
 
+    use tokio::sync::RwLock;
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::tracker_apis::start_job;
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
+    use crate::servers::udp::server::banning::BanService;
+    use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
     #[tokio::test]
     async fn it_should_start_http_tracker() {
         let cfg = Arc::new(ephemeral_public());
         let config = &cfg.http_api.clone().unwrap();
         let tracker = initialize_with_configuration(&cfg);
+        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
         let version = Version::V1;
 
-        start_job(config, tracker, Registar::default().give_form(), version)
+        start_job(config, tracker, ban_service, Registar::default().give_form(), version)
             .await
             .expect("it should be able to join to the tracker api start-job");
     }

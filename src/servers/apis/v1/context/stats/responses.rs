@@ -21,6 +21,10 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
     lines.push(format!("completed {}", tracker_metrics.torrents_metrics.downloaded));
     lines.push(format!("leechers {}", tracker_metrics.torrents_metrics.incomplete));
 
+    // TCP
+
+    // TCPv4
+
     lines.push(format!(
         "tcp4_connections_handled {}",
         tracker_metrics.protocol_metrics.tcp4_connections_handled
@@ -33,6 +37,8 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         "tcp4_scrapes_handled {}",
         tracker_metrics.protocol_metrics.tcp4_scrapes_handled
     ));
+
+    // TCPv6
 
     lines.push(format!(
         "tcp6_connections_handled {}",
@@ -47,10 +53,34 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         tracker_metrics.protocol_metrics.tcp6_scrapes_handled
     ));
 
+    // UDP
+
     lines.push(format!(
         "udp_requests_aborted {}",
         tracker_metrics.protocol_metrics.udp_requests_aborted
     ));
+    lines.push(format!(
+        "udp_requests_banned {}",
+        tracker_metrics.protocol_metrics.udp_requests_banned
+    ));
+    lines.push(format!(
+        "udp_banned_ips_total {}",
+        tracker_metrics.protocol_metrics.udp_banned_ips_total
+    ));
+    lines.push(format!(
+        "udp_avg_connect_processing_time_ns {}",
+        tracker_metrics.protocol_metrics.udp_avg_connect_processing_time_ns
+    ));
+    lines.push(format!(
+        "udp_avg_announce_processing_time_ns {}",
+        tracker_metrics.protocol_metrics.udp_avg_announce_processing_time_ns
+    ));
+    lines.push(format!(
+        "udp_avg_scrape_processing_time_ns {}",
+        tracker_metrics.protocol_metrics.udp_avg_scrape_processing_time_ns
+    ));
+
+    // UDPv4
 
     lines.push(format!("udp4_requests {}", tracker_metrics.protocol_metrics.udp4_requests));
     lines.push(format!(
@@ -70,6 +100,8 @@ pub fn metrics_response(tracker_metrics: &TrackerMetrics) -> Response {
         "udp4_errors_handled {}",
         tracker_metrics.protocol_metrics.udp4_errors_handled
     ));
+
+    // UDPv6
 
     lines.push(format!("udp6_requests {}", tracker_metrics.protocol_metrics.udp6_requests));
     lines.push(format!(

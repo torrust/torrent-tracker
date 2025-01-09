@@ -8,12 +8,14 @@
 //! > for the configuration options.
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use torrust_tracker_configuration::UdpTracker;
 use tracing::instrument;
 
 use crate::core;
 use crate::servers::registar::ServiceRegistrationForm;
+use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::spawner::Spawner;
 use crate::servers::udp::server::Server;
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
@@ -29,13 +31,18 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 /// It will panic if the task did not finish successfully.
 #[must_use]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(config, tracker, form))]
-pub async fn start_job(config: &UdpTracker, tracker: Arc<core::Tracker>, form: ServiceRegistrationForm) -> JoinHandle<()> {
+#[instrument(skip(config, tracker, ban_service, form))]
+pub async fn start_job(
+    config: &UdpTracker,
+    tracker: Arc<core::Tracker>,
+    ban_service: Arc<RwLock<BanService>>,
+    form: ServiceRegistrationForm,
+) -> JoinHandle<()> {
     let bind_to = config.bind_address;
     let cookie_lifetime = config.cookie_lifetime;
 
     let server = Server::new(Spawner::new(bind_to))
-        .start(tracker, form, cookie_lifetime)
+        .start(tracker, ban_service, form, cookie_lifetime)
         .await
         .expect("it should be able to start the udp tracker");
 

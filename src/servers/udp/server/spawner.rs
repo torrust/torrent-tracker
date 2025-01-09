@@ -5,9 +5,10 @@ use std::time::Duration;
 
 use derive_more::derive::Display;
 use derive_more::Constructor;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
 
+use super::banning::BanService;
 use super::launcher::Launcher;
 use crate::bootstrap::jobs::Started;
 use crate::core::Tracker;
@@ -28,6 +29,7 @@ impl Spawner {
     pub fn spawn_launcher(
         &self,
         tracker: Arc<Tracker>,
+        ban_service: Arc<RwLock<BanService>>,
         cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
         rx_halt: oneshot::Receiver<Halted>,
@@ -35,7 +37,7 @@ impl Spawner {
         let spawner = Self::new(self.bind_to);
 
         tokio::spawn(async move {
-            Launcher::run_with_graceful_shutdown(tracker, spawner.bind_to, cookie_lifetime, tx_start, rx_halt).await;
+            Launcher::run_with_graceful_shutdown(tracker, ban_service, spawner.bind_to, cookie_lifetime, tx_start, rx_halt).await;
             spawner
         })
     }

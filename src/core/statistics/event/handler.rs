@@ -1,4 +1,4 @@
-use crate::core::statistics::event::Event;
+use crate::core::statistics::event::{Event, UdpResponseKind};
 use crate::core::statistics::repository::Repository;
 
 pub async fn handle_event(event: Event, stats_repository: &Repository) {
@@ -24,8 +24,11 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         }
 
         // UDP
-        Event::Udp4RequestAborted => {
+        Event::UdpRequestAborted => {
             stats_repository.increase_udp_requests_aborted().await;
+        }
+        Event::UdpRequestBanned => {
+            stats_repository.increase_udp_requests_banned().await;
         }
 
         // UDP4
@@ -41,8 +44,30 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         Event::Udp4Scrape => {
             stats_repository.increase_udp4_scrapes().await;
         }
-        Event::Udp4Response => {
+        Event::Udp4Response {
+            kind,
+            req_processing_time,
+        } => {
             stats_repository.increase_udp4_responses().await;
+
+            match kind {
+                UdpResponseKind::Connect => {
+                    stats_repository
+                        .recalculate_udp_avg_connect_processing_time_ns(req_processing_time)
+                        .await;
+                }
+                UdpResponseKind::Announce => {
+                    stats_repository
+                        .recalculate_udp_avg_announce_processing_time_ns(req_processing_time)
+                        .await;
+                }
+                UdpResponseKind::Scrape => {
+                    stats_repository
+                        .recalculate_udp_avg_scrape_processing_time_ns(req_processing_time)
+                        .await;
+                }
+                UdpResponseKind::Error => {}
+            }
         }
         Event::Udp4Error => {
             stats_repository.increase_udp4_errors().await;
@@ -61,7 +86,10 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
         Event::Udp6Scrape => {
             stats_repository.increase_udp6_scrapes().await;
         }
-        Event::Udp6Response => {
+        Event::Udp6Response {
+            kind: _,
+            req_processing_time: _,
+        } => {
             stats_repository.increase_udp6_responses().await;
         }
         Event::Udp6Error => {

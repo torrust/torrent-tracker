@@ -34,9 +34,21 @@ pub struct Stats {
     /// Total number of TCP (HTTP tracker) `scrape` requests from IPv6 peers.
     pub tcp6_scrapes_handled: u64,
 
+    // UDP
     /// Total number of UDP (UDP tracker) requests aborted.
     pub udp_requests_aborted: u64,
+    /// Total number of UDP (UDP tracker) requests banned.
+    pub udp_requests_banned: u64,
+    /// Total number of IPs banned for UDP (UDP tracker) requests.
+    pub udp_banned_ips_total: u64,
+    /// Average rounded time spent processing UDP connect requests.
+    pub udp_avg_connect_processing_time_ns: u64,
+    /// Average rounded time spent processing UDP announce requests.
+    pub udp_avg_announce_processing_time_ns: u64,
+    /// Average rounded time spent processing UDP scrape requests.
+    pub udp_avg_scrape_processing_time_ns: u64,
 
+    // UDPv4
     /// Total number of UDP (UDP tracker) requests from IPv4 peers.
     pub udp4_requests: u64,
     /// Total number of UDP (UDP tracker) connections from IPv4 peers.
@@ -50,6 +62,7 @@ pub struct Stats {
     /// Total number of UDP (UDP tracker) `scrape` requests from IPv4 peers.
     pub udp4_errors_handled: u64,
 
+    // UDPv6
     /// Total number of UDP (UDP tracker) requests from IPv6 peers.
     pub udp6_requests: u64,
     /// Total number of UDP (UDP tracker) `connection` requests from IPv6 peers.
@@ -80,12 +93,19 @@ impl From<TrackerMetrics> for Stats {
             tcp6_scrapes_handled: metrics.protocol_metrics.tcp6_scrapes_handled,
             // UDP
             udp_requests_aborted: metrics.protocol_metrics.udp_requests_aborted,
+            udp_requests_banned: metrics.protocol_metrics.udp_requests_banned,
+            udp_banned_ips_total: metrics.protocol_metrics.udp_banned_ips_total,
+            udp_avg_connect_processing_time_ns: metrics.protocol_metrics.udp_avg_connect_processing_time_ns,
+            udp_avg_announce_processing_time_ns: metrics.protocol_metrics.udp_avg_announce_processing_time_ns,
+            udp_avg_scrape_processing_time_ns: metrics.protocol_metrics.udp_avg_scrape_processing_time_ns,
+            // UDPv4
             udp4_requests: metrics.protocol_metrics.udp4_requests,
             udp4_connections_handled: metrics.protocol_metrics.udp4_connections_handled,
             udp4_announces_handled: metrics.protocol_metrics.udp4_announces_handled,
             udp4_scrapes_handled: metrics.protocol_metrics.udp4_scrapes_handled,
             udp4_responses: metrics.protocol_metrics.udp4_responses,
             udp4_errors_handled: metrics.protocol_metrics.udp4_errors_handled,
+            // UDPv6
             udp6_requests: metrics.protocol_metrics.udp6_requests,
             udp6_connections_handled: metrics.protocol_metrics.udp6_connections_handled,
             udp6_announces_handled: metrics.protocol_metrics.udp6_announces_handled,
@@ -124,18 +144,25 @@ mod tests {
                     tcp6_scrapes_handled: 10,
                     // UDP
                     udp_requests_aborted: 11,
-                    udp4_requests: 12,
-                    udp4_connections_handled: 13,
-                    udp4_announces_handled: 14,
-                    udp4_scrapes_handled: 15,
-                    udp4_responses: 16,
-                    udp4_errors_handled: 17,
-                    udp6_requests: 18,
-                    udp6_connections_handled: 19,
-                    udp6_announces_handled: 20,
-                    udp6_scrapes_handled: 21,
-                    udp6_responses: 22,
-                    udp6_errors_handled: 23
+                    udp_requests_banned: 12,
+                    udp_banned_ips_total: 13,
+                    udp_avg_connect_processing_time_ns: 14,
+                    udp_avg_announce_processing_time_ns: 15,
+                    udp_avg_scrape_processing_time_ns: 16,
+                    // UDPv4
+                    udp4_requests: 17,
+                    udp4_connections_handled: 18,
+                    udp4_announces_handled: 19,
+                    udp4_scrapes_handled: 20,
+                    udp4_responses: 21,
+                    udp4_errors_handled: 22,
+                    // UDPv6
+                    udp6_requests: 23,
+                    udp6_connections_handled: 24,
+                    udp6_announces_handled: 25,
+                    udp6_scrapes_handled: 26,
+                    udp6_responses: 27,
+                    udp6_errors_handled: 28
                 }
             }),
             Stats {
@@ -143,27 +170,35 @@ mod tests {
                 seeders: 1,
                 completed: 2,
                 leechers: 3,
-                // TCP
+                // TCPv4
                 tcp4_connections_handled: 5,
                 tcp4_announces_handled: 6,
                 tcp4_scrapes_handled: 7,
+                // TCPv6
                 tcp6_connections_handled: 8,
                 tcp6_announces_handled: 9,
                 tcp6_scrapes_handled: 10,
                 // UDP
                 udp_requests_aborted: 11,
-                udp4_requests: 12,
-                udp4_connections_handled: 13,
-                udp4_announces_handled: 14,
-                udp4_scrapes_handled: 15,
-                udp4_responses: 16,
-                udp4_errors_handled: 17,
-                udp6_requests: 18,
-                udp6_connections_handled: 19,
-                udp6_announces_handled: 20,
-                udp6_scrapes_handled: 21,
-                udp6_responses: 22,
-                udp6_errors_handled: 23
+                udp_requests_banned: 12,
+                udp_banned_ips_total: 13,
+                udp_avg_connect_processing_time_ns: 14,
+                udp_avg_announce_processing_time_ns: 15,
+                udp_avg_scrape_processing_time_ns: 16,
+                // UDPv4
+                udp4_requests: 17,
+                udp4_connections_handled: 18,
+                udp4_announces_handled: 19,
+                udp4_scrapes_handled: 20,
+                udp4_responses: 21,
+                udp4_errors_handled: 22,
+                // UDPv6
+                udp6_requests: 23,
+                udp6_connections_handled: 24,
+                udp6_announces_handled: 25,
+                udp6_scrapes_handled: 26,
+                udp6_responses: 27,
+                udp6_errors_handled: 28
             }
         );
     }

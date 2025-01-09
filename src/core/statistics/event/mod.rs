@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 pub mod handler;
 pub mod listener;
 pub mod sender;
@@ -18,17 +20,32 @@ pub enum Event {
     Tcp4Scrape,
     Tcp6Announce,
     Tcp6Scrape,
-    Udp4RequestAborted,
+    UdpRequestAborted,
+    UdpRequestBanned,
     Udp4Request,
     Udp4Connect,
     Udp4Announce,
     Udp4Scrape,
-    Udp4Response,
+    Udp4Response {
+        kind: UdpResponseKind,
+        req_processing_time: Duration,
+    },
     Udp4Error,
     Udp6Request,
     Udp6Connect,
     Udp6Announce,
     Udp6Scrape,
-    Udp6Response,
+    Udp6Response {
+        kind: UdpResponseKind,
+        req_processing_time: Duration,
+    },
     Udp6Error,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum UdpResponseKind {
+    Connect,
+    Announce,
+    Scrape,
+    Error,
 }

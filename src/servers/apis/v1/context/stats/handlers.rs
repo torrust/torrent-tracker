@@ -6,10 +6,12 @@ use axum::extract::State;
 use axum::response::Response;
 use axum_extra::extract::Query;
 use serde::Deserialize;
+use tokio::sync::RwLock;
 
 use super::responses::{metrics_response, stats_response};
 use crate::core::services::statistics::get_metrics;
 use crate::core::Tracker;
+use crate::servers::udp::server::banning::BanService;
 
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "lowercase")]
@@ -35,8 +37,11 @@ pub struct QueryParams {
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::stats#get-tracker-statistics)
 /// for more information about this endpoint.
-pub async fn get_stats_handler(State(tracker): State<Arc<Tracker>>, params: Query<QueryParams>) -> Response {
-    let metrics = get_metrics(tracker.clone()).await;
+pub async fn get_stats_handler(
+    State(state): State<(Arc<Tracker>, Arc<RwLock<BanService>>)>,
+    params: Query<QueryParams>,
+) -> Response {
+    let metrics = get_metrics(state.0.clone(), state.1.clone()).await;
 
     match params.0.format {
         Some(format) => match format {

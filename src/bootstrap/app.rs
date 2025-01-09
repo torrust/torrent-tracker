@@ -13,6 +13,7 @@
 //! 4. Initialize the domain tracker.
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use torrust_tracker_clock::static_time;
 use torrust_tracker_configuration::validator::Validator;
 use torrust_tracker_configuration::Configuration;
@@ -22,6 +23,8 @@ use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::core::services::tracker_factory;
 use crate::core::Tracker;
+use crate::servers::udp::server::banning::BanService;
+use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
 use crate::shared::crypto::keys::{self, Keeper as _};
 
@@ -32,7 +35,7 @@ use crate::shared::crypto::keys::{self, Keeper as _};
 /// Setup can file if the configuration is invalid.
 #[must_use]
 #[instrument(skip())]
-pub fn setup() -> (Configuration, Arc<Tracker>) {
+pub fn setup() -> (Configuration, Arc<Tracker>, Arc<RwLock<BanService>>) {
     #[cfg(not(test))]
     check_seed();
 
@@ -44,9 +47,11 @@ pub fn setup() -> (Configuration, Arc<Tracker>) {
 
     let tracker = initialize_with_configuration(&configuration);
 
+    let udp_ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
-    (configuration, tracker)
+    (configuration, tracker, udp_ban_service)
 }
 
 /// checks if the seed is the instance seed in production.

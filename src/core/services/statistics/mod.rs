@@ -40,10 +40,12 @@ pub mod setup;
 
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
 use crate::core::statistics::metrics::Metrics;
 use crate::core::Tracker;
+use crate::servers::udp::server::banning::BanService;
 
 /// All the metrics collected by the tracker.
 #[derive(Debug, PartialEq)]
@@ -60,28 +62,37 @@ pub struct TrackerMetrics {
 }
 
 /// It returns all the [`TrackerMetrics`]
-pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
+pub async fn get_metrics(tracker: Arc<Tracker>, ban_service: Arc<RwLock<BanService>>) -> TrackerMetrics {
     let torrents_metrics = tracker.get_torrents_metrics();
     let stats = tracker.get_stats().await;
+    let udp_banned_ips_total = ban_service.read().await.get_banned_ips_total();
 
     TrackerMetrics {
         torrents_metrics,
         protocol_metrics: Metrics {
-            // TCP
+            // TCPv4
             tcp4_connections_handled: stats.tcp4_connections_handled,
             tcp4_announces_handled: stats.tcp4_announces_handled,
             tcp4_scrapes_handled: stats.tcp4_scrapes_handled,
+            // TCPv6
             tcp6_connections_handled: stats.tcp6_connections_handled,
             tcp6_announces_handled: stats.tcp6_announces_handled,
             tcp6_scrapes_handled: stats.tcp6_scrapes_handled,
             // UDP
             udp_requests_aborted: stats.udp_requests_aborted,
+            udp_requests_banned: stats.udp_requests_banned,
+            udp_banned_ips_total: udp_banned_ips_total as u64,
+            udp_avg_connect_processing_time_ns: stats.udp_avg_connect_processing_time_ns,
+            udp_avg_announce_processing_time_ns: stats.udp_avg_announce_processing_time_ns,
+            udp_avg_scrape_processing_time_ns: stats.udp_avg_scrape_processing_time_ns,
+            // UDPv4
             udp4_requests: stats.udp4_requests,
             udp4_connections_handled: stats.udp4_connections_handled,
             udp4_announces_handled: stats.udp4_announces_handled,
             udp4_scrapes_handled: stats.udp4_scrapes_handled,
             udp4_responses: stats.udp4_responses,
             udp4_errors_handled: stats.udp4_errors_handled,
+            // UDPv6
             udp6_requests: stats.udp6_requests,
             udp6_connections_handled: stats.udp6_connections_handled,
             udp6_announces_handled: stats.udp6_announces_handled,
@@ -96,6 +107,7 @@ pub async fn get_metrics(tracker: Arc<Tracker>) -> TrackerMetrics {
 mod tests {
     use std::sync::Arc;
 
+    use tokio::sync::RwLock;
     use torrust_tracker_configuration::Configuration;
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_test_helpers::configuration;
@@ -103,6 +115,8 @@ mod tests {
     use crate::core;
     use crate::core::services::statistics::{get_metrics, TrackerMetrics};
     use crate::core::services::tracker_factory;
+    use crate::servers::udp::server::banning::BanService;
+    use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
     pub fn tracker_configuration() -> Configuration {
         configuration::ephemeral()
@@ -111,8 +125,9 @@ mod tests {
     #[tokio::test]
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let tracker = Arc::new(tracker_factory(&tracker_configuration()));
+        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
-        let tracker_metrics = get_metrics(tracker.clone()).await;
+        let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone()).await;
 
         assert_eq!(
             tracker_metrics,
