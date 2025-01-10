@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
 
@@ -10,7 +11,6 @@ use crate::servers::api::v1::asserts::{
     assert_failed_to_reload_whitelist, assert_failed_to_remove_torrent_from_whitelist, assert_failed_to_whitelist_torrent,
     assert_invalid_infohash_param, assert_not_found, assert_ok, assert_token_not_valid, assert_unauthorized,
 };
-use crate::servers::api::v1::client::{headers_with_request_id, Client};
 use crate::servers::api::v1::contract::fixtures::{
     invalid_infohashes_returning_bad_request, invalid_infohashes_returning_not_found,
 };
@@ -76,7 +76,7 @@ async fn should_not_allow_whitelisting_a_torrent_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
         .await;
 
@@ -89,7 +89,7 @@ async fn should_not_allow_whitelisting_a_torrent_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .whitelist_a_torrent(&info_hash, Some(headers_with_request_id(request_id)))
         .await;
 
@@ -270,7 +270,7 @@ async fn should_not_allow_removing_a_torrent_from_the_whitelist_for_unauthentica
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 
@@ -285,7 +285,7 @@ async fn should_not_allow_removing_a_torrent_from_the_whitelist_for_unauthentica
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .remove_torrent_from_whitelist(&hash, Some(headers_with_request_id(request_id)))
         .await;
 

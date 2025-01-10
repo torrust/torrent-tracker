@@ -1,10 +1,11 @@
 use hyper::HeaderMap;
 use reqwest::Response;
 use serde::Serialize;
+use url::Url;
 use uuid::Uuid;
 
 use crate::common::http::{Query, QueryParam, ReqwestQuery};
-use crate::servers::api::connection_info::ConnectionInfo;
+use crate::connection_info::ConnectionInfo;
 
 /// API Client
 pub struct Client {
@@ -13,10 +14,11 @@ pub struct Client {
 }
 
 impl Client {
+    #[must_use]
     pub fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             connection_info,
-            base_path: "/api/v1/".to_string(),
+            base_path: "api/v1/".to_string(),
         }
     }
 
@@ -70,6 +72,9 @@ impl Client {
         self.get_request_with_query(path, query, headers).await
     }
 
+    /// # Panics
+    ///
+    /// Will panic if the request can't be sent
     pub async fn post_empty(&self, path: &str, headers: Option<HeaderMap>) -> Response {
         let builder = reqwest::Client::new()
             .post(self.base_url(path).clone())
@@ -83,6 +88,9 @@ impl Client {
         builder.send().await.unwrap()
     }
 
+    /// # Panics
+    ///
+    /// Will panic if the request can't be sent
     pub async fn post_form<T: Serialize + ?Sized>(&self, path: &str, form: &T, headers: Option<HeaderMap>) -> Response {
         let builder = reqwest::Client::new()
             .post(self.base_url(path).clone())
@@ -97,6 +105,9 @@ impl Client {
         builder.send().await.unwrap()
     }
 
+    /// # Panics
+    ///
+    /// Will panic if the request can't be sent
     async fn delete(&self, path: &str, headers: Option<HeaderMap>) -> Response {
         let builder = reqwest::Client::new()
             .delete(self.base_url(path).clone())
@@ -111,11 +122,11 @@ impl Client {
     }
 
     pub async fn get_request_with_query(&self, path: &str, params: Query, headers: Option<HeaderMap>) -> Response {
-        get(&self.base_url(path), Some(params), headers).await
+        get(self.base_url(path), Some(params), headers).await
     }
 
     pub async fn get_request(&self, path: &str) -> Response {
-        get(&self.base_url(path), None, None).await
+        get(self.base_url(path), None, None).await
     }
 
     fn query_with_token(&self) -> Query {
@@ -125,12 +136,15 @@ impl Client {
         }
     }
 
-    fn base_url(&self, path: &str) -> String {
-        format!("http://{}{}{path}", &self.connection_info.bind_address, &self.base_path)
+    fn base_url(&self, path: &str) -> Url {
+        Url::parse(&format!("{}{}{path}", &self.connection_info.origin, &self.base_path)).unwrap()
     }
 }
 
-pub async fn get(path: &str, query: Option<Query>, headers: Option<HeaderMap>) -> Response {
+/// # Panics
+///
+/// Will panic if the request can't be sent
+pub async fn get(path: Url, query: Option<Query>, headers: Option<HeaderMap>) -> Response {
     let builder = reqwest::Client::builder().build().unwrap();
 
     let builder = match query {
@@ -147,6 +161,11 @@ pub async fn get(path: &str, query: Option<Query>, headers: Option<HeaderMap>) -
 }
 
 /// Returns a `HeaderMap` with a request id header
+///
+/// # Panics
+///
+/// Will panic if the request ID can't be parsed into a string.
+#[must_use]
 pub fn headers_with_request_id(request_id: Uuid) -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert("x-request-id", request_id.to_string().parse().unwrap());

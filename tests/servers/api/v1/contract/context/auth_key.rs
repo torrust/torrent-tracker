@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
+use torrust_tracker_api_client::v1::client::{headers_with_request_id, AddKeyForm, Client};
 use torrust_tracker_lib::core::auth::Key;
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
@@ -12,7 +13,6 @@ use crate::servers::api::v1::asserts::{
     assert_invalid_auth_key_get_param, assert_invalid_auth_key_post_param, assert_ok, assert_token_not_valid,
     assert_unauthorized, assert_unprocessable_auth_key_duration_param,
 };
-use crate::servers::api::v1::client::{headers_with_request_id, AddKeyForm, Client};
 use crate::servers::api::{force_database_error, Started};
 
 #[tokio::test]
@@ -81,7 +81,7 @@ async fn should_not_allow_generating_a_new_auth_key_for_unauthenticated_users() 
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .add_auth_key(
             AddKeyForm {
                 opt_key: None,
@@ -100,7 +100,7 @@ async fn should_not_allow_generating_a_new_auth_key_for_unauthenticated_users() 
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .add_auth_key(
             AddKeyForm {
                 opt_key: None,
@@ -332,7 +332,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .delete_auth_key(&auth_key.key.to_string(), Some(headers_with_request_id(request_id)))
         .await;
 
@@ -352,7 +352,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .delete_auth_key(&auth_key.key.to_string(), Some(headers_with_request_id(request_id)))
         .await;
 
@@ -433,7 +433,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .reload_keys(Some(headers_with_request_id(request_id)))
         .await;
 
@@ -446,7 +446,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .reload_keys(Some(headers_with_request_id(request_id)))
         .await;
 
@@ -462,6 +462,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
 
 mod deprecated_generate_key_endpoint {
 
+    use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
     use torrust_tracker_lib::core::auth::Key;
     use torrust_tracker_test_helpers::configuration;
     use uuid::Uuid;
@@ -472,7 +473,6 @@ mod deprecated_generate_key_endpoint {
         assert_auth_key_utf8, assert_failed_to_generate_key, assert_invalid_key_duration_param, assert_token_not_valid,
         assert_unauthorized,
     };
-    use crate::servers::api::v1::client::{headers_with_request_id, Client};
     use crate::servers::api::{force_database_error, Started};
 
     #[tokio::test]
@@ -507,13 +507,13 @@ mod deprecated_generate_key_endpoint {
         let request_id = Uuid::new_v4();
         let seconds_valid = 60;
 
-        let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+        let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
             .generate_auth_key(seconds_valid, Some(headers_with_request_id(request_id)))
             .await;
 
         assert_token_not_valid(response).await;
 
-        let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+        let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
             .generate_auth_key(seconds_valid, None)
             .await;
 

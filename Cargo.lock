@@ -3974,6 +3974,7 @@ dependencies = [
  "serde_with",
  "thiserror 2.0.9",
  "tokio",
+ "torrust-tracker-api-client",
  "torrust-tracker-clock",
  "torrust-tracker-configuration",
  "torrust-tracker-contrib-bencode",
@@ -3988,6 +3989,18 @@ dependencies = [
  "url",
  "uuid",
  "zerocopy",
+]
+
+[[package]]
+name = "torrust-tracker-api-client"
+version = "3.0.0-develop"
+dependencies = [
+ "hyper",
+ "reqwest",
+ "serde",
+ "thiserror 2.0.9",
+ "url",
+ "uuid",
 ]
 
 [[package]]

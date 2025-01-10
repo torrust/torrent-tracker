@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
 use torrust_tracker_lib::servers::apis::v1::context::stats::resources::Stats;
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
@@ -9,7 +10,6 @@ use uuid::Uuid;
 use crate::common::logging::{self, logs_contains_a_line_with};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{assert_stats, assert_token_not_valid, assert_unauthorized};
-use crate::servers::api::v1::client::{headers_with_request_id, Client};
 use crate::servers::api::Started;
 
 #[tokio::test]
@@ -79,7 +79,7 @@ async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users()
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 
@@ -92,7 +92,7 @@ async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users()
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 

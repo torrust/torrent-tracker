@@ -1,0 +1,23 @@
+[package]
+description = "A library to interact with the Torrust Tracker REST API."
+keywords = ["bittorrent", "client", "tracker"]
+license = "LGPL-3.0"
+name = "torrust-tracker-api-client"
+readme = "README.md"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+hyper = "1"
+reqwest = { version = "0", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
