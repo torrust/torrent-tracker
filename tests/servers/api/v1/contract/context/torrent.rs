@@ -263,7 +263,7 @@ async fn should_not_allow_getting_torrents_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .get_torrents(Query::empty(), Some(headers_with_request_id(request_id)))
         .await;
 
@@ -276,7 +276,7 @@ async fn should_not_allow_getting_torrents_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .get_torrents(Query::default(), Some(headers_with_request_id(request_id)))
         .await;
 
@@ -382,7 +382,7 @@ async fn should_not_allow_getting_a_torrent_info_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .get_torrent(&info_hash.to_string(), Some(headers_with_request_id(request_id)))
         .await;
 
@@ -395,7 +395,7 @@ async fn should_not_allow_getting_a_torrent_info_for_unauthenticated_users() {
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .get_torrent(&info_hash.to_string(), Some(headers_with_request_id(request_id)))
         .await;
 

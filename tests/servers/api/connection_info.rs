@@ -1,9 +1,9 @@
-use torrust_tracker_api_client::connection_info::ConnectionInfo;
+use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 
-pub fn connection_with_invalid_token(bind_address: &str) -> ConnectionInfo {
-    ConnectionInfo::authenticated(bind_address, "invalid token")
+pub fn connection_with_invalid_token(origin: Origin) -> ConnectionInfo {
+    ConnectionInfo::authenticated(origin, "invalid token")
 }
 
-pub fn connection_with_no_token(bind_address: &str) -> ConnectionInfo {
-    ConnectionInfo::anonymous(bind_address)
+pub fn connection_with_no_token(origin: Origin) -> ConnectionInfo {
+    ConnectionInfo::anonymous(origin)
 }

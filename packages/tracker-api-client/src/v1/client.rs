@@ -1,6 +1,7 @@
 use hyper::HeaderMap;
 use reqwest::Response;
 use serde::Serialize;
+use url::Url;
 use uuid::Uuid;
 
 use crate::common::http::{Query, QueryParam, ReqwestQuery};
@@ -17,7 +18,7 @@ impl Client {
     pub fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             connection_info,
-            base_path: "/api/v1/".to_string(),
+            base_path: "api/v1/".to_string(),
         }
     }
 
@@ -121,11 +122,11 @@ impl Client {
     }
 
     pub async fn get_request_with_query(&self, path: &str, params: Query, headers: Option<HeaderMap>) -> Response {
-        get(&self.base_url(path), Some(params), headers).await
+        get(self.base_url(path), Some(params), headers).await
     }
 
     pub async fn get_request(&self, path: &str) -> Response {
-        get(&self.base_url(path), None, None).await
+        get(self.base_url(path), None, None).await
     }
 
     fn query_with_token(&self) -> Query {
@@ -135,15 +136,15 @@ impl Client {
         }
     }
 
-    fn base_url(&self, path: &str) -> String {
-        format!("http://{}{}{path}", &self.connection_info.bind_address, &self.base_path)
+    fn base_url(&self, path: &str) -> Url {
+        Url::parse(&format!("{}{}{path}", &self.connection_info.origin, &self.base_path)).unwrap()
     }
 }
 
 /// # Panics
 ///
 /// Will panic if the request can't be sent
-pub async fn get(path: &str, query: Option<Query>, headers: Option<HeaderMap>) -> Response {
+pub async fn get(path: Url, query: Option<Query>, headers: Option<HeaderMap>) -> Response {
     let builder = reqwest::Client::builder().build().unwrap();
 
     let builder = match query {

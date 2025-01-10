@@ -79,7 +79,7 @@ async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users()
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_invalid_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_invalid_token(env.get_connection_info().origin))
         .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 
@@ -92,7 +92,7 @@ async fn should_not_allow_getting_tracker_statistics_for_unauthenticated_users()
 
     let request_id = Uuid::new_v4();
 
-    let response = Client::new(connection_with_no_token(env.get_connection_info().bind_address.as_str()))
+    let response = Client::new(connection_with_no_token(env.get_connection_info().origin))
         .get_tracker_statistics(Some(headers_with_request_id(request_id)))
         .await;
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
 use tokio::sync::RwLock;
-use torrust_tracker_api_client::connection_info::ConnectionInfo;
+use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::{Configuration, HttpApi};
 use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
@@ -92,8 +92,10 @@ impl Environment<Running> {
     }
 
     pub fn get_connection_info(&self) -> ConnectionInfo {
+        let origin = Origin::new(&format!("http://{}/", self.server.state.local_addr)).unwrap(); // DevSkim: ignore DS137138
+
         ConnectionInfo {
-            bind_address: self.server.state.local_addr.to_string(),
+            origin,
             api_token: self.config.access_tokens.get("admin").cloned(),
         }
     }

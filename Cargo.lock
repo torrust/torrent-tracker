@@ -3998,6 +3998,8 @@ dependencies = [
  "hyper",
  "reqwest",
  "serde",
+ "thiserror 2.0.9",
+ "url",
  "uuid",
 ]
 
