@@ -1,20 +1,20 @@
 use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_api_client::common::http::{Query, QueryParam};
+use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
 use torrust_tracker_lib::servers::apis::v1::context::torrent::resources::peer::Peer;
 use torrust_tracker_lib::servers::apis::v1::context::torrent::resources::torrent::{self, Torrent};
 use torrust_tracker_primitives::peer::fixture::PeerBuilder;
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
 
-use crate::common::http::{Query, QueryParam};
 use crate::common::logging::{self, logs_contains_a_line_with};
 use crate::servers::api::connection_info::{connection_with_invalid_token, connection_with_no_token};
 use crate::servers::api::v1::asserts::{
     assert_bad_request, assert_invalid_infohash_param, assert_not_found, assert_token_not_valid, assert_torrent_info,
     assert_torrent_list, assert_torrent_not_known, assert_unauthorized,
 };
-use crate::servers::api::v1::client::{headers_with_request_id, Client};
 use crate::servers::api::v1::contract::fixtures::{
     invalid_infohashes_returning_bad_request, invalid_infohashes_returning_not_found,
 };

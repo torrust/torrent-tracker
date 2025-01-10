@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
+use torrust_tracker_api_client::v1::client::{headers_with_request_id, AddKeyForm, Client};
 use torrust_tracker_lib::core::auth::Key;
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
@@ -12,7 +13,6 @@ use crate::servers::api::v1::asserts::{
     assert_invalid_auth_key_get_param, assert_invalid_auth_key_post_param, assert_ok, assert_token_not_valid,
     assert_unauthorized, assert_unprocessable_auth_key_duration_param,
 };
-use crate::servers::api::v1::client::{headers_with_request_id, AddKeyForm, Client};
 use crate::servers::api::{force_database_error, Started};
 
 #[tokio::test]
@@ -462,6 +462,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
 
 mod deprecated_generate_key_endpoint {
 
+    use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
     use torrust_tracker_lib::core::auth::Key;
     use torrust_tracker_test_helpers::configuration;
     use uuid::Uuid;
@@ -472,7 +473,6 @@ mod deprecated_generate_key_endpoint {
         assert_auth_key_utf8, assert_failed_to_generate_key, assert_invalid_key_duration_param, assert_token_not_valid,
         assert_unauthorized,
     };
-    use crate::servers::api::v1::client::{headers_with_request_id, Client};
     use crate::servers::api::{force_database_error, Started};
 
     #[tokio::test]

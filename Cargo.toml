@@ -97,6 +97,7 @@ ignored = ["crossbeam-skiplist", "dashmap", "figment", "parking_lot", "serde_byt
 [dev-dependencies]
 local-ip-address = "0"
 mockall = "0"
+torrust-tracker-api-client = { version = "3.0.0-develop", path = "packages/tracker-api-client" }
 torrust-tracker-test-helpers = { version = "3.0.0-develop", path = "packages/test-helpers" }
 
 [workspace]

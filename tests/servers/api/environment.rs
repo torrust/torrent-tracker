@@ -4,6 +4,7 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
 use tokio::sync::RwLock;
+use torrust_tracker_api_client::connection_info::ConnectionInfo;
 use torrust_tracker_configuration::{Configuration, HttpApi};
 use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
@@ -13,8 +14,6 @@ use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
 use torrust_tracker_lib::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use torrust_tracker_primitives::peer;
-
-use super::connection_info::ConnectionInfo;
 
 pub struct Environment<S>
 where

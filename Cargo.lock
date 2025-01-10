@@ -3974,6 +3974,7 @@ dependencies = [
  "serde_with",
  "thiserror 2.0.9",
  "tokio",
+ "torrust-tracker-api-client",
  "torrust-tracker-clock",
  "torrust-tracker-configuration",
  "torrust-tracker-contrib-bencode",

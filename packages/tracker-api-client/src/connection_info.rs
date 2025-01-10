@@ -1,13 +1,3 @@
-#[must_use]
-pub fn connection_with_invalid_token(bind_address: &str) -> ConnectionInfo {
-    ConnectionInfo::authenticated(bind_address, "invalid token")
-}
-
-#[must_use]
-pub fn connection_with_no_token(bind_address: &str) -> ConnectionInfo {
-    ConnectionInfo::anonymous(bind_address)
-}
-
 #[derive(Clone)]
 pub struct ConnectionInfo {
     pub bind_address: String,
