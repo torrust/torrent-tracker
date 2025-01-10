@@ -16,7 +16,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [lib]
-name = "torrust_tracker_lib" 
+name = "torrust_tracker_lib"
 
 [workspace.package]
 authors = ["Nautilus Cyberneering <info@nautilus-cyberneering.de>, Mick van Dijke <mick@dutchbits.nl>"]
@@ -108,6 +108,7 @@ members = [
     "packages/primitives",
     "packages/test-helpers",
     "packages/torrent-repository",
+    "packages/tracker-api-client",
     "packages/tracker-client",
 ]
 

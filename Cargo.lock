@@ -3991,6 +3991,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "torrust-tracker-api-client"
+version = "3.0.0-develop"
+dependencies = [
+ "hyper",
+ "reqwest",
+ "serde",
+ "uuid",
+]
+
+[[package]]
 name = "torrust-tracker-client"
 version = "3.0.0-develop"
 dependencies = [
