@@ -12,9 +12,10 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
-use crate::core::{statistics, AnnounceData, PeersWanted, Tracker};
+use crate::core::{statistics, PeersWanted, Tracker};
 
 /// The HTTP tracker `announce` service.
 ///
@@ -100,12 +101,13 @@ mod tests {
         use std::sync::Arc;
 
         use mockall::predicate::eq;
+        use torrust_tracker_primitives::core::AnnounceData;
         use torrust_tracker_primitives::peer;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
-        use crate::core::{statistics, AnnounceData, PeersWanted, Tracker};
+        use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
 

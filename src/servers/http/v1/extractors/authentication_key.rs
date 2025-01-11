@@ -9,7 +9,7 @@
 //! It's a wrapper for Axum `Path` extractor in order to return custom
 //! authentication errors.
 //!
-//! It returns a bencoded [`Error`](crate::servers::http::v1::responses::error)
+//! It returns a bencoded [`Error`](bittorrent_http_protocol::v1::responses::error)
 //! response (`500`) if the `key` parameter are missing or invalid.
 //!
 //! **Sample authentication error responses**
@@ -49,11 +49,12 @@ use axum::extract::rejection::PathRejection;
 use axum::extract::{FromRequestParts, Path};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
+use bittorrent_http_protocol::v1::responses;
+use hyper::StatusCode;
 use serde::Deserialize;
 
 use crate::core::auth::Key;
 use crate::servers::http::v1::handlers::common::auth;
-use crate::servers::http::v1::responses;
 
 /// Extractor for the [`Key`] struct.
 pub struct Extract(pub Key);
@@ -82,7 +83,7 @@ where
 
             match extract_key(maybe_path_with_key) {
                 Ok(key) => Ok(Extract(key)),
-                Err(error) => Err(error.into_response()),
+                Err(error) => Err((StatusCode::OK, error.write()).into_response()),
             }
         }
     }
@@ -130,8 +131,9 @@ fn custom_error(rejection: &PathRejection) -> responses::error::Error {
 #[cfg(test)]
 mod tests {
 
+    use bittorrent_http_protocol::v1::responses::error::Error;
+
     use super::parse_key;
-    use crate::servers::http::v1::responses::error::Error;
 
     fn assert_error_response(error: &Error, error_message: &str) {
         assert!(

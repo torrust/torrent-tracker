@@ -1,13 +1,10 @@
-//! `Scrape` response for the HTTP tracker [`scrape`](crate::servers::http::v1::requests::scrape::Scrape) request.
+//! `Scrape` response for the HTTP tracker [`scrape`](bittorrent_http_protocol::v1::requests::scrape::Scrape) request.
 //!
 //! Data structures and logic to build the `scrape` response.
 use std::borrow::Cow;
 
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 use torrust_tracker_contrib_bencode::{ben_int, ben_map, BMutAccess};
-
-use crate::core::ScrapeData;
+use torrust_tracker_primitives::core::ScrapeData;
 
 /// The `Scrape` response for the HTTP tracker.
 ///
@@ -82,21 +79,15 @@ impl From<ScrapeData> for Bencoded {
     }
 }
 
-impl IntoResponse for Bencoded {
-    fn into_response(self) -> Response {
-        (StatusCode::OK, self.body()).into_response()
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     mod scrape_response {
         use bittorrent_primitives::info_hash::InfoHash;
+        use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-        use crate::core::ScrapeData;
-        use crate::servers::http::v1::responses::scrape::Bencoded;
+        use crate::v1::responses::scrape::Bencoded;
 
         fn sample_scrape_data() -> ScrapeData {
             let info_hash = InfoHash::from_bytes(&[0x69; 20]);

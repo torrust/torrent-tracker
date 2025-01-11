@@ -12,19 +12,22 @@ use std::sync::Arc;
 use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes};
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
+use bittorrent_http_protocol::v1::requests::announce::{Announce, Compact, Event};
+use bittorrent_http_protocol::v1::responses::{self};
+use bittorrent_http_protocol::v1::services::peer_ip_resolver;
+use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+use hyper::StatusCode;
 use torrust_tracker_clock::clock::Time;
+use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
 use crate::core::auth::Key;
-use crate::core::{AnnounceData, PeersWanted, Tracker};
+use crate::core::{PeersWanted, Tracker};
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
 use crate::servers::http::v1::handlers::common::auth;
-use crate::servers::http::v1::requests::announce::{Announce, Compact, Event};
-use crate::servers::http::v1::responses::{self};
-use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
-use crate::servers::http::v1::services::{self, peer_ip_resolver};
+use crate::servers::http::v1::services::{self};
 use crate::CurrentClock;
 
 /// It handles the `announce` request when the HTTP tracker does not require
@@ -66,7 +69,7 @@ async fn handle(
 ) -> Response {
     let announce_data = match handle_announce(tracker, announce_request, client_ip_sources, maybe_key).await {
         Ok(announce_data) => announce_data,
-        Err(error) => return error.into_response(),
+        Err(error) => return (StatusCode::OK, error.write()).into_response(),
     };
     build_response(announce_request, announce_data)
 }
@@ -123,10 +126,12 @@ async fn handle_announce(
 fn build_response(announce_request: &Announce, announce_data: AnnounceData) -> Response {
     if announce_request.compact.as_ref().is_some_and(|f| *f == Compact::Accepted) {
         let response: responses::Announce<responses::Compact> = announce_data.into();
-        response.into_response()
+        let bytes: Vec<u8> = response.data.into();
+        (StatusCode::OK, bytes).into_response()
     } else {
         let response: responses::Announce<responses::Normal> = announce_data.into();
-        response.into_response()
+        let bytes: Vec<u8> = response.data.into();
+        (StatusCode::OK, bytes).into_response()
     }
 }
 
@@ -174,14 +179,14 @@ pub fn map_to_torrust_event(event: &Option<Event>) -> AnnounceEvent {
 mod tests {
 
     use aquatic_udp_protocol::PeerId;
+    use bittorrent_http_protocol::v1::requests::announce::Announce;
+    use bittorrent_http_protocol::v1::responses;
+    use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
     use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::core::services::tracker_factory;
     use crate::core::Tracker;
-    use crate::servers::http::v1::requests::announce::Announce;
-    use crate::servers::http::v1::responses;
-    use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
     fn private_tracker() -> Tracker {
         tracker_factory(&configuration::ephemeral_private())
@@ -301,10 +306,11 @@ mod tests {
 
         use std::sync::Arc;
 
+        use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+
         use super::{sample_announce_request, tracker_on_reverse_proxy};
         use crate::servers::http::v1::handlers::announce::handle_announce;
         use crate::servers::http::v1::handlers::announce::tests::assert_error_response;
-        use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
@@ -330,10 +336,11 @@ mod tests {
 
         use std::sync::Arc;
 
+        use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+
         use super::{sample_announce_request, tracker_not_on_reverse_proxy};
         use crate::servers::http::v1::handlers::announce::handle_announce;
         use crate::servers::http::v1::handlers::announce::tests::assert_error_response;
-        use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {

@@ -4,10 +4,10 @@
 //! It parses the query parameters returning an [`Announce`]
 //! request.
 //!
-//! Refer to [`Announce`](crate::servers::http::v1::requests::announce) for more
+//! Refer to [`Announce`](bittorrent_http_protocol::v1::requests::announce) for more
 //! information about the returned structure.
 //!
-//! It returns a bencoded [`Error`](crate::servers::http::v1::responses::error)
+//! It returns a bencoded [`Error`](bittorrent_http_protocol::v1::responses::error)
 //! response (`500`) if the query parameters are missing or invalid.
 //!
 //! **Sample announce request**
@@ -33,11 +33,11 @@ use std::panic::Location;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
+use bittorrent_http_protocol::v1::query::Query;
+use bittorrent_http_protocol::v1::requests::announce::{Announce, ParseAnnounceQueryError};
+use bittorrent_http_protocol::v1::responses;
 use futures::FutureExt;
-
-use crate::servers::http::v1::query::Query;
-use crate::servers::http::v1::requests::announce::{Announce, ParseAnnounceQueryError};
-use crate::servers::http::v1::responses;
+use hyper::StatusCode;
 
 /// Extractor for the [`Announce`]
 /// request.
@@ -53,7 +53,7 @@ where
         async {
             match extract_announce_from(parts.uri.query()) {
                 Ok(announce_request) => Ok(ExtractRequest(announce_request)),
-                Err(error) => Err(error.into_response()),
+                Err(error) => Err((StatusCode::OK, error.write()).into_response()),
             }
         }
         .boxed()
@@ -87,11 +87,11 @@ mod tests {
     use std::str::FromStr;
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
+    use bittorrent_http_protocol::v1::requests::announce::{Announce, Compact, Event};
+    use bittorrent_http_protocol::v1::responses::error::Error;
     use bittorrent_primitives::info_hash::InfoHash;
 
     use super::extract_announce_from;
-    use crate::servers::http::v1::requests::announce::{Announce, Compact, Event};
-    use crate::servers::http::v1::responses::error::Error;
 
     fn assert_error_response(error: &Error, error_message: &str) {
         assert!(

@@ -9,15 +9,18 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
+use bittorrent_http_protocol::v1::requests::scrape::Scrape;
+use bittorrent_http_protocol::v1::responses;
+use bittorrent_http_protocol::v1::services::peer_ip_resolver::{self, ClientIpSources};
+use hyper::StatusCode;
+use torrust_tracker_primitives::core::ScrapeData;
 
 use crate::core::auth::Key;
-use crate::core::{ScrapeData, Tracker};
+use crate::core::Tracker;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
 use crate::servers::http::v1::extractors::scrape_request::ExtractRequest;
-use crate::servers::http::v1::requests::scrape::Scrape;
-use crate::servers::http::v1::services::peer_ip_resolver::{self, ClientIpSources};
-use crate::servers::http::v1::{responses, services};
+use crate::servers::http::v1::services;
 
 /// It handles the `scrape` request when the HTTP tracker is configured
 /// to run in `public` mode.
@@ -56,7 +59,7 @@ async fn handle(
 ) -> Response {
     let scrape_data = match handle_scrape(tracker, scrape_request, client_ip_sources, maybe_key).await {
         Ok(scrape_data) => scrape_data,
-        Err(error) => return error.into_response(),
+        Err(error) => return (StatusCode::OK, error.write()).into_response(),
     };
     build_response(scrape_data)
 }
@@ -102,7 +105,9 @@ async fn handle_scrape(
 }
 
 fn build_response(scrape_data: ScrapeData) -> Response {
-    responses::scrape::Bencoded::from(scrape_data).into_response()
+    let response = responses::scrape::Bencoded::from(scrape_data);
+
+    (StatusCode::OK, response.body()).into_response()
 }
 
 #[cfg(test)]
@@ -110,14 +115,14 @@ mod tests {
     use std::net::IpAddr;
     use std::str::FromStr;
 
+    use bittorrent_http_protocol::v1::requests::scrape::Scrape;
+    use bittorrent_http_protocol::v1::responses;
+    use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
     use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::core::services::tracker_factory;
     use crate::core::Tracker;
-    use crate::servers::http::v1::requests::scrape::Scrape;
-    use crate::servers::http::v1::responses;
-    use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
     fn private_tracker() -> Tracker {
         tracker_factory(&configuration::ephemeral_private())
@@ -159,8 +164,10 @@ mod tests {
         use std::str::FromStr;
         use std::sync::Arc;
 
+        use torrust_tracker_primitives::core::ScrapeData;
+
         use super::{private_tracker, sample_client_ip_sources, sample_scrape_request};
-        use crate::core::{auth, ScrapeData};
+        use crate::core::auth;
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
 
         #[tokio::test]
@@ -201,8 +208,9 @@ mod tests {
 
         use std::sync::Arc;
 
+        use torrust_tracker_primitives::core::ScrapeData;
+
         use super::{sample_client_ip_sources, sample_scrape_request, whitelisted_tracker};
-        use crate::core::ScrapeData;
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
 
         #[tokio::test]
@@ -224,10 +232,11 @@ mod tests {
     mod with_tracker_on_reverse_proxy {
         use std::sync::Arc;
 
+        use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+
         use super::{sample_scrape_request, tracker_on_reverse_proxy};
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
         use crate::servers::http::v1::handlers::scrape::tests::assert_error_response;
-        use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
@@ -252,10 +261,11 @@ mod tests {
     mod with_tracker_not_on_reverse_proxy {
         use std::sync::Arc;
 
+        use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+
         use super::{sample_scrape_request, tracker_not_on_reverse_proxy};
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
         use crate::servers::http::v1::handlers::scrape::tests::assert_error_response;
-        use crate::servers::http::v1::services::peer_ip_resolver::ClientIpSources;
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {

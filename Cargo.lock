@@ -553,7 +553,15 @@ version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
  "bittorrent-primitives",
+ "derive_more",
+ "multimap",
  "percent-encoding",
+ "serde",
+ "serde_bencode",
+ "thiserror 2.0.9",
+ "torrust-tracker-configuration",
+ "torrust-tracker-contrib-bencode",
+ "torrust-tracker-located-error",
  "torrust-tracker-primitives",
 ]
 
@@ -3955,7 +3963,6 @@ dependencies = [
  "lazy_static",
  "local-ip-address",
  "mockall",
- "multimap",
  "parking_lot",
  "percent-encoding",
  "pin-project-lite",
@@ -3977,7 +3984,6 @@ dependencies = [
  "torrust-tracker-api-client",
  "torrust-tracker-clock",
  "torrust-tracker-configuration",
- "torrust-tracker-contrib-bencode",
  "torrust-tracker-located-error",
  "torrust-tracker-primitives",
  "torrust-tracker-test-helpers",
@@ -4082,6 +4088,7 @@ dependencies = [
  "tdyne-peer-id",
  "tdyne-peer-id-registry",
  "thiserror 2.0.9",
+ "torrust-tracker-configuration",
  "zerocopy",
 ]
 

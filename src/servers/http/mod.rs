@@ -43,18 +43,18 @@
 //!
 //! Parameter | Type | Description | Required |  Default | Example
 //! ---|---|---|---|---|---
-//! [`info_hash`](crate::servers::http::v1::requests::announce::Announce::info_hash) | percent encoded of 20-byte array | The `Info Hash` of the torrent. | Yes | No | `%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00`
+//! [`info_hash`](bittorrent_http_protocol::v1::requests::announce::Announce::info_hash) | percent encoded of 20-byte array | The `Info Hash` of the torrent. | Yes | No | `%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00`
 //! `peer_addr` | string |The IP address of the peer. | No | No | `2.137.87.41`
-//! [`downloaded`](crate::servers::http::v1::requests::announce::Announce::downloaded) | positive integer |The number of bytes downloaded by the peer. | No | `0` | `0`
-//! [`uploaded`](crate::servers::http::v1::requests::announce::Announce::uploaded) | positive integer | The number of bytes uploaded by the peer. | No | `0` | `0`
-//! [`peer_id`](crate::servers::http::v1::requests::announce::Announce::peer_id) | percent encoded of 20-byte array  | The ID of the peer. | Yes | No | `-qB00000000000000001`
-//! [`port`](crate::servers::http::v1::requests::announce::Announce::port) | positive integer | The port used by the peer. | Yes | No | `17548`
-//! [`left`](crate::servers::http::v1::requests::announce::Announce::left) | positive integer | The number of bytes pending to download. | No | `0` | `0`
-//! [`event`](crate::servers::http::v1::requests::announce::Announce::event) | positive integer | The event that triggered the `Announce` request: `started`, `completed`, `stopped` | No | `None` | `completed`
-//! [`compact`](crate::servers::http::v1::requests::announce::Announce::compact) | `0` or `1` | Whether the tracker should return a compact peer list. | No | `None` | `0`
+//! [`downloaded`](bittorrent_http_protocol::v1::requests::announce::Announce::downloaded) | positive integer |The number of bytes downloaded by the peer. | No | `0` | `0`
+//! [`uploaded`](bittorrent_http_protocol::v1::requests::announce::Announce::uploaded) | positive integer | The number of bytes uploaded by the peer. | No | `0` | `0`
+//! [`peer_id`](bittorrent_http_protocol::v1::requests::announce::Announce::peer_id) | percent encoded of 20-byte array  | The ID of the peer. | Yes | No | `-qB00000000000000001`
+//! [`port`](bittorrent_http_protocol::v1::requests::announce::Announce::port) | positive integer | The port used by the peer. | Yes | No | `17548`
+//! [`left`](bittorrent_http_protocol::v1::requests::announce::Announce::left) | positive integer | The number of bytes pending to download. | No | `0` | `0`
+//! [`event`](bittorrent_http_protocol::v1::requests::announce::Announce::event) | positive integer | The event that triggered the `Announce` request: `started`, `completed`, `stopped` | No | `None` | `completed`
+//! [`compact`](bittorrent_http_protocol::v1::requests::announce::Announce::compact) | `0` or `1` | Whether the tracker should return a compact peer list. | No | `None` | `0`
 //! `numwant` | positive integer | **Not implemented**. The maximum number of peers you want in the reply. | No | `50` | `50`
 //!
-//! Refer to the [`Announce`](crate::servers::http::v1::requests::announce::Announce)
+//! Refer to the [`Announce`](bittorrent_http_protocol::v1::requests::announce::Announce)
 //! request for more information about the parameters.
 //!
 //! > **NOTICE**: the [BEP 03](https://www.bittorrent.org/beps/bep_0003.html)
@@ -152,7 +152,7 @@
 //! 000000f0: 65                                       e
 //! ```
 //!
-//! Refer to the [`Normal`](crate::servers::http::v1::responses::announce::Normal), i.e. `Non-Compact`
+//! Refer to the [`Normal`](bittorrent_http_protocol::v1::responses::announce::Normal), i.e. `Non-Compact`
 //! response for more information about the response.
 //!
 //! **Sample compact response**
@@ -190,7 +190,7 @@
 //! 0000070: 7065                                     pe
 //! ```
 //!
-//! Refer to the [`Compact`](crate::servers::http::v1::responses::announce::Compact)
+//! Refer to the [`Compact`](bittorrent_http_protocol::v1::responses::announce::Compact)
 //! response for more information about the response.
 //!
 //! **Protocol**
@@ -220,12 +220,12 @@
 //!
 //! Parameter | Type | Description | Required |  Default | Example
 //! ---|---|---|---|---|---
-//! [`info_hash`](crate::servers::http::v1::requests::scrape::Scrape::info_hashes) | percent encoded of 20-byte array | The `Info Hash` of the torrent. | Yes | No | `%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00`
+//! [`info_hash`](bittorrent_http_protocol::v1::requests::scrape::Scrape::info_hashes) | percent encoded of 20-byte array | The `Info Hash` of the torrent. | Yes | No | `%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00`
 //!
 //! > **NOTICE**: you can scrape multiple torrents at the same time by passing
 //! > multiple `info_hash` parameters.
 //!
-//! Refer to the [`Scrape`](crate::servers::http::v1::requests::scrape::Scrape)
+//! Refer to the [`Scrape`](bittorrent_http_protocol::v1::requests::scrape::Scrape)
 //! request for more information about the parameters.
 //!
 //! **Sample scrape URL**

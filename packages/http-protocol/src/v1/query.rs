@@ -224,7 +224,7 @@ impl std::fmt::Display for FieldValuePairSet {
 mod tests {
 
     mod url_query {
-        use crate::servers::http::v1::query::Query;
+        use crate::v1::query::Query;
 
         #[test]
         fn should_parse_the_query_params_from_an_url_query_string() {
@@ -277,7 +277,7 @@ mod tests {
         }
 
         mod should_allow_more_than_one_value_for_the_same_param {
-            use crate::servers::http::v1::query::Query;
+            use crate::v1::query::Query;
 
             #[test]
             fn instantiated_from_a_vector() {
@@ -299,7 +299,7 @@ mod tests {
         }
 
         mod should_be_displayed {
-            use crate::servers::http::v1::query::Query;
+            use crate::v1::query::Query;
 
             #[test]
             fn with_one_param() {
@@ -320,7 +320,7 @@ mod tests {
         }
 
         mod param_name_value_pair {
-            use crate::servers::http::v1::query::NameValuePair;
+            use crate::v1::query::NameValuePair;
 
             #[test]
             fn should_parse_a_single_query_param() {

@@ -3,13 +3,13 @@
 //! Data structures and logic for parsing the `scrape` request.
 use std::panic::Location;
 
-use bittorrent_http_protocol::percent_encoding::percent_decode_info_hash;
 use bittorrent_primitives::info_hash::{self, InfoHash};
 use thiserror::Error;
 use torrust_tracker_located_error::{Located, LocatedError};
 
-use crate::servers::http::v1::query::Query;
-use crate::servers::http::v1::responses;
+use crate::percent_encoding::percent_decode_info_hash;
+use crate::v1::query::Query;
+use crate::v1::responses;
 
 // Query param names
 const INFO_HASH: &str = "info_hash";
@@ -86,8 +86,8 @@ mod tests {
 
         use bittorrent_primitives::info_hash::InfoHash;
 
-        use crate::servers::http::v1::query::Query;
-        use crate::servers::http::v1::requests::scrape::{Scrape, INFO_HASH};
+        use crate::v1::query::Query;
+        use crate::v1::requests::scrape::{Scrape, INFO_HASH};
 
         #[test]
         fn should_be_instantiated_from_the_url_query_with_only_one_infohash() {
@@ -107,8 +107,8 @@ mod tests {
 
         mod when_it_is_instantiated_from_the_url_query_params {
 
-            use crate::servers::http::v1::query::Query;
-            use crate::servers::http::v1::requests::scrape::{Scrape, INFO_HASH};
+            use crate::v1::query::Query;
+            use crate::v1::requests::scrape::{Scrape, INFO_HASH};
 
             #[test]
             fn it_should_fail_if_the_query_does_not_include_the_info_hash_param() {

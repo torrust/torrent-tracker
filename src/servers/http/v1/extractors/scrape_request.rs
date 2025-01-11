@@ -4,10 +4,10 @@
 //! It parses the query parameters returning an [`Scrape`]
 //! request.
 //!
-//! Refer to [`Scrape`](crate::servers::http::v1::requests::scrape)  for more
+//! Refer to [`Scrape`](bittorrent_http_protocol::v1::requests::scrape)  for more
 //! information about the returned structure.
 //!
-//! It returns a bencoded [`Error`](crate::servers::http::v1::responses::error)
+//! It returns a bencoded [`Error`](bittorrent_http_protocol::v1::responses::error)
 //! response (`500`) if the query parameters are missing or invalid.
 //!
 //! **Sample scrape request**
@@ -33,11 +33,11 @@ use std::panic::Location;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
+use bittorrent_http_protocol::v1::query::Query;
+use bittorrent_http_protocol::v1::requests::scrape::{ParseScrapeQueryError, Scrape};
+use bittorrent_http_protocol::v1::responses;
 use futures::FutureExt;
-
-use crate::servers::http::v1::query::Query;
-use crate::servers::http::v1::requests::scrape::{ParseScrapeQueryError, Scrape};
-use crate::servers::http::v1::responses;
+use hyper::StatusCode;
 
 /// Extractor for the [`Scrape`]
 /// request.
@@ -53,7 +53,7 @@ where
         async {
             match extract_scrape_from(parts.uri.query()) {
                 Ok(scrape_request) => Ok(ExtractRequest(scrape_request)),
-                Err(error) => Err(error.into_response()),
+                Err(error) => Err((StatusCode::OK, error.write()).into_response()),
             }
         }
         .boxed()
@@ -86,11 +86,11 @@ fn extract_scrape_from(maybe_raw_query: Option<&str>) -> Result<Scrape, response
 mod tests {
     use std::str::FromStr;
 
+    use bittorrent_http_protocol::v1::requests::scrape::Scrape;
+    use bittorrent_http_protocol::v1::responses::error::Error;
     use bittorrent_primitives::info_hash::InfoHash;
 
     use super::extract_scrape_from;
-    use crate::servers::http::v1::requests::scrape::Scrape;
-    use crate::servers::http::v1::responses::error::Error;
 
     struct TestInfoHash {
         pub bencoded: String,
