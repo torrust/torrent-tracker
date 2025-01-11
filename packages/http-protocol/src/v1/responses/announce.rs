@@ -1,17 +1,13 @@
-//! `Announce` response for the HTTP tracker [`announce`](crate::servers::http::v1::requests::announce::Announce) request.
+//! `Announce` response for the HTTP tracker [`announce`](bittorrent_http_protocol::v1::requests::announce::Announce) request.
 //!
 //! Data structures and logic to build the `announce` response.
 use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use axum::http::StatusCode;
 use derive_more::{AsRef, Constructor, From};
 use torrust_tracker_contrib_bencode::{ben_bytes, ben_int, ben_list, ben_map, BMutAccess, BencodeMut};
+use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
-
-use super::Response;
-use crate::core::AnnounceData;
-use crate::servers::http::v1::responses;
 
 /// An [`Announce`] response, that can be anything that is convertible from [`AnnounceData`].
 ///
@@ -35,31 +31,13 @@ pub struct Announce<E>
 where
     E: From<AnnounceData> + Into<Vec<u8>>,
 {
-    data: E,
+    pub data: E,
 }
 
 /// Build any [`Announce`] from an [`AnnounceData`].
 impl<E: From<AnnounceData> + Into<Vec<u8>>> From<AnnounceData> for Announce<E> {
     fn from(data: AnnounceData) -> Self {
         Self::new(data.into())
-    }
-}
-
-/// Convert any Announce [`Announce`] into a [`axum::response::Response`]
-impl<E: From<AnnounceData> + Into<Vec<u8>>> axum::response::IntoResponse for Announce<E>
-where
-    Announce<E>: Response,
-{
-    fn into_response(self) -> axum::response::Response {
-        axum::response::IntoResponse::into_response(self.body().map(|bytes| (StatusCode::OK, bytes)))
-    }
-}
-
-/// Implement the [`Response`] for the [`Announce`].
-///
-impl<E: From<AnnounceData> + Into<Vec<u8>>> Response for Announce<E> {
-    fn body(self) -> Result<Vec<u8>, responses::error::Error> {
-        Ok(self.data.into())
     }
 }
 
@@ -152,9 +130,9 @@ impl Into<Vec<u8>> for Compact {
 
 /// A [`NormalPeer`], for the [`Normal`] form.
 ///
-/// ```text
+/// ```rust
 /// use std::net::{IpAddr, Ipv4Addr};
-/// use torrust_tracker_lib::servers::http::v1::responses::announce::{Normal, NormalPeer};
+/// use bittorrent_http_protocol::v1::responses::announce::{Normal, NormalPeer};
 ///
 /// let peer = NormalPeer {
 ///     peer_id: *b"-qB00000000000000001",
@@ -204,9 +182,9 @@ impl From<&NormalPeer> for BencodeMut<'_> {
 /// A part from reducing the size of the response, this format does not contain
 /// the peer's ID.
 ///
-/// ```text
+/// ```rust
 ///  use std::net::{IpAddr, Ipv4Addr};
-///  use torrust_tracker_lib::servers::http::v1::responses::announce::{Compact, CompactPeer, CompactPeerData};
+///  use bittorrent_http_protocol::v1::responses::announce::{Compact, CompactPeer, CompactPeerData};
 ///
 ///  let peer = CompactPeer::V4(CompactPeerData {
 ///     ip: Ipv4Addr::new(0x69, 0x69, 0x69, 0x69), // 105.105.105.105
@@ -302,11 +280,11 @@ mod tests {
 
     use aquatic_udp_protocol::PeerId;
     use torrust_tracker_configuration::AnnouncePolicy;
+    use torrust_tracker_primitives::core::AnnounceData;
     use torrust_tracker_primitives::peer::fixture::PeerBuilder;
     use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-    use crate::core::AnnounceData;
-    use crate::servers::http::v1::responses::announce::{Announce, Compact, Normal, Response};
+    use crate::v1::responses::announce::{Announce, Compact, Normal};
 
     // Some ascii values used in tests:
     //
@@ -345,7 +323,7 @@ mod tests {
     #[test]
     fn non_compact_announce_response_can_be_bencoded() {
         let response: Announce<Normal> = setup_announce_data().into();
-        let bytes = response.body().expect("it should encode the response");
+        let bytes = response.data.into();
 
         // cspell:disable-next-line
         let expected_bytes = b"d8:completei333e10:incompletei444e8:intervali111e12:min intervali222e5:peersld2:ip15:105.105.105.1057:peer id20:-qB000000000000000014:porti28784eed2:ip39:6969:6969:6969:6969:6969:6969:6969:69697:peer id20:-qB000000000000000024:porti28784eeee";
@@ -359,7 +337,7 @@ mod tests {
     #[test]
     fn compact_announce_response_can_be_bencoded() {
         let response: Announce<Compact> = setup_announce_data().into();
-        let bytes = response.body().expect("it should encode the response");
+        let bytes = response.data.into();
 
         let expected_bytes =
             // cspell:disable-next-line

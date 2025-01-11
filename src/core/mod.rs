@@ -449,7 +449,6 @@ pub mod torrent;
 pub mod peer_tests;
 
 use std::cmp::max;
-use std::collections::HashMap;
 use std::net::IpAddr;
 use std::panic::Location;
 use std::sync::Arc;
@@ -458,13 +457,13 @@ use std::time::Duration;
 use auth::PeerKey;
 use bittorrent_primitives::info_hash::InfoHash;
 use databases::driver::Driver;
-use derive_more::Constructor;
 use error::PeerKeyError;
 use tokio::sync::mpsc::error::SendError;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_located_error::Located;
+use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
@@ -511,17 +510,6 @@ pub struct Tracker {
     stats_repository: statistics::repository::Repository,
 }
 
-/// Structure that holds the data returned by the `announce` request.
-#[derive(Clone, Debug, PartialEq, Constructor, Default)]
-pub struct AnnounceData {
-    /// The list of peers that are downloading the same torrent.
-    /// It excludes the peer that made the request.
-    pub peers: Vec<Arc<peer::Peer>>,
-    /// Swarm statistics
-    pub stats: SwarmMetadata,
-    pub policy: AnnouncePolicy,
-}
-
 /// How many peers the peer announcing wants in the announce response.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum PeersWanted {
@@ -561,44 +549,6 @@ impl From<i32> for PeersWanted {
         } else {
             Self::All
         }
-    }
-}
-
-/// Structure that holds the data returned by the `scrape` request.
-#[derive(Debug, PartialEq, Default)]
-pub struct ScrapeData {
-    /// A map of infohashes and swarm metadata for each torrent.
-    pub files: HashMap<InfoHash, SwarmMetadata>,
-}
-
-impl ScrapeData {
-    /// Creates a new empty `ScrapeData` with no files (torrents).
-    #[must_use]
-    pub fn empty() -> Self {
-        let files: HashMap<InfoHash, SwarmMetadata> = HashMap::new();
-        Self { files }
-    }
-
-    /// Creates a new `ScrapeData` with zeroed metadata for each torrent.
-    #[must_use]
-    pub fn zeroed(info_hashes: &Vec<InfoHash>) -> Self {
-        let mut scrape_data = Self::empty();
-
-        for info_hash in info_hashes {
-            scrape_data.add_file(info_hash, SwarmMetadata::zeroed());
-        }
-
-        scrape_data
-    }
-
-    /// Adds a torrent to the `ScrapeData`.
-    pub fn add_file(&mut self, info_hash: &InfoHash, swarm_metadata: SwarmMetadata) {
-        self.files.insert(*info_hash, swarm_metadata);
-    }
-
-    /// Adds a torrent to the `ScrapeData` with zeroed metadata.
-    pub fn add_file_with_zeroed_metadata(&mut self, info_hash: &InfoHash) {
-        self.files.insert(*info_hash, SwarmMetadata::zeroed());
     }
 }
 

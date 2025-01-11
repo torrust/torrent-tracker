@@ -59,11 +59,11 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker running on reverse proxy mode:
 ///
-/// ```text
+/// ```rust
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use bittorrent_http_protocol::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = true;
 ///
@@ -81,11 +81,11 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker non running on reverse proxy mode:
 ///
-/// ```text
+/// ```rust
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use bittorrent_http_protocol::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = false;
 ///
@@ -142,7 +142,7 @@ mod tests {
         use std::str::FromStr;
 
         use super::invoke;
-        use crate::servers::http::v1::services::peer_ip_resolver::{ClientIpSources, PeerIpResolutionError};
+        use crate::v1::services::peer_ip_resolver::{ClientIpSources, PeerIpResolutionError};
 
         #[test]
         fn it_should_get_the_peer_ip_from_the_connection_info() {
@@ -181,7 +181,7 @@ mod tests {
         use std::net::IpAddr;
         use std::str::FromStr;
 
-        use crate::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+        use crate::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 
         #[test]
         fn it_should_get_the_peer_ip_from_the_right_most_ip_in_the_x_forwarded_for_header() {

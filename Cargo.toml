@@ -58,7 +58,6 @@ http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
 lazy_static = "1"
-multimap = "0"
 parking_lot = "0"
 percent-encoding = "2"
 pin-project-lite = "0"
@@ -79,7 +78,6 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
 torrust-tracker-clock = { version = "3.0.0-develop", path = "packages/clock" }
 torrust-tracker-configuration = { version = "3.0.0-develop", path = "packages/configuration" }
-torrust-tracker-contrib-bencode = { version = "3.0.0-develop", path = "contrib/bencode" }
 torrust-tracker-located-error = { version = "3.0.0-develop", path = "packages/located-error" }
 torrust-tracker-primitives = { version = "3.0.0-develop", path = "packages/primitives" }
 torrust-tracker-torrent-repository = { version = "3.0.0-develop", path = "packages/torrent-repository" }

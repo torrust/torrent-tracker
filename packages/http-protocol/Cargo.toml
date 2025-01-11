@@ -17,5 +17,13 @@ version.workspace = true
 [dependencies]
 aquatic_udp_protocol = "0"
 bittorrent-primitives = "0.1.0"
+derive_more = { version = "1", features = ["as_ref", "constructor", "from"] }
+multimap = "0"
 percent-encoding = "2"
+serde = { version = "1", features = ["derive"] }
+serde_bencode = "0"
+thiserror = "2"
+torrust-tracker-configuration = { version = "3.0.0-develop", path = "../configuration" }
+torrust-tracker-contrib-bencode = { version = "3.0.0-develop", path = "../../contrib/bencode" }
+torrust-tracker-located-error = { version = "3.0.0-develop", path = "../located-error" }
 torrust-tracker-primitives = { version = "3.0.0-develop", path = "../primitives" }

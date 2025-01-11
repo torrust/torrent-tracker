@@ -30,8 +30,8 @@ impl Query {
     /// It return `Some(value)` for a URL query param if the param with the
     /// input `name` exists. For example:
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::query::Query;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::query::Query;
     ///
     /// let raw_query = "param1=value1&param2=value2";
     ///
@@ -43,8 +43,8 @@ impl Query {
     ///
     /// It returns only the first param value even if it has multiple values:
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::query::Query;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::query::Query;
     ///
     /// let raw_query = "param1=value1&param1=value2";
     ///
@@ -59,8 +59,8 @@ impl Query {
 
     /// Returns all the param values as a vector.
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::query::Query;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::query::Query;
     ///
     /// let query = "param1=value1&param1=value2".parse::<Query>().unwrap();
     ///
@@ -72,8 +72,8 @@ impl Query {
     ///
     /// Returns all the param values as a vector even if it has only one value.
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::query::Query;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::query::Query;
     ///
     /// let query = "param1=value1".parse::<Query>().unwrap();
     ///
@@ -224,7 +224,7 @@ impl std::fmt::Display for FieldValuePairSet {
 mod tests {
 
     mod url_query {
-        use crate::servers::http::v1::query::Query;
+        use crate::v1::query::Query;
 
         #[test]
         fn should_parse_the_query_params_from_an_url_query_string() {
@@ -277,7 +277,7 @@ mod tests {
         }
 
         mod should_allow_more_than_one_value_for_the_same_param {
-            use crate::servers::http::v1::query::Query;
+            use crate::v1::query::Query;
 
             #[test]
             fn instantiated_from_a_vector() {
@@ -299,7 +299,7 @@ mod tests {
         }
 
         mod should_be_displayed {
-            use crate::servers::http::v1::query::Query;
+            use crate::v1::query::Query;
 
             #[test]
             fn with_one_param() {
@@ -320,7 +320,7 @@ mod tests {
         }
 
         mod param_name_value_pair {
-            use crate::servers::http::v1::query::NameValuePair;
+            use crate::v1::query::NameValuePair;
 
             #[test]
             fn should_parse_a_single_query_param() {

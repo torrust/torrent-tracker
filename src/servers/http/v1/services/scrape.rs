@@ -12,8 +12,9 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrust_tracker_primitives::core::ScrapeData;
 
-use crate::core::{statistics, ScrapeData, Tracker};
+use crate::core::{statistics, Tracker};
 
 /// The HTTP tracker `scrape` service.
 ///
@@ -100,10 +101,11 @@ mod tests {
         use std::sync::Arc;
 
         use mockall::predicate::eq;
+        use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::{statistics, PeersWanted, ScrapeData, Tracker};
+        use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
             public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
@@ -192,9 +194,10 @@ mod tests {
         use std::sync::Arc;
 
         use mockall::predicate::eq;
+        use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::{statistics, PeersWanted, ScrapeData, Tracker};
+        use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
             public_tracker, sample_info_hash, sample_info_hashes, sample_peer,

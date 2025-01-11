@@ -3,10 +3,10 @@
 //! response.
 use std::panic::Location;
 
+use bittorrent_http_protocol::v1::responses;
 use thiserror::Error;
 
 use crate::core::auth;
-use crate::servers::http::v1::responses;
 
 /// Authentication error.
 ///

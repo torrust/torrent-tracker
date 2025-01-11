@@ -4,6 +4,7 @@
 //! which is a `BitTorrent` tracker server. These structures are used not only
 //! by the tracker server crate, but also by other crates in the Torrust
 //! ecosystem.
+pub mod core;
 pub mod pagination;
 pub mod peer;
 pub mod swarm_metadata;

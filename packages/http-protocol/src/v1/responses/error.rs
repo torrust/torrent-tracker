@@ -11,9 +11,9 @@
 //! > **NOTICE**: error responses are bencoded and always have a `200 OK` status
 //! > code. The official `BitTorrent` specification does not specify the status
 //! > code.
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+
+use crate::v1::services::peer_ip_resolver::PeerIpResolutionError;
 
 /// `Error` response for the [`HTTP tracker`](crate::servers::http).
 #[derive(Serialize, Debug, PartialEq)]
@@ -26,8 +26,8 @@ pub struct Error {
 impl Error {
     /// Returns the bencoded representation of the `Error` struct.
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::responses::error::Error;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::responses::error::Error;
     ///
     /// let err = Error {
     ///    failure_reason: "error message".to_owned(),
@@ -47,9 +47,11 @@ impl Error {
     }
 }
 
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        (StatusCode::OK, self.write()).into_response()
+impl From<PeerIpResolutionError> for Error {
+    fn from(err: PeerIpResolutionError) -> Self {
+        Self {
+            failure_reason: format!("Error resolving peer IP: {err}"),
+        }
     }
 }
 
