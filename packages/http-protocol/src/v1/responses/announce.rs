@@ -130,9 +130,9 @@ impl Into<Vec<u8>> for Compact {
 
 /// A [`NormalPeer`], for the [`Normal`] form.
 ///
-/// ```text
+/// ```rust
 /// use std::net::{IpAddr, Ipv4Addr};
-/// use torrust_tracker_lib::servers::http::v1::responses::announce::{Normal, NormalPeer};
+/// use bittorrent_http_protocol::v1::responses::announce::{Normal, NormalPeer};
 ///
 /// let peer = NormalPeer {
 ///     peer_id: *b"-qB00000000000000001",
@@ -182,9 +182,9 @@ impl From<&NormalPeer> for BencodeMut<'_> {
 /// A part from reducing the size of the response, this format does not contain
 /// the peer's ID.
 ///
-/// ```text
+/// ```rust
 ///  use std::net::{IpAddr, Ipv4Addr};
-///  use torrust_tracker_lib::servers::http::v1::responses::announce::{Compact, CompactPeer, CompactPeerData};
+///  use bittorrent_http_protocol::v1::responses::announce::{Compact, CompactPeer, CompactPeerData};
 ///
 ///  let peer = CompactPeer::V4(CompactPeerData {
 ///     ip: Ipv4Addr::new(0x69, 0x69, 0x69, 0x69), // 105.105.105.105

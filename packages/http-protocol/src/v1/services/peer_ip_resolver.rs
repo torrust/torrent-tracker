@@ -59,11 +59,11 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker running on reverse proxy mode:
 ///
-/// ```text
+/// ```rust
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use bittorrent_http_protocol::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = true;
 ///
@@ -81,11 +81,11 @@ pub enum PeerIpResolutionError {
 ///
 /// With the tracker non running on reverse proxy mode:
 ///
-/// ```text
+/// ```rust
 /// use std::net::IpAddr;
 /// use std::str::FromStr;
 ///
-/// use torrust_tracker_lib::servers::http::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
+/// use bittorrent_http_protocol::v1::services::peer_ip_resolver::{invoke, ClientIpSources, PeerIpResolutionError};
 ///
 /// let on_reverse_proxy = false;
 ///

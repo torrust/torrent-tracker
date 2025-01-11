@@ -8,11 +8,11 @@ use torrust_tracker_primitives::core::ScrapeData;
 
 /// The `Scrape` response for the HTTP tracker.
 ///
-/// ```text
-/// use torrust_tracker_lib::servers::http::v1::responses::scrape::Bencoded;
+/// ```rust
+/// use bittorrent_http_protocol::v1::responses::scrape::Bencoded;
 /// use bittorrent_primitives::info_hash::InfoHash;
 /// use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
-/// use torrust_tracker_lib::core::ScrapeData;
+/// use torrust_tracker_primitives::core::ScrapeData;
 ///
 /// let info_hash = InfoHash::from_bytes(&[0x69; 20]);
 /// let mut scrape_data = ScrapeData::empty();

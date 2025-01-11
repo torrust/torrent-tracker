@@ -26,8 +26,8 @@ pub struct Error {
 impl Error {
     /// Returns the bencoded representation of the `Error` struct.
     ///
-    /// ```text
-    /// use torrust_tracker_lib::servers::http::v1::responses::error::Error;
+    /// ```rust
+    /// use bittorrent_http_protocol::v1::responses::error::Error;
     ///
     /// let err = Error {
     ///    failure_reason: "error message".to_owned(),
