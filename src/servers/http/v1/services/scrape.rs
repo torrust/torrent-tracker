@@ -67,13 +67,13 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::core::services::tracker_factory;
     use crate::core::{statistics, Tracker};
 
     fn public_tracker() -> Tracker {
         let config = configuration::ephemeral_public();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         tracker_factory(&config, &database, &whitelist_manager)
     }
 
@@ -100,9 +100,7 @@ mod tests {
     fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
         let config = configuration::ephemeral();
 
-        let database = initialize_database(&config);
-
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
 
         Tracker::new(
             &config.core,

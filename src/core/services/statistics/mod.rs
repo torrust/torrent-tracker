@@ -112,9 +112,10 @@ mod tests {
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_test_helpers::configuration;
 
+    use crate::bootstrap::app::initialize_tracker_dependencies;
     use crate::core;
     use crate::core::services::statistics::{get_metrics, TrackerMetrics};
-    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::core::services::tracker_factory;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
@@ -125,8 +126,7 @@ mod tests {
     #[tokio::test]
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let config = tracker_configuration();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         let tracker = Arc::new(tracker_factory(&tracker_configuration(), &database, &whitelist_manager));
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 

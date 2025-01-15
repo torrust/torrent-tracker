@@ -1153,36 +1153,33 @@ mod tests {
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
+        use crate::bootstrap::app::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
-        use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+        use crate::core::services::tracker_factory;
         use crate::core::{TorrentsMetrics, Tracker};
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
-            let database = initialize_database(&config);
-            let whitelist_manager = initialize_whitelist(database.clone());
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
             tracker_factory(&config, &database, &whitelist_manager)
         }
 
         fn private_tracker() -> Tracker {
             let config = configuration::ephemeral_private();
-            let database = initialize_database(&config);
-            let whitelist_manager = initialize_whitelist(database.clone());
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
             tracker_factory(&config, &database, &whitelist_manager)
         }
 
         fn whitelisted_tracker() -> Tracker {
             let config = configuration::ephemeral_listed();
-            let database = initialize_database(&config);
-            let whitelist_manager = initialize_whitelist(database.clone());
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
             tracker_factory(&config, &database, &whitelist_manager)
         }
 
         pub fn tracker_persisting_torrents_in_database() -> Tracker {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
-            let database = initialize_database(&config);
-            let whitelist_manager = initialize_whitelist(database.clone());
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
             tracker_factory(&config, &database, &whitelist_manager)
         }
 

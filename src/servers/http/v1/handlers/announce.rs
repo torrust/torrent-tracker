@@ -185,34 +185,31 @@ mod tests {
     use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::core::services::tracker_factory;
     use crate::core::Tracker;
 
     fn private_tracker() -> Tracker {
         let config = configuration::ephemeral_private();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         tracker_factory(&config, &database, &whitelist_manager)
     }
 
     fn whitelisted_tracker() -> Tracker {
         let config = configuration::ephemeral_listed();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         tracker_factory(&config, &database, &whitelist_manager)
     }
 
     fn tracker_on_reverse_proxy() -> Tracker {
         let config = configuration::ephemeral_with_reverse_proxy();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         tracker_factory(&config, &database, &whitelist_manager)
     }
 
     fn tracker_not_on_reverse_proxy() -> Tracker {
         let config = configuration::ephemeral_without_reverse_proxy();
-        let database = initialize_database(&config);
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         tracker_factory(&config, &database, &whitelist_manager)
     }
 

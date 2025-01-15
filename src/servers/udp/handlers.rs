@@ -435,7 +435,8 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::core::services::tracker_factory;
     use crate::core::{statistics, Tracker};
     use crate::CurrentClock;
 
@@ -455,10 +456,9 @@ mod tests {
         initialized_tracker(&configuration::ephemeral_listed())
     }
 
-    fn initialized_tracker(configuration: &Configuration) -> Arc<Tracker> {
-        let database = initialize_database(configuration);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        tracker_factory(configuration, &database, &whitelist_manager).into()
+    fn initialized_tracker(config: &Configuration) -> Arc<Tracker> {
+        let (database, whitelist_manager) = initialize_tracker_dependencies(config);
+        tracker_factory(config, &database, &whitelist_manager).into()
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {
@@ -558,9 +558,7 @@ mod tests {
     fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
         let config = tracker_configuration();
 
-        let database = initialize_database(&config);
-
-        let whitelist_manager = initialize_whitelist(database.clone());
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
 
         Tracker::new(
             &config.core,
@@ -1190,8 +1188,8 @@ mod tests {
 
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
 
+                use crate::bootstrap::app::initialize_tracker_dependencies;
                 use crate::core;
-                use crate::core::services::{initialize_database, initialize_whitelist};
                 use crate::core::statistics::keeper::Keeper;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
@@ -1202,14 +1200,13 @@ mod tests {
 
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
-                    let configuration = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
-                    let database = initialize_database(&configuration);
-                    let whitelist_manager = initialize_whitelist(database.clone());
+                    let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
+                    let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
                     let (stats_event_sender, stats_repository) = Keeper::new_active_instance();
 
                     let tracker = Arc::new(
                         core::Tracker::new(
-                            &configuration.core,
+                            &config.core,
                             &database,
                             &whitelist_manager,
                             Some(stats_event_sender),
