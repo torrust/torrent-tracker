@@ -5,6 +5,7 @@ use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
 use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
+use torrust_tracker_lib::core::whitelist::WhiteListManager;
 use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
@@ -13,6 +14,7 @@ use torrust_tracker_primitives::peer;
 pub struct Environment<S> {
     pub config: Arc<HttpTracker>,
     pub tracker: Arc<Tracker>,
+    pub whitelist_manager: Arc<WhiteListManager>,
     pub registar: Registar,
     pub server: HttpServer<S>,
 }
@@ -28,6 +30,8 @@ impl Environment<Stopped> {
     #[allow(dead_code)]
     pub fn new(configuration: &Arc<Configuration>) -> Self {
         let tracker = initialize_with_configuration(configuration);
+
+        let whitelist_manager = tracker.whitelist_manager.clone();
 
         let http_tracker = configuration
             .http_trackers
@@ -45,6 +49,7 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker,
+            whitelist_manager,
             registar: Registar::default(),
             server,
         }
@@ -55,6 +60,7 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            whitelist_manager: self.whitelist_manager.clone(),
             registar: self.registar.clone(),
             server: self.server.start(self.tracker, self.registar.give_form()).await.unwrap(),
         }
@@ -70,6 +76,7 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            whitelist_manager: self.whitelist_manager,
             registar: Registar::default(),
 
             server: self.server.stop().await.unwrap(),
