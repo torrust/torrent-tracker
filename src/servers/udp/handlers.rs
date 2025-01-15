@@ -456,7 +456,9 @@ mod tests {
     }
 
     fn initialized_tracker(configuration: &Configuration) -> Arc<Tracker> {
-        tracker_factory(configuration).into()
+        let database = initialize_database(configuration);
+        let whitelist_manager = initialize_whitelist(database.clone());
+        tracker_factory(configuration, &database, &whitelist_manager).into()
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {

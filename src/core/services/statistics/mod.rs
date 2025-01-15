@@ -114,7 +114,7 @@ mod tests {
 
     use crate::core;
     use crate::core::services::statistics::{get_metrics, TrackerMetrics};
-    use crate::core::services::tracker_factory;
+    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
@@ -124,7 +124,10 @@ mod tests {
 
     #[tokio::test]
     async fn the_statistics_service_should_return_the_tracker_metrics() {
-        let tracker = Arc::new(tracker_factory(&tracker_configuration()));
+        let config = tracker_configuration();
+        let database = initialize_database(&config);
+        let whitelist_manager = initialize_whitelist(database.clone());
+        let tracker = Arc::new(tracker_factory(&tracker_configuration(), &database, &whitelist_manager));
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
         let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone()).await;

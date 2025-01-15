@@ -21,7 +21,7 @@ use tracing::instrument;
 
 use super::config::initialize_configuration;
 use crate::bootstrap;
-use crate::core::services::tracker_factory;
+use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -105,7 +105,11 @@ pub fn initialize_static() {
 #[must_use]
 #[instrument(skip(config))]
 pub fn initialize_tracker(config: &Configuration) -> Tracker {
-    tracker_factory(config)
+    let database = initialize_database(config);
+
+    let whitelist_manager = initialize_whitelist(database.clone());
+
+    tracker_factory(config, &database, &whitelist_manager)
 }
 
 /// It initializes the log threshold, format and channel.

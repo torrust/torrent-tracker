@@ -24,17 +24,17 @@ use crate::core::Tracker;
 ///
 /// Will panic if tracker cannot be instantiated.
 #[must_use]
-pub fn tracker_factory(config: &Configuration) -> Tracker {
-    let database = initialize_database(config);
-
-    let whitelist_manager = initialize_whitelist(database.clone());
-
+pub fn tracker_factory(
+    config: &Configuration,
+    database: &Arc<Box<dyn Database>>,
+    whitelist_manager: &Arc<WhiteListManager>,
+) -> Tracker {
     let (stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
     match Tracker::new(
         &Arc::new(config).core,
-        &database,
-        &whitelist_manager,
+        database,
+        whitelist_manager,
         stats_event_sender,
         stats_repository,
     ) {

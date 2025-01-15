@@ -71,7 +71,10 @@ mod tests {
     use crate::core::{statistics, Tracker};
 
     fn public_tracker() -> Tracker {
-        tracker_factory(&configuration::ephemeral_public())
+        let config = configuration::ephemeral_public();
+        let database = initialize_database(&config);
+        let whitelist_manager = initialize_whitelist(database.clone());
+        tracker_factory(&config, &database, &whitelist_manager)
     }
 
     fn sample_info_hashes() -> Vec<InfoHash> {
