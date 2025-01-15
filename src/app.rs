@@ -67,6 +67,7 @@ pub async fn start(
     // Load whitelisted torrents
     if tracker.is_listed() {
         tracker
+            .whitelist_manager
             .load_whitelist_from_database()
             .await
             .expect("Could not load whitelist from database.");

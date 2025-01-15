@@ -1261,7 +1261,7 @@ mod configured_as_whitelisted {
 
             let info_hash = InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap();
 
-            env.tracker
+            env.whitelist_manager
                 .add_torrent_to_whitelist(&info_hash)
                 .await
                 .expect("should add the torrent to the whitelist");
@@ -1343,7 +1343,7 @@ mod configured_as_whitelisted {
                     .build(),
             );
 
-            env.tracker
+            env.whitelist_manager
                 .add_torrent_to_whitelist(&info_hash)
                 .await
                 .expect("should add the torrent to the whitelist");

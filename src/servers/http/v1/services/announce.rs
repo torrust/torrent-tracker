@@ -59,11 +59,14 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
+    use crate::bootstrap::app::initialize_tracker_dependencies;
     use crate::core::services::tracker_factory;
     use crate::core::Tracker;
 
     fn public_tracker() -> Tracker {
-        tracker_factory(&configuration::ephemeral_public())
+        let config = configuration::ephemeral_public();
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager)
     }
 
     fn sample_info_hash() -> InfoHash {
@@ -107,9 +110,25 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
+        use crate::bootstrap::app::initialize_tracker_dependencies;
         use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
+
+        fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
+            let config = configuration::ephemeral();
+
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+
+            Tracker::new(
+                &config.core,
+                &database,
+                &whitelist_manager,
+                stats_event_sender,
+                statistics::repository::Repository::new(),
+            )
+            .unwrap()
+        }
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
@@ -142,14 +161,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let mut peer = sample_peer_using_ipv4();
 
@@ -162,12 +174,7 @@ mod tests {
                 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969,
             )));
 
-            Tracker::new(
-                &configuration.core,
-                Some(stats_event_sender),
-                statistics::repository::Repository::new(),
-            )
-            .unwrap()
+            test_tracker_factory(Some(stats_event_sender))
         }
 
         fn peer_with_the_ipv4_loopback_ip() -> peer::Peer {
@@ -213,14 +220,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let mut peer = sample_peer_using_ipv6();
 
