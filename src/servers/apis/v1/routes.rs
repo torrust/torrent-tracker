@@ -14,7 +14,7 @@ pub fn add(prefix: &str, router: Router, tracker: Arc<Tracker>, ban_service: Arc
 
     let router = auth_key::routes::add(&v1_prefix, router, tracker.clone());
     let router = stats::routes::add(&v1_prefix, router, tracker.clone(), ban_service);
-    let router = whitelist::routes::add(&v1_prefix, router, tracker.clone());
+    let router = whitelist::routes::add(&v1_prefix, router, &tracker);
 
     torrent::routes::add(&v1_prefix, router, tracker)
 }
