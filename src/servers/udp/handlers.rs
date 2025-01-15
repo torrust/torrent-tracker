@@ -1391,7 +1391,10 @@ mod tests {
 
                 add_a_seeder(tracker.clone(), &remote_addr, &info_hash).await;
 
-                tracker.whitelist_manager.add_torrent_to_memory_whitelist(&info_hash.0.into()).await;
+                tracker
+                    .whitelist_manager
+                    .add_torrent_to_memory_whitelist(&info_hash.0.into())
+                    .await;
 
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
