@@ -500,7 +500,7 @@ pub struct Tracker {
     keys: tokio::sync::RwLock<std::collections::HashMap<Key, auth::PeerKey>>,
 
     /// The list of allowed torrents. Only for listed trackers.
-    whitelist_manager: WhiteListManager,
+    pub whitelist_manager: WhiteListManager,
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
@@ -1073,10 +1073,6 @@ impl Tracker {
         self.whitelist_manager.add_torrent_to_whitelist(info_hash).await
     }
 
-    pub async fn add_torrent_to_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.whitelist_manager.add_torrent_to_memory_whitelist(info_hash).await
-    }
-
     /// It removes a torrent from the whitelist.
     /// Removing torrents is not relevant to public trackers.
     ///
@@ -1087,24 +1083,6 @@ impl Tracker {
     /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         self.whitelist_manager.remove_torrent_from_whitelist(info_hash).await
-    }
-
-    /// It removes a torrent from the whitelist in the database.
-    ///
-    /// # Context: Whitelist
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
-    pub fn remove_torrent_from_database_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
-        self.whitelist_manager.remove_torrent_from_database_whitelist(info_hash)
-    }
-
-    /// It removes a torrent from the whitelist in memory.
-    ///
-    /// # Context: Whitelist
-    pub async fn remove_torrent_from_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.whitelist_manager.remove_torrent_from_memory_whitelist(info_hash).await
     }
 
     /// It checks if a torrent is whitelisted.
