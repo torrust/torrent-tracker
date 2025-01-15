@@ -435,8 +435,8 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::core::services::tracker_factory;
-    use crate::core::Tracker;
+    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::core::{statistics, Tracker};
     use crate::CurrentClock;
 
     fn tracker_configuration() -> Configuration {
@@ -553,6 +553,23 @@ mod tests {
         }
     }
 
+    fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
+        let config = tracker_configuration();
+
+        let database = initialize_database(&config);
+
+        let whitelist_manager = initialize_whitelist(database.clone());
+
+        Tracker::new(
+            &config.core,
+            &database,
+            &whitelist_manager,
+            stats_event_sender,
+            statistics::repository::Repository::new(),
+        )
+        .unwrap()
+    }
+
     mod connect_request {
 
         use std::future;
@@ -561,13 +578,13 @@ mod tests {
         use aquatic_udp_protocol::{ConnectRequest, ConnectResponse, Response, TransactionId};
         use mockall::predicate::eq;
 
-        use super::{sample_ipv4_socket_address, sample_ipv6_remote_addr, tracker_configuration};
-        use crate::core::{self, statistics};
+        use super::{sample_ipv4_socket_address, sample_ipv6_remote_addr};
+        use crate::core::statistics;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_connect;
         use crate::servers::udp::handlers::tests::{
             public_tracker, sample_ipv4_remote_addr, sample_ipv4_remote_addr_fingerprint, sample_ipv6_remote_addr_fingerprint,
-            sample_issue_time,
+            sample_issue_time, test_tracker_factory,
         };
 
         fn sample_connect_request() -> ConnectRequest {
@@ -639,14 +656,7 @@ mod tests {
 
             let client_socket_address = sample_ipv4_socket_address();
 
-            let torrent_tracker = Arc::new(
-                core::Tracker::new(
-                    &tracker_configuration().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let torrent_tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
             handle_connect(
                 client_socket_address,
                 &sample_connect_request(),
@@ -666,14 +676,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let torrent_tracker = Arc::new(
-                core::Tracker::new(
-                    &tracker_configuration().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let torrent_tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
             handle_connect(
                 sample_ipv6_remote_addr(),
                 &sample_connect_request(),
@@ -774,7 +777,7 @@ mod tests {
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
                 gen_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv4_socket_address, sample_issue_time,
-                tracker_configuration, TorrentPeerBuilder,
+                test_tracker_factory, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -927,14 +930,7 @@ mod tests {
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
 
-                let tracker = Arc::new(
-                    core::Tracker::new(
-                        &tracker_configuration().core,
-                        Some(stats_event_sender),
-                        statistics::repository::Repository::new(),
-                    )
-                    .unwrap(),
-                );
+                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
                 handle_announce(
                     sample_ipv4_socket_address(),
@@ -1013,7 +1009,7 @@ mod tests {
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
                 gen_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv6_remote_addr, sample_issue_time,
-                tracker_configuration, TorrentPeerBuilder,
+                test_tracker_factory, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -1173,14 +1169,7 @@ mod tests {
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
                 let stats_event_sender = Box::new(stats_event_sender_mock);
 
-                let tracker = Arc::new(
-                    core::Tracker::new(
-                        &tracker_configuration().core,
-                        Some(stats_event_sender),
-                        statistics::repository::Repository::new(),
-                    )
-                    .unwrap(),
-                );
+                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
                 let remote_addr = sample_ipv6_remote_addr();
 
@@ -1200,6 +1189,7 @@ mod tests {
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
 
                 use crate::core;
+                use crate::core::services::{initialize_database, initialize_whitelist};
                 use crate::core::statistics::keeper::Keeper;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
@@ -1211,9 +1201,20 @@ mod tests {
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let configuration = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
+                    let database = initialize_database(&configuration);
+                    let whitelist_manager = initialize_whitelist(database.clone());
                     let (stats_event_sender, stats_repository) = Keeper::new_active_instance();
-                    let tracker =
-                        Arc::new(core::Tracker::new(&configuration.core, Some(stats_event_sender), stats_repository).unwrap());
+
+                    let tracker = Arc::new(
+                        core::Tracker::new(
+                            &configuration.core,
+                            &database,
+                            &whitelist_manager,
+                            Some(stats_event_sender),
+                            stats_repository,
+                        )
+                        .unwrap(),
+                    );
 
                     let loopback_ipv4 = Ipv4Addr::new(127, 0, 0, 1);
                     let loopback_ipv6 = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
@@ -1456,10 +1457,10 @@ mod tests {
             use mockall::predicate::eq;
 
             use super::sample_scrape_request;
-            use crate::core::{self, statistics};
+            use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
-                sample_cookie_valid_range, sample_ipv4_remote_addr, tracker_configuration,
+                sample_cookie_valid_range, sample_ipv4_remote_addr, test_tracker_factory,
             };
 
             #[tokio::test]
@@ -1473,14 +1474,7 @@ mod tests {
                 let stats_event_sender = Box::new(stats_event_sender_mock);
 
                 let remote_addr = sample_ipv4_remote_addr();
-                let tracker = Arc::new(
-                    core::Tracker::new(
-                        &tracker_configuration().core,
-                        Some(stats_event_sender),
-                        statistics::repository::Repository::new(),
-                    )
-                    .unwrap(),
-                );
+                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
                 handle_scrape(
                     remote_addr,
@@ -1500,10 +1494,10 @@ mod tests {
             use mockall::predicate::eq;
 
             use super::sample_scrape_request;
-            use crate::core::{self, statistics};
+            use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
-                sample_cookie_valid_range, sample_ipv6_remote_addr, tracker_configuration,
+                sample_cookie_valid_range, sample_ipv6_remote_addr, test_tracker_factory,
             };
 
             #[tokio::test]
@@ -1517,14 +1511,7 @@ mod tests {
                 let stats_event_sender = Box::new(stats_event_sender_mock);
 
                 let remote_addr = sample_ipv6_remote_addr();
-                let tracker = Arc::new(
-                    core::Tracker::new(
-                        &tracker_configuration().core,
-                        Some(stats_event_sender),
-                        statistics::repository::Repository::new(),
-                    )
-                    .unwrap(),
-                );
+                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
                 handle_scrape(
                     remote_addr,

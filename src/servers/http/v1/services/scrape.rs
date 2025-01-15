@@ -67,8 +67,8 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::services::tracker_factory;
-    use crate::core::Tracker;
+    use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+    use crate::core::{statistics, Tracker};
 
     fn public_tracker() -> Tracker {
         tracker_factory(&configuration::ephemeral_public())
@@ -94,6 +94,23 @@ mod tests {
         }
     }
 
+    fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
+        let config = configuration::ephemeral();
+
+        let database = initialize_database(&config);
+
+        let whitelist_manager = initialize_whitelist(database.clone());
+
+        Tracker::new(
+            &config.core,
+            &database,
+            &whitelist_manager,
+            stats_event_sender,
+            statistics::repository::Repository::new(),
+        )
+        .unwrap()
+    }
+
     mod with_real_data {
 
         use std::future;
@@ -103,12 +120,11 @@ mod tests {
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
-        use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::{statistics, PeersWanted, Tracker};
+        use crate::core::{statistics, PeersWanted};
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
+            public_tracker, sample_info_hash, sample_info_hashes, sample_peer, test_tracker_factory,
         };
 
         #[tokio::test]
@@ -148,14 +164,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
@@ -172,14 +181,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 
@@ -195,12 +197,11 @@ mod tests {
 
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::ScrapeData;
-        use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::{statistics, PeersWanted, Tracker};
+        use crate::core::{statistics, PeersWanted};
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
+            public_tracker, sample_info_hash, sample_info_hashes, sample_peer, test_tracker_factory,
         };
 
         #[tokio::test]
@@ -232,14 +233,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
@@ -256,14 +250,7 @@ mod tests {
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
             let stats_event_sender = Box::new(stats_event_sender_mock);
 
-            let tracker = Arc::new(
-                Tracker::new(
-                    &configuration::ephemeral().core,
-                    Some(stats_event_sender),
-                    statistics::repository::Repository::new(),
-                )
-                .unwrap(),
-            );
+            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 

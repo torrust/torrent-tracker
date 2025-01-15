@@ -7,7 +7,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use in_memory::InMemoryWhitelist;
 use persisted::DatabaseWhitelist;
 
-use super::databases::{self, Database};
+use super::databases::{self};
 
 /// It handles the list of allowed torrents. Only for listed trackers.
 pub struct WhiteListManager {
@@ -15,15 +15,15 @@ pub struct WhiteListManager {
     in_memory_whitelist: InMemoryWhitelist,
 
     /// The persisted list of allowed torrents.
-    database_whitelist: DatabaseWhitelist,
+    database_whitelist: Arc<DatabaseWhitelist>,
 }
 
 impl WhiteListManager {
     #[must_use]
-    pub fn new(database: Arc<Box<dyn Database>>) -> Self {
+    pub fn new(database_whitelist: Arc<DatabaseWhitelist>) -> Self {
         Self {
             in_memory_whitelist: InMemoryWhitelist::default(),
-            database_whitelist: DatabaseWhitelist::new(database),
+            database_whitelist,
         }
     }
 

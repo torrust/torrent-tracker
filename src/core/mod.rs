@@ -457,11 +457,9 @@ use std::time::Duration;
 
 use auth::PeerKey;
 use bittorrent_primitives::info_hash::InfoHash;
-use databases::driver::Driver;
 use error::PeerKeyError;
 use tokio::sync::mpsc::error::SendError;
 use torrust_tracker_clock::clock::Time;
-use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_located_error::Located;
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
@@ -500,7 +498,7 @@ pub struct Tracker {
     keys: tokio::sync::RwLock<std::collections::HashMap<Key, auth::PeerKey>>,
 
     /// The list of allowed torrents. Only for listed trackers.
-    pub whitelist_manager: WhiteListManager,
+    pub whitelist_manager: Arc<WhiteListManager>,
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
@@ -576,24 +574,19 @@ impl Tracker {
     /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
     pub fn new(
         config: &Core,
+        database: &Arc<Box<dyn Database>>,
+        whitelist_manager: &Arc<WhiteListManager>,
         stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
         stats_repository: statistics::repository::Repository,
     ) -> Result<Tracker, databases::error::Error> {
-        let driver = match config.database.driver {
-            database::Driver::Sqlite3 => Driver::Sqlite3,
-            database::Driver::MySQL => Driver::MySQL,
-        };
-
-        let database = Arc::new(databases::driver::build(&driver, &config.database.path)?);
-
         Ok(Tracker {
             config: config.clone(),
+            database: database.clone(),
             keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
-            whitelist_manager: WhiteListManager::new(database.clone()),
+            whitelist_manager: whitelist_manager.clone(),
             torrents: Arc::default(),
             stats_event_sender,
             stats_repository,
-            database,
         })
     }
 
