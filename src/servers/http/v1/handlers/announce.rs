@@ -191,26 +191,26 @@ mod tests {
 
     fn private_tracker() -> Tracker {
         let config = configuration::ephemeral_private();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager)
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
     }
 
     fn whitelisted_tracker() -> Tracker {
         let config = configuration::ephemeral_listed();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager)
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
     }
 
     fn tracker_on_reverse_proxy() -> Tracker {
         let config = configuration::ephemeral_with_reverse_proxy();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager)
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
     }
 
     fn tracker_not_on_reverse_proxy() -> Tracker {
         let config = configuration::ephemeral_without_reverse_proxy();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager)
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
     }
 
     fn sample_announce_request() -> Announce {

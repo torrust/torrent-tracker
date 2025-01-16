@@ -504,10 +504,10 @@ pub struct Tracker {
     torrents: Arc<Torrents>,
 
     /// Service to send stats events.
-    stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
+    stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
 
     /// The in-memory stats repo.
-    stats_repository: statistics::repository::Repository,
+    stats_repository: Arc<statistics::repository::Repository>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -576,8 +576,8 @@ impl Tracker {
         config: &Core,
         database: &Arc<Box<dyn Database>>,
         whitelist_manager: &Arc<WhiteListManager>,
-        stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
-        stats_repository: statistics::repository::Repository,
+        stats_event_sender: &Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        stats_repository: &Arc<statistics::repository::Repository>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
@@ -585,8 +585,8 @@ impl Tracker {
             keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
             whitelist_manager: whitelist_manager.clone(),
             torrents: Arc::default(),
-            stats_event_sender,
-            stats_repository,
+            stats_event_sender: stats_event_sender.clone(),
+            stats_repository: stats_repository.clone(),
         })
     }
 
@@ -1068,7 +1068,7 @@ impl Tracker {
         &self,
         event: statistics::event::Event,
     ) -> Option<Result<(), SendError<statistics::event::Event>>> {
-        match &self.stats_event_sender {
+        match &*self.stats_event_sender {
             None => None,
             Some(stats_event_sender) => stats_event_sender.send_event(event).await,
         }
@@ -1119,20 +1119,20 @@ mod tests {
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+            tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
         }
 
         fn private_tracker() -> Tracker {
             let config = configuration::ephemeral_private();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+            tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = tracker_factory(&config, &database, &whitelist_manager);
+            let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+            let tracker = tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository);
 
             (tracker, whitelist_manager)
         }
@@ -1140,8 +1140,8 @@ mod tests {
         pub fn tracker_persisting_torrents_in_database() -> Tracker {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+            tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
         }
 
         fn sample_info_hash() -> InfoHash {

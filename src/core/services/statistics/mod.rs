@@ -126,8 +126,16 @@ mod tests {
     #[tokio::test]
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let config = tracker_configuration();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        let tracker = Arc::new(tracker_factory(&tracker_configuration(), &database, &whitelist_manager));
+
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        let tracker = Arc::new(tracker_factory(
+            &config,
+            &database,
+            &whitelist_manager,
+            &stats_event_sender,
+            &stats_repository,
+        ));
+
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
         let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone()).await;

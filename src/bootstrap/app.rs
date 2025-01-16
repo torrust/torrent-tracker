@@ -22,7 +22,9 @@ use tracing::instrument;
 use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::core::databases::Database;
-use crate::core::services::{initialize_database, initialize_whitelist, tracker_factory};
+use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
+use crate::core::statistics::event::sender::Sender;
+use crate::core::statistics::repository::Repository;
 use crate::core::whitelist::WhiteListManager;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
@@ -107,17 +109,28 @@ pub fn initialize_static() {
 #[must_use]
 #[instrument(skip(config))]
 pub fn initialize_tracker(config: &Configuration) -> Tracker {
-    let (database, whitelist_manager) = initialize_tracker_dependencies(config);
+    let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(config);
 
-    tracker_factory(config, &database, &whitelist_manager)
+    tracker_factory(config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
 }
 
+#[allow(clippy::type_complexity)]
 #[must_use]
-pub fn initialize_tracker_dependencies(config: &Configuration) -> (Arc<Box<dyn Database>>, Arc<WhiteListManager>) {
+pub fn initialize_tracker_dependencies(
+    config: &Configuration,
+) -> (
+    Arc<Box<dyn Database>>,
+    Arc<WhiteListManager>,
+    Arc<Option<Box<dyn Sender>>>,
+    Arc<Repository>,
+) {
     let database = initialize_database(config);
     let whitelist_manager = initialize_whitelist(database.clone());
+    let (stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+    let stats_event_sender = Arc::new(stats_event_sender);
+    let stats_repository = Arc::new(stats_repository);
 
-    (database, whitelist_manager)
+    (database, whitelist_manager, stats_event_sender, stats_repository)
 }
 
 /// It initializes the log threshold, format and channel.

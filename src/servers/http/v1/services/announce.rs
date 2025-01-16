@@ -65,8 +65,8 @@ mod tests {
 
     fn public_tracker() -> Tracker {
         let config = configuration::ephemeral_public();
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager)
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
+        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
     }
 
     fn sample_info_hash() -> InfoHash {
@@ -118,14 +118,18 @@ mod tests {
         fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
             let config = configuration::ephemeral();
 
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+            let (database, whitelist_manager, _stats_event_sender, _stats_repository) = initialize_tracker_dependencies(&config);
+
+            let stats_event_sender = Arc::new(stats_event_sender);
+
+            let stats_repository = Arc::new(statistics::repository::Repository::new());
 
             Tracker::new(
                 &config.core,
                 &database,
                 &whitelist_manager,
-                stats_event_sender,
-                statistics::repository::Repository::new(),
+                &stats_event_sender,
+                &stats_repository,
             )
             .unwrap()
         }

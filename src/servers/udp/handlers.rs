@@ -457,8 +457,8 @@ mod tests {
     }
 
     fn initialized_tracker(config: &Configuration) -> Arc<Tracker> {
-        let (database, whitelist_manager) = initialize_tracker_dependencies(config);
-        tracker_factory(config, &database, &whitelist_manager).into()
+        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(config);
+        tracker_factory(config, &database, &whitelist_manager, &stats_event_sender, &stats_repository).into()
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {
@@ -558,14 +558,18 @@ mod tests {
     fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
         let config = tracker_configuration();
 
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+        let (database, whitelist_manager, _stats_event_sender, _stats_repository) = initialize_tracker_dependencies(&config);
+
+        let stats_event_sender = Arc::new(stats_event_sender);
+
+        let stats_repository = Arc::new(statistics::repository::Repository::new());
 
         Tracker::new(
             &config.core,
             &database,
             &whitelist_manager,
-            stats_event_sender,
-            statistics::repository::Repository::new(),
+            &stats_event_sender,
+            &stats_repository,
         )
         .unwrap()
     }
@@ -1201,7 +1205,10 @@ mod tests {
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
-                    let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+
+                    let (database, whitelist_manager, _stats_event_sender, _stats_repository) =
+                        initialize_tracker_dependencies(&config);
+
                     let (stats_event_sender, stats_repository) = Keeper::new_active_instance();
 
                     let tracker = Arc::new(
@@ -1209,8 +1216,8 @@ mod tests {
                             &config.core,
                             &database,
                             &whitelist_manager,
-                            Some(stats_event_sender),
-                            stats_repository,
+                            &Arc::new(Some(stats_event_sender)),
+                            &Arc::new(stats_repository),
                         )
                         .unwrap(),
                     );
