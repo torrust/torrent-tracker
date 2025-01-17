@@ -491,6 +491,7 @@
 use torrust_tracker_clock::clock;
 
 pub mod app;
+pub mod app_test;
 pub mod bootstrap;
 pub mod console;
 pub mod container;

@@ -22,9 +22,7 @@ use tracing::instrument;
 use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::container::AppContainer;
-use crate::core::databases::Database;
 use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
-use crate::core::whitelist::WhiteListManager;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -113,15 +111,6 @@ pub fn initialize_static() {
 
     // Initialize the Zeroed Cipher
     lazy_static::initialize(&ephemeral_instance_keys::ZEROED_TEST_CIPHER_BLOWFISH);
-}
-
-#[allow(clippy::type_complexity)]
-#[must_use]
-pub fn initialize_tracker_dependencies(config: &Configuration) -> (Arc<Box<dyn Database>>, Arc<WhiteListManager>) {
-    let database = initialize_database(config);
-    let whitelist_manager = initialize_whitelist(database.clone());
-
-    (database, whitelist_manager)
 }
 
 /// It initializes the log threshold, format and channel.

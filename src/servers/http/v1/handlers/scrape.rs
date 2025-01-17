@@ -126,7 +126,7 @@ mod tests {
     use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::services::{statistics, tracker_factory};
     use crate::core::Tracker;
 

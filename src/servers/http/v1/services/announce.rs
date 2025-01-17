@@ -65,7 +65,7 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::services::{statistics, tracker_factory};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
@@ -123,7 +123,7 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
-        use crate::bootstrap::app::initialize_tracker_dependencies;
+        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};

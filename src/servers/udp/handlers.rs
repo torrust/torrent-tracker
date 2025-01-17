@@ -470,7 +470,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::bootstrap::app::initialize_tracker_dependencies;
+    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::services::{statistics, tracker_factory};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
@@ -1318,7 +1318,7 @@ mod tests {
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
                 use mockall::predicate::eq;
 
-                use crate::bootstrap::app::initialize_tracker_dependencies;
+                use crate::app_test::initialize_tracker_dependencies;
                 use crate::core::{self, statistics};
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
