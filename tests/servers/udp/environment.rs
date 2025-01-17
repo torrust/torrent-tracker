@@ -4,14 +4,12 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
-use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
-use torrust_tracker_lib::core::services::statistics;
+use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
-use torrust_tracker_lib::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
 use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};
 use torrust_tracker_lib::servers::udp::server::Server;
@@ -44,12 +42,9 @@ where
 impl Environment<Stopped> {
     #[allow(dead_code)]
     pub fn new(configuration: &Arc<Configuration>) -> Self {
-        let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-        let stats_repository = Arc::new(stats_repository);
-        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+        initialize_global_services(configuration);
 
-        let tracker = initialize_with_configuration(configuration);
+        let app_container = initialize_app_container(configuration);
 
         let udp_tracker = configuration.udp_trackers.clone().expect("missing UDP tracker configuration");
 
@@ -61,10 +56,10 @@ impl Environment<Stopped> {
 
         Self {
             config,
-            tracker,
-            stats_event_sender,
-            stats_repository,
-            ban_service,
+            tracker: app_container.tracker.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            stats_repository: app_container.stats_repository.clone(),
+            ban_service: app_container.ban_service.clone(),
             registar: Registar::default(),
             server,
         }

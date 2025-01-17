@@ -3,9 +3,8 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
-use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
+use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
-use torrust_tracker_lib::core::services::statistics;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::whitelist::WhiteListManager;
@@ -34,14 +33,9 @@ impl<S> Environment<S> {
 impl Environment<Stopped> {
     #[allow(dead_code)]
     pub fn new(configuration: &Arc<Configuration>) -> Self {
-        let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-        let stats_repository = Arc::new(stats_repository);
+        initialize_global_services(configuration);
 
-        let tracker = initialize_with_configuration(configuration);
-
-        // todo: instantiate outside of `initialize_with_configuration`
-        let whitelist_manager = tracker.whitelist_manager.clone();
+        let app_container = initialize_app_container(configuration);
 
         let http_tracker = configuration
             .http_trackers
@@ -58,10 +52,10 @@ impl Environment<Stopped> {
 
         Self {
             config,
-            tracker,
-            stats_event_sender,
-            stats_repository,
-            whitelist_manager,
+            tracker: app_container.tracker.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            stats_repository: app_container.stats_repository.clone(),
+            whitelist_manager: app_container.whitelist_manager.clone(),
             registar: Registar::default(),
             server,
         }

@@ -179,9 +179,9 @@ pub async fn run() {
         return;
     };
 
-    let (config, tracker, ban_service, stats_event_sender, stats_repository) = bootstrap::app::setup();
+    let (config, app_container) = bootstrap::app::setup();
 
-    let jobs = app::start(&config, tracker, ban_service, stats_event_sender, stats_repository).await;
+    let jobs = app::start(&config, &app_container).await;
 
     // Run the tracker for a fixed duration
     let run_duration = sleep(Duration::from_secs(duration_secs));

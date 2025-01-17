@@ -126,8 +126,8 @@ mod tests {
     use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::bootstrap::app::initialize_tracker_dependencies;
-    use crate::core::services::{statistics, tracker_factory};
+    use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::services::{initialize_tracker, statistics};
     use crate::core::Tracker;
 
     fn private_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
@@ -136,7 +136,7 @@ mod tests {
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
-        (tracker_factory(&config, &database, &whitelist_manager), stats_event_sender)
+        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn whitelisted_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
@@ -145,7 +145,7 @@ mod tests {
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
-        (tracker_factory(&config, &database, &whitelist_manager), stats_event_sender)
+        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn tracker_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
@@ -154,7 +154,7 @@ mod tests {
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
-        (tracker_factory(&config, &database, &whitelist_manager), stats_event_sender)
+        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn tracker_not_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
@@ -163,7 +163,7 @@ mod tests {
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
-        (tracker_factory(&config, &database, &whitelist_manager), stats_event_sender)
+        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn sample_scrape_request() -> Scrape {

@@ -21,32 +21,21 @@ use tracing::instrument;
 
 use super::config::initialize_configuration;
 use crate::bootstrap;
-use crate::core::databases::Database;
-use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::repository::Repository;
-use crate::core::whitelist::WhiteListManager;
-use crate::core::Tracker;
+use crate::container::AppContainer;
+use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
 use crate::shared::crypto::keys::{self, Keeper as _};
 
-/// It loads the configuration from the environment and builds the main domain [`Tracker`] struct.
+/// It loads the configuration from the environment and builds app container.
 ///
 /// # Panics
 ///
 /// Setup can file if the configuration is invalid.
 #[must_use]
-#[allow(clippy::type_complexity)]
 #[instrument(skip())]
-pub fn setup() -> (
-    Configuration,
-    Arc<Tracker>,
-    Arc<RwLock<BanService>>,
-    Arc<Option<Box<dyn Sender>>>,
-    Arc<Repository>,
-) {
+pub fn setup() -> (Configuration, AppContainer) {
     #[cfg(not(test))]
     check_seed();
 
@@ -56,19 +45,13 @@ pub fn setup() -> (
         panic!("Configuration error: {e}");
     }
 
-    // Initialize services
-
-    let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-    let stats_event_sender = Arc::new(stats_event_sender);
-    let stats_repository = Arc::new(stats_repository);
-
-    let udp_ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-
-    let tracker = initialize_with_configuration(&configuration);
+    initialize_global_services(&configuration);
 
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
-    (configuration, tracker, udp_ban_service, stats_event_sender, stats_repository)
+    let app_container = initialize_app_container(&configuration);
+
+    (configuration, app_container)
 }
 
 /// checks if the seed is the instance seed in production.
@@ -83,15 +66,31 @@ pub fn check_seed() {
     assert_eq!(seed, instance, "maybe using zeroed seed in production!?");
 }
 
-/// It initializes the application with the given configuration.
-///
-/// The configuration may be obtained from the environment (via config file or env vars).
-#[must_use]
+/// It initializes the global services.
 #[instrument(skip())]
-pub fn initialize_with_configuration(configuration: &Configuration) -> Arc<Tracker> {
+pub fn initialize_global_services(configuration: &Configuration) {
     initialize_static();
     initialize_logging(configuration);
-    Arc::new(initialize_tracker(configuration))
+}
+
+/// It initializes the IoC Container.
+#[instrument(skip())]
+pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
+    let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
+    let stats_event_sender = Arc::new(stats_event_sender);
+    let stats_repository = Arc::new(stats_repository);
+    let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+    let database = initialize_database(configuration);
+    let whitelist_manager = initialize_whitelist(database.clone());
+    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_manager));
+
+    AppContainer {
+        tracker,
+        ban_service,
+        stats_event_sender,
+        stats_repository,
+        whitelist_manager,
+    }
 }
 
 /// It initializes the application static values.
@@ -113,27 +112,6 @@ pub fn initialize_static() {
 
     // Initialize the Zeroed Cipher
     lazy_static::initialize(&ephemeral_instance_keys::ZEROED_TEST_CIPHER_BLOWFISH);
-}
-
-/// It builds the domain tracker
-///
-/// The tracker is the domain layer service. It's the entrypoint to make requests to the domain layer.
-/// It's used by other higher-level components like the UDP and HTTP trackers or the tracker API.
-#[must_use]
-#[instrument(skip(config))]
-pub fn initialize_tracker(config: &Configuration) -> Tracker {
-    let (database, whitelist_manager) = initialize_tracker_dependencies(config);
-
-    tracker_factory(config, &database, &whitelist_manager)
-}
-
-#[allow(clippy::type_complexity)]
-#[must_use]
-pub fn initialize_tracker_dependencies(config: &Configuration) -> (Arc<Box<dyn Database>>, Arc<WhiteListManager>) {
-    let database = initialize_database(config);
-    let whitelist_manager = initialize_whitelist(database.clone());
-
-    (database, whitelist_manager)
 }
 
 /// It initializes the log threshold, format and channel.

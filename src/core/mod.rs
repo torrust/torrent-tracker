@@ -1080,28 +1080,28 @@ mod tests {
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::bootstrap::app::initialize_tracker_dependencies;
+        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
-        use crate::core::services::tracker_factory;
+        use crate::core::services::initialize_tracker;
         use crate::core::whitelist::WhiteListManager;
         use crate::core::{TorrentsMetrics, Tracker};
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            initialize_tracker(&config, &database, &whitelist_manager)
         }
 
         fn private_tracker() -> Tracker {
             let config = configuration::ephemeral_private();
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            initialize_tracker(&config, &database, &whitelist_manager)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = tracker_factory(&config, &database, &whitelist_manager);
+            let tracker = initialize_tracker(&config, &database, &whitelist_manager);
 
             (tracker, whitelist_manager)
         }
@@ -1110,7 +1110,7 @@ mod tests {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            tracker_factory(&config, &database, &whitelist_manager)
+            initialize_tracker(&config, &database, &whitelist_manager)
         }
 
         fn sample_info_hash() -> InfoHash {

@@ -24,7 +24,7 @@ use crate::core::Tracker;
 ///
 /// Will panic if tracker cannot be instantiated.
 #[must_use]
-pub fn tracker_factory(
+pub fn initialize_tracker(
     config: &Configuration,
     database: &Arc<Box<dyn Database>>,
     whitelist_manager: &Arc<WhiteListManager>,

@@ -140,9 +140,9 @@ mod tests {
     use tokio::sync::RwLock;
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
-    use crate::bootstrap::app::initialize_with_configuration;
+    use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::tracker_apis::start_job;
-    use crate::core::services::statistics;
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -158,7 +158,11 @@ mod tests {
         let stats_event_sender = Arc::new(stats_event_sender);
         let stats_repository = Arc::new(stats_repository);
 
-        let tracker = initialize_with_configuration(&cfg);
+        initialize_global_services(&cfg);
+
+        let database = initialize_database(&cfg);
+        let whitelist_manager = initialize_whitelist(database.clone());
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
 
         let version = Version::V1;
 

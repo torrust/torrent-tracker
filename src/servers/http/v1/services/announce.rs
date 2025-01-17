@@ -65,8 +65,8 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::bootstrap::app::initialize_tracker_dependencies;
-    use crate::core::services::{statistics, tracker_factory};
+    use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::services::{initialize_tracker, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
 
@@ -77,7 +77,7 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = tracker_factory(&config, &database, &whitelist_manager);
+        let tracker = initialize_tracker(&config, &database, &whitelist_manager);
 
         (tracker, stats_event_sender)
     }
@@ -123,7 +123,7 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
-        use crate::bootstrap::app::initialize_tracker_dependencies;
+        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::{statistics, PeersWanted, Tracker};
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
