@@ -471,7 +471,7 @@ mod tests {
 
     use super::gen_remote_fingerprint;
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::{statistics, tracker_factory};
+    use crate::core::services::{initialize_tracker, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
     use crate::CurrentClock;
@@ -496,7 +496,7 @@ mod tests {
         let (database, whitelist_manager) = initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
-        (tracker_factory(config, &database, &whitelist_manager), stats_event_sender)
+        (initialize_tracker(config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {

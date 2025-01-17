@@ -81,7 +81,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::tracker_factory;
+    use crate::core::services::initialize_tracker;
     use crate::core::Tracker;
 
     fn public_tracker() -> Tracker {
@@ -89,7 +89,7 @@ mod tests {
 
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
 
-        tracker_factory(&config, &database, &whitelist_manager)
+        initialize_tracker(&config, &database, &whitelist_manager)
     }
 
     fn sample_info_hashes() -> Vec<InfoHash> {

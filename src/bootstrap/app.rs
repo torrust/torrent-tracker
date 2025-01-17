@@ -22,7 +22,7 @@ use tracing::instrument;
 use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::container::AppContainer;
-use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
+use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -82,13 +82,14 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
     let database = initialize_database(configuration);
     let whitelist_manager = initialize_whitelist(database.clone());
-    let tracker = Arc::new(tracker_factory(configuration, &database, &whitelist_manager));
+    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_manager));
 
     AppContainer {
         tracker,
         ban_service,
         stats_event_sender,
         stats_repository,
+        whitelist_manager,
     }
 }
 

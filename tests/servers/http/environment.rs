@@ -5,7 +5,7 @@ use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
 use torrust_tracker_lib::bootstrap::app::initialize_global_services;
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
-use torrust_tracker_lib::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
+use torrust_tracker_lib::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::whitelist::WhiteListManager;
@@ -42,7 +42,7 @@ impl Environment<Stopped> {
 
         let database = initialize_database(configuration);
         let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(tracker_factory(configuration, &database, &whitelist_manager));
+        let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_manager));
 
         let http_tracker = configuration
             .http_trackers

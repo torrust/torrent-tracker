@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::whitelist::WhiteListManager;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 
@@ -12,4 +13,5 @@ pub struct AppContainer {
     pub ban_service: Arc<RwLock<BanService>>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
+    pub whitelist_manager: Arc<WhiteListManager>,
 }

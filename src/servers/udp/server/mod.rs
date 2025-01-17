@@ -64,7 +64,7 @@ mod tests {
     use super::spawner::Spawner;
     use super::Server;
     use crate::bootstrap::app::initialize_global_services;
-    use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -81,7 +81,7 @@ mod tests {
 
         let database = initialize_database(&cfg);
         let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(tracker_factory(&cfg, &database, &whitelist_manager));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -120,7 +120,7 @@ mod tests {
 
         let database = initialize_database(&cfg);
         let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(tracker_factory(&cfg, &database, &whitelist_manager));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;

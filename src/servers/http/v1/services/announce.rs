@@ -66,7 +66,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::{statistics, tracker_factory};
+    use crate::core::services::{initialize_tracker, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
 
@@ -77,7 +77,7 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = tracker_factory(&config, &database, &whitelist_manager);
+        let tracker = initialize_tracker(&config, &database, &whitelist_manager);
 
         (tracker, stats_event_sender)
     }

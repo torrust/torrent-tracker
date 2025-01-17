@@ -6,9 +6,8 @@ use futures::executor::block_on;
 use tokio::sync::RwLock;
 use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::{Configuration, HttpApi};
-use torrust_tracker_lib::bootstrap::app::initialize_global_services;
+use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
-use torrust_tracker_lib::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::whitelist::WhiteListManager;
@@ -16,7 +15,6 @@ use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
-use torrust_tracker_lib::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use torrust_tracker_primitives::peer;
 
 pub struct Environment<S>
@@ -45,16 +43,9 @@ where
 
 impl Environment<Stopped> {
     pub fn new(configuration: &Arc<Configuration>) -> Self {
-        let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-        let stats_repository = Arc::new(stats_repository);
-        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-
         initialize_global_services(configuration);
 
-        let database = initialize_database(configuration);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(tracker_factory(configuration, &database, &whitelist_manager));
+        let app_container = initialize_app_container(configuration);
 
         let config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));
 
@@ -66,11 +57,11 @@ impl Environment<Stopped> {
 
         Self {
             config,
-            tracker,
-            stats_event_sender,
-            stats_repository,
-            whitelist_manager,
-            ban_service,
+            tracker: app_container.tracker.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            stats_repository: app_container.stats_repository.clone(),
+            whitelist_manager: app_container.whitelist_manager.clone(),
+            ban_service: app_container.ban_service.clone(),
             registar: Registar::default(),
             server,
         }

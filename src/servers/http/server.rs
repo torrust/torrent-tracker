@@ -244,7 +244,7 @@ mod tests {
 
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::make_rust_tls;
-    use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
     use crate::servers::http::server::{HttpServer, Launcher};
     use crate::servers::registar::Registar;
 
@@ -259,7 +259,7 @@ mod tests {
 
         let database = initialize_database(&cfg);
         let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(tracker_factory(&cfg, &database, &whitelist_manager));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
 
         let http_trackers = cfg.http_trackers.clone().expect("missing HTTP trackers configuration");
         let config = &http_trackers[0];

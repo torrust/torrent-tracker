@@ -130,9 +130,9 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use crate::app_test::initialize_tracker_dependencies;
+        use crate::core::services::initialize_tracker;
         use crate::core::services::torrent::tests::sample_peer;
         use crate::core::services::torrent::{get_torrent_info, Info};
-        use crate::core::services::tracker_factory;
 
         pub fn tracker_configuration() -> Configuration {
             configuration::ephemeral()
@@ -143,7 +143,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = tracker_factory(&config, &database, &whitelist_manager);
+            let tracker = initialize_tracker(&config, &database, &whitelist_manager);
 
             let tracker = Arc::new(tracker);
 
@@ -161,7 +161,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -192,9 +192,9 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use crate::app_test::initialize_tracker_dependencies;
+        use crate::core::services::initialize_tracker;
         use crate::core::services::torrent::tests::sample_peer;
         use crate::core::services::torrent::{get_torrents_page, BasicInfo, Pagination};
-        use crate::core::services::tracker_factory;
 
         pub fn tracker_configuration() -> Configuration {
             configuration::ephemeral()
@@ -205,7 +205,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let torrents = get_torrents_page(tracker.clone(), Some(&Pagination::default())).await;
 
@@ -217,7 +217,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -242,7 +242,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -265,7 +265,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -297,7 +297,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
+            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_manager));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
