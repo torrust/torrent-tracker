@@ -25,7 +25,6 @@ use crate::container::AppContainer;
 use crate::core::databases::Database;
 use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
 use crate::core::whitelist::WhiteListManager;
-use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -82,10 +81,10 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
     let stats_event_sender = Arc::new(stats_event_sender);
     let stats_repository = Arc::new(stats_repository);
-
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-
-    let tracker = Arc::new(initialize_tracker(configuration));
+    let database = initialize_database(configuration);
+    let whitelist_manager = initialize_whitelist(database.clone());
+    let tracker = Arc::new(tracker_factory(configuration, &database, &whitelist_manager));
 
     AppContainer {
         tracker,
@@ -114,18 +113,6 @@ pub fn initialize_static() {
 
     // Initialize the Zeroed Cipher
     lazy_static::initialize(&ephemeral_instance_keys::ZEROED_TEST_CIPHER_BLOWFISH);
-}
-
-/// It builds the domain tracker
-///
-/// The tracker is the domain layer service. It's the entrypoint to make requests to the domain layer.
-/// It's used by other higher-level components like the UDP and HTTP trackers or the tracker API.
-#[must_use]
-#[instrument(skip(config))]
-pub fn initialize_tracker(config: &Configuration) -> Tracker {
-    let (database, whitelist_manager) = initialize_tracker_dependencies(config);
-
-    tracker_factory(config, &database, &whitelist_manager)
 }
 
 #[allow(clippy::type_complexity)]
