@@ -29,15 +29,7 @@ pub fn tracker_factory(
     database: &Arc<Box<dyn Database>>,
     whitelist_manager: &Arc<WhiteListManager>,
 ) -> Tracker {
-    let (stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-    match Tracker::new(
-        &Arc::new(config).core,
-        database,
-        whitelist_manager,
-        stats_event_sender,
-        stats_repository,
-    ) {
+    match Tracker::new(&Arc::new(config).core, database, whitelist_manager) {
         Ok(tracker) => tracker,
         Err(error) => {
             panic!("{}", error)

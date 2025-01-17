@@ -39,7 +39,8 @@ use tracing::{instrument, Level};
 
 use super::routes::router;
 use crate::bootstrap::jobs::Started;
-use crate::core::Tracker;
+use crate::core::statistics::repository::Repository;
+use crate::core::{statistics, Tracker};
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::logging::STARTED_ON;
@@ -124,10 +125,12 @@ impl ApiServer<Stopped> {
     /// # Panics
     ///
     /// It would panic if the bound socket address cannot be sent back to this starter.
-    #[instrument(skip(self, tracker, ban_service, form, access_tokens), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        stats_repository: Arc<Repository>,
         ban_service: Arc<RwLock<BanService>>,
         form: ServiceRegistrationForm,
         access_tokens: Arc<AccessTokens>,
@@ -140,7 +143,17 @@ impl ApiServer<Stopped> {
         let task = tokio::spawn(async move {
             tracing::debug!(target: API_LOG_TARGET, "Starting with launcher in spawned task ...");
 
-            let _task = launcher.start(tracker, ban_service, access_tokens, tx_start, rx_halt).await;
+            let _task = launcher
+                .start(
+                    tracker,
+                    ban_service,
+                    stats_event_sender,
+                    stats_repository,
+                    access_tokens,
+                    tx_start,
+                    rx_halt,
+                )
+                .await;
 
             tracing::debug!(target: API_LOG_TARGET, "Started with launcher in spawned task");
 
@@ -238,11 +251,23 @@ impl Launcher {
     ///
     /// Will panic if unable to bind to the socket, or unable to get the address of the bound socket.
     /// Will also panic if unable to send message regarding the bound socket address.
-    #[instrument(skip(self, tracker, ban_service, access_tokens, tx_start, rx_halt))]
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(skip(
+        self,
+        tracker,
+        ban_service,
+        stats_event_sender,
+        stats_repository,
+        access_tokens,
+        tx_start,
+        rx_halt
+    ))]
     pub fn start(
         &self,
         tracker: Arc<Tracker>,
         ban_service: Arc<RwLock<BanService>>,
+        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        stats_repository: Arc<Repository>,
         access_tokens: Arc<AccessTokens>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
@@ -250,7 +275,14 @@ impl Launcher {
         let socket = std::net::TcpListener::bind(self.bind_to).expect("Could not bind tcp_listener to address.");
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
-        let router = router(tracker, ban_service, access_tokens, address);
+        let router = router(
+            tracker,
+            ban_service,
+            stats_event_sender,
+            stats_repository,
+            access_tokens,
+            address,
+        );
 
         let handle = Handle::new();
 
@@ -303,6 +335,7 @@ mod tests {
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::make_rust_tls;
+    use crate::core::services::statistics;
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -313,8 +346,11 @@ mod tests {
         let cfg = Arc::new(ephemeral_public());
         let config = &cfg.http_api.clone().unwrap();
 
-        let tracker = initialize_with_configuration(&cfg);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+        let (stats_event_sender, stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+        let stats_repository = Arc::new(stats_repository);
+        let tracker = initialize_with_configuration(&cfg);
 
         let bind_to = config.bind_address;
 
@@ -329,7 +365,14 @@ mod tests {
         let register = &Registar::default();
 
         let started = stopped
-            .start(tracker, ban_service, register.give_form(), access_tokens)
+            .start(
+                tracker,
+                stats_event_sender,
+                stats_repository,
+                ban_service,
+                register.give_form(),
+                access_tokens,
+            )
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

@@ -14,6 +14,7 @@ use torrust_tracker_configuration::UdpTracker;
 use tracing::instrument;
 
 use crate::core;
+use crate::core::statistics::event::sender::Sender;
 use crate::servers::registar::ServiceRegistrationForm;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::spawner::Spawner;
@@ -31,10 +32,11 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 /// It will panic if the task did not finish successfully.
 #[must_use]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(config, tracker, ban_service, form))]
+#[instrument(skip(config, tracker, stats_event_sender, ban_service, form))]
 pub async fn start_job(
     config: &UdpTracker,
     tracker: Arc<core::Tracker>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     ban_service: Arc<RwLock<BanService>>,
     form: ServiceRegistrationForm,
 ) -> JoinHandle<()> {
@@ -42,7 +44,7 @@ pub async fn start_job(
     let cookie_lifetime = config.cookie_lifetime;
 
     let server = Server::new(Spawner::new(bind_to))
-        .start(tracker, ban_service, form, cookie_lifetime)
+        .start(tracker, stats_event_sender, ban_service, form, cookie_lifetime)
         .await
         .expect("it should be able to start the udp tracker");
 

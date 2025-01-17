@@ -13,6 +13,7 @@ use tracing::instrument;
 use super::banning::BanService;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
+use crate::core::statistics::event::sender::Sender;
 use crate::core::{statistics, Tracker};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
@@ -40,9 +41,10 @@ impl Launcher {
     /// It panics if unable to send address of socket.
     /// It panics if the udp server is loaded when the tracker is private.
     ///
-    #[instrument(skip(tracker, ban_service, bind_to, tx_start, rx_halt))]
+    #[instrument(skip(tracker, opt_stats_event_sender, ban_service, bind_to, tx_start, rx_halt))]
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
+        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         bind_to: SocketAddr,
         cookie_lifetime: Duration,
@@ -81,7 +83,14 @@ impl Launcher {
             let local_addr = local_udp_url.clone();
             tokio::task::spawn(async move {
                 tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_with_graceful_shutdown::task (listening...)");
-                let () = Self::run_udp_server_main(receiver, tracker.clone(), ban_service.clone(), cookie_lifetime).await;
+                let () = Self::run_udp_server_main(
+                    receiver,
+                    tracker.clone(),
+                    opt_stats_event_sender.clone(),
+                    ban_service.clone(),
+                    cookie_lifetime,
+                )
+                .await;
             })
         };
 
@@ -118,10 +127,11 @@ impl Launcher {
         ServiceHealthCheckJob::new(binding, info, job)
     }
 
-    #[instrument(skip(receiver, tracker, ban_service))]
+    #[instrument(skip(receiver, tracker, opt_stats_event_sender, ban_service))]
     async fn run_udp_server_main(
         mut receiver: Receiver,
         tracker: Arc<Tracker>,
+        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         cookie_lifetime: Duration,
     ) {
@@ -165,24 +175,35 @@ impl Launcher {
                     }
                 };
 
-                match req.from.ip() {
-                    IpAddr::V4(_) => {
-                        tracker.send_stats_event(statistics::event::Event::Udp4Request).await;
-                    }
-                    IpAddr::V6(_) => {
-                        tracker.send_stats_event(statistics::event::Event::Udp6Request).await;
+                if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+                    match req.from.ip() {
+                        IpAddr::V4(_) => {
+                            stats_event_sender.send_event(statistics::event::Event::Udp4Request).await;
+                        }
+                        IpAddr::V6(_) => {
+                            stats_event_sender.send_event(statistics::event::Event::Udp6Request).await;
+                        }
                     }
                 }
 
                 if ban_service.read().await.is_banned(&req.from.ip()) {
                     tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr,  "Udp::run_udp_server::loop continue: (banned ip)");
 
-                    tracker.send_stats_event(statistics::event::Event::UdpRequestBanned).await;
+                    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+                        stats_event_sender
+                            .send_event(statistics::event::Event::UdpRequestBanned)
+                            .await;
+                    }
 
                     continue;
                 }
 
-                let processor = Processor::new(receiver.socket.clone(), tracker.clone(), cookie_lifetime);
+                let processor = Processor::new(
+                    receiver.socket.clone(),
+                    tracker.clone(),
+                    opt_stats_event_sender.clone(),
+                    cookie_lifetime,
+                );
 
                 /* We spawn the new task even if the active requests buffer is
                 full. This could seem counterintuitive because we are accepting
@@ -206,7 +227,12 @@ impl Launcher {
 
                 if old_request_aborted {
                     // Evicted task from active requests buffer was aborted.
-                    tracker.send_stats_event(statistics::event::Event::UdpRequestAborted).await;
+
+                    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+                        stats_event_sender
+                            .send_event(statistics::event::Event::UdpRequestAborted)
+                            .await;
+                    };
                 }
             } else {
                 tokio::task::yield_now().await;

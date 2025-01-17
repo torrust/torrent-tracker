@@ -20,6 +20,7 @@ use zerocopy::network_endian::I32;
 use super::connection_cookie::{check, make};
 use super::server::banning::BanService;
 use super::RawRequest;
+use crate::core::statistics::event::sender::Sender;
 use crate::core::{statistics, PeersWanted, Tracker};
 use crate::servers::udp::error::Error;
 use crate::servers::udp::{peer_builder, UDP_TRACKER_LOG_TARGET};
@@ -53,10 +54,11 @@ impl CookieTimeValues {
 /// - Delegating the request to the correct handler depending on the request type.
 ///
 /// It will return an `Error` response if the request is invalid.
-#[instrument(fields(request_id), skip(udp_request, tracker, cookie_time_values, ban_service), ret(level = Level::TRACE))]
+#[instrument(fields(request_id), skip(udp_request, tracker, opt_stats_event_sender, cookie_time_values, ban_service), ret(level = Level::TRACE))]
 pub(crate) async fn handle_packet(
     udp_request: RawRequest,
     tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     local_addr: SocketAddr,
     cookie_time_values: CookieTimeValues,
     ban_service: Arc<RwLock<BanService>>,
@@ -70,7 +72,15 @@ pub(crate) async fn handle_packet(
 
     let response =
         match Request::parse_bytes(&udp_request.payload[..udp_request.payload.len()], MAX_SCRAPE_TORRENTS).map_err(Error::from) {
-            Ok(request) => match handle_request(request, udp_request.from, tracker, cookie_time_values.clone()).await {
+            Ok(request) => match handle_request(
+                request,
+                udp_request.from,
+                tracker,
+                opt_stats_event_sender,
+                cookie_time_values.clone(),
+            )
+            .await
+            {
                 Ok(response) => return response,
                 Err((e, transaction_id)) => {
                     match &e {
@@ -88,7 +98,7 @@ pub(crate) async fn handle_packet(
                         udp_request.from,
                         local_addr,
                         request_id,
-                        tracker,
+                        opt_stats_event_sender,
                         cookie_time_values.valid_range.clone(),
                         &e,
                         Some(transaction_id),
@@ -101,7 +111,7 @@ pub(crate) async fn handle_packet(
                     udp_request.from,
                     local_addr,
                     request_id,
-                    tracker,
+                    opt_stats_event_sender,
                     cookie_time_values.valid_range.clone(),
                     &e,
                     None,
@@ -121,24 +131,43 @@ pub(crate) async fn handle_packet(
 /// # Errors
 ///
 /// If a error happens in the `handle_request` function, it will just return the  `ServerError`.
-#[instrument(skip(request, remote_addr, tracker, cookie_time_values))]
+#[instrument(skip(request, remote_addr, tracker, opt_stats_event_sender, cookie_time_values))]
 pub async fn handle_request(
     request: Request,
     remote_addr: SocketAddr,
     tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_time_values: CookieTimeValues,
 ) -> Result<Response, (Error, TransactionId)> {
     tracing::trace!("handle request");
 
     match request {
-        Request::Connect(connect_request) => {
-            Ok(handle_connect(remote_addr, &connect_request, tracker, cookie_time_values.issue_time).await)
-        }
+        Request::Connect(connect_request) => Ok(handle_connect(
+            remote_addr,
+            &connect_request,
+            opt_stats_event_sender,
+            cookie_time_values.issue_time,
+        )
+        .await),
         Request::Announce(announce_request) => {
-            handle_announce(remote_addr, &announce_request, tracker, cookie_time_values.valid_range).await
+            handle_announce(
+                remote_addr,
+                &announce_request,
+                tracker,
+                opt_stats_event_sender,
+                cookie_time_values.valid_range,
+            )
+            .await
         }
         Request::Scrape(scrape_request) => {
-            handle_scrape(remote_addr, &scrape_request, tracker, cookie_time_values.valid_range).await
+            handle_scrape(
+                remote_addr,
+                &scrape_request,
+                tracker,
+                opt_stats_event_sender,
+                cookie_time_values.valid_range,
+            )
+            .await
         }
     }
 }
@@ -149,11 +178,11 @@ pub async fn handle_request(
 /// # Errors
 ///
 /// This function does not ever return an error.
-#[instrument(fields(transaction_id), skip(tracker), ret(level = Level::TRACE))]
+#[instrument(fields(transaction_id), skip(opt_stats_event_sender), ret(level = Level::TRACE))]
 pub async fn handle_connect(
     remote_addr: SocketAddr,
     request: &ConnectRequest,
-    tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_issue_time: f64,
 ) -> Response {
     tracing::Span::current().record("transaction_id", request.transaction_id.0.to_string());
@@ -167,13 +196,14 @@ pub async fn handle_connect(
         connection_id,
     };
 
-    // send stats event
-    match remote_addr {
-        SocketAddr::V4(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp4Connect).await;
-        }
-        SocketAddr::V6(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp6Connect).await;
+    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+        match remote_addr {
+            SocketAddr::V4(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp4Connect).await;
+            }
+            SocketAddr::V6(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp6Connect).await;
+            }
         }
     }
 
@@ -186,11 +216,12 @@ pub async fn handle_connect(
 /// # Errors
 ///
 /// If a error happens in the `handle_announce` function, it will just return the  `ServerError`.
-#[instrument(fields(transaction_id, connection_id, info_hash), skip(tracker), ret(level = Level::TRACE))]
+#[instrument(fields(transaction_id, connection_id, info_hash), skip(tracker, opt_stats_event_sender), ret(level = Level::TRACE))]
 pub async fn handle_announce(
     remote_addr: SocketAddr,
     request: &AnnounceRequest,
     tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_valid_range: Range<f64>,
 ) -> Result<Response, (Error, TransactionId)> {
     tracing::Span::current()
@@ -224,12 +255,14 @@ pub async fn handle_announce(
 
     let response = tracker.announce(&info_hash, &mut peer, &remote_client_ip, &peers_wanted);
 
-    match remote_client_ip {
-        IpAddr::V4(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp4Announce).await;
-        }
-        IpAddr::V6(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp6Announce).await;
+    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+        match remote_client_ip {
+            IpAddr::V4(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp4Announce).await;
+            }
+            IpAddr::V6(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp6Announce).await;
+            }
         }
     }
 
@@ -293,11 +326,12 @@ pub async fn handle_announce(
 /// # Errors
 ///
 /// This function does not ever return an error.
-#[instrument(fields(transaction_id, connection_id), skip(tracker),  ret(level = Level::TRACE))]
+#[instrument(fields(transaction_id, connection_id), skip(tracker, opt_stats_event_sender),  ret(level = Level::TRACE))]
 pub async fn handle_scrape(
     remote_addr: SocketAddr,
     request: &ScrapeRequest,
     tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_valid_range: Range<f64>,
 ) -> Result<Response, (Error, TransactionId)> {
     tracing::Span::current()
@@ -338,13 +372,14 @@ pub async fn handle_scrape(
         torrent_stats.push(scrape_entry);
     }
 
-    // send stats event
-    match remote_addr {
-        SocketAddr::V4(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp4Scrape).await;
-        }
-        SocketAddr::V6(_) => {
-            tracker.send_stats_event(statistics::event::Event::Udp6Scrape).await;
+    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+        match remote_addr {
+            SocketAddr::V4(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp4Scrape).await;
+            }
+            SocketAddr::V6(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Udp6Scrape).await;
+            }
         }
     }
 
@@ -356,12 +391,12 @@ pub async fn handle_scrape(
     Ok(Response::from(response))
 }
 
-#[instrument(fields(transaction_id), skip(tracker), ret(level = Level::TRACE))]
+#[instrument(fields(transaction_id), skip(opt_stats_event_sender), ret(level = Level::TRACE))]
 async fn handle_error(
     remote_addr: SocketAddr,
     local_addr: SocketAddr,
     request_id: Uuid,
-    tracker: &Tracker,
+    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_valid_range: Range<f64>,
     e: &Error,
     transaction_id: Option<TransactionId>,
@@ -398,13 +433,14 @@ async fn handle_error(
     };
 
     if e.1.is_some() {
-        // send stats event
-        match remote_addr {
-            SocketAddr::V4(_) => {
-                tracker.send_stats_event(statistics::event::Event::Udp4Error).await;
-            }
-            SocketAddr::V6(_) => {
-                tracker.send_stats_event(statistics::event::Event::Udp6Error).await;
+        if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+            match remote_addr {
+                SocketAddr::V4(_) => {
+                    stats_event_sender.send_event(statistics::event::Event::Udp4Error).await;
+                }
+                SocketAddr::V6(_) => {
+                    stats_event_sender.send_event(statistics::event::Event::Udp6Error).await;
+                }
             }
         }
     }
@@ -426,7 +462,6 @@ mod tests {
 
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
     use std::ops::Range;
-    use std::sync::Arc;
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
     use torrust_tracker_clock::clock::Time;
@@ -436,8 +471,9 @@ mod tests {
 
     use super::gen_remote_fingerprint;
     use crate::bootstrap::app::initialize_tracker_dependencies;
-    use crate::core::services::tracker_factory;
-    use crate::core::{statistics, Tracker};
+    use crate::core::services::{statistics, tracker_factory};
+    use crate::core::statistics::event::sender::Sender;
+    use crate::core::Tracker;
     use crate::CurrentClock;
 
     fn tracker_configuration() -> Configuration {
@@ -448,17 +484,19 @@ mod tests {
         configuration::ephemeral()
     }
 
-    fn public_tracker() -> Arc<Tracker> {
+    fn public_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
         initialized_tracker(&configuration::ephemeral_public())
     }
 
-    fn whitelisted_tracker() -> Arc<Tracker> {
+    fn whitelisted_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
         initialized_tracker(&configuration::ephemeral_listed())
     }
 
-    fn initialized_tracker(config: &Configuration) -> Arc<Tracker> {
+    fn initialized_tracker(config: &Configuration) -> (Tracker, Option<Box<dyn Sender>>) {
         let (database, whitelist_manager) = initialize_tracker_dependencies(config);
-        tracker_factory(config, &database, &whitelist_manager).into()
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+
+        (tracker_factory(config, &database, &whitelist_manager), stats_event_sender)
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {
@@ -555,19 +593,12 @@ mod tests {
         }
     }
 
-    fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
+    fn test_tracker_factory() -> Tracker {
         let config = tracker_configuration();
 
         let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
 
-        Tracker::new(
-            &config.core,
-            &database,
-            &whitelist_manager,
-            stats_event_sender,
-            statistics::repository::Repository::new(),
-        )
-        .unwrap()
+        Tracker::new(&config.core, &database, &whitelist_manager).unwrap()
     }
 
     mod connect_request {
@@ -583,8 +614,7 @@ mod tests {
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_connect;
         use crate::servers::udp::handlers::tests::{
-            public_tracker, sample_ipv4_remote_addr, sample_ipv4_remote_addr_fingerprint, sample_ipv6_remote_addr_fingerprint,
-            sample_issue_time, test_tracker_factory,
+            sample_ipv4_remote_addr, sample_ipv4_remote_addr_fingerprint, sample_ipv6_remote_addr_fingerprint, sample_issue_time,
         };
 
         fn sample_connect_request() -> ConnectRequest {
@@ -595,11 +625,14 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_the_same_transaction_id_as_the_connect_request() {
+            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let stats_event_sender = Arc::new(stats_event_sender);
+
             let request = ConnectRequest {
                 transaction_id: TransactionId(0i32.into()),
             };
 
-            let response = handle_connect(sample_ipv4_remote_addr(), &request, &public_tracker(), sample_issue_time()).await;
+            let response = handle_connect(sample_ipv4_remote_addr(), &request, &stats_event_sender, sample_issue_time()).await;
 
             assert_eq!(
                 response,
@@ -612,11 +645,14 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id() {
+            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let stats_event_sender = Arc::new(stats_event_sender);
+
             let request = ConnectRequest {
                 transaction_id: TransactionId(0i32.into()),
             };
 
-            let response = handle_connect(sample_ipv4_remote_addr(), &request, &public_tracker(), sample_issue_time()).await;
+            let response = handle_connect(sample_ipv4_remote_addr(), &request, &stats_event_sender, sample_issue_time()).await;
 
             assert_eq!(
                 response,
@@ -629,11 +665,14 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id_ipv6() {
+            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let stats_event_sender = Arc::new(stats_event_sender);
+
             let request = ConnectRequest {
                 transaction_id: TransactionId(0i32.into()),
             };
 
-            let response = handle_connect(sample_ipv6_remote_addr(), &request, &public_tracker(), sample_issue_time()).await;
+            let response = handle_connect(sample_ipv6_remote_addr(), &request, &stats_event_sender, sample_issue_time()).await;
 
             assert_eq!(
                 response,
@@ -652,15 +691,15 @@ mod tests {
                 .with(eq(statistics::event::Event::Udp4Connect))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender = Box::new(stats_event_sender_mock);
+            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(stats_event_sender_mock)));
 
             let client_socket_address = sample_ipv4_socket_address();
 
-            let torrent_tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
             handle_connect(
                 client_socket_address,
                 &sample_connect_request(),
-                &torrent_tracker,
+                &stats_event_sender,
                 sample_issue_time(),
             )
             .await;
@@ -674,13 +713,13 @@ mod tests {
                 .with(eq(statistics::event::Event::Udp6Connect))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender = Box::new(stats_event_sender_mock);
+            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let torrent_tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
             handle_connect(
                 sample_ipv6_remote_addr(),
                 &sample_connect_request(),
-                &torrent_tracker,
+                &stats_event_sender,
                 sample_issue_time(),
             )
             .await;
@@ -783,7 +822,9 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let tracker = public_tracker();
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let client_ip = Ipv4Addr::new(126, 0, 0, 1);
                 let client_port = 8080;
@@ -800,9 +841,15 @@ mod tests {
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -816,15 +863,25 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
+
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
 
                 let request = AnnounceRequestBuilder::default()
                     .with_connection_id(make(gen_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                let response = handle_announce(remote_addr, &request, &public_tracker(), sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                let response = handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let empty_peer_vector: Vec<ResponsePeer<Ipv4AddrBytes>> = vec![];
                 assert_eq!(
@@ -847,7 +904,9 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let tracker = public_tracker();
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -867,9 +926,15 @@ mod tests {
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -893,19 +958,29 @@ mod tests {
             }
 
             async fn announce_a_new_peer_using_ipv4(tracker: Arc<core::Tracker>) -> Response {
+                let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+                let stats_event_sender = Arc::new(stats_event_sender);
+
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
                 let request = AnnounceRequestBuilder::default()
                     .with_connection_id(make(gen_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap()
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap()
             }
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv4_the_response_should_not_include_peers_using_ipv6() {
-                let tracker = public_tracker();
+                let (tracker, _stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
 
                 add_a_torrent_peer_using_ipv6(&tracker);
 
@@ -928,14 +1003,16 @@ mod tests {
                     .with(eq(statistics::event::Event::Udp4Announce))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-                let stats_event_sender = Box::new(stats_event_sender_mock);
+                let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                    Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+                let tracker = Arc::new(test_tracker_factory());
 
                 handle_announce(
                     sample_ipv4_socket_address(),
                     &AnnounceRequestBuilder::default().into(),
                     &tracker,
+                    &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
@@ -957,7 +1034,9 @@ mod tests {
 
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration_if_defined() {
-                    let tracker = public_tracker();
+                    let (tracker, stats_event_sender) = public_tracker();
+                    let tracker = Arc::new(tracker);
+                    let stats_event_sender = Arc::new(stats_event_sender);
 
                     let client_ip = Ipv4Addr::new(127, 0, 0, 1);
                     let client_port = 8080;
@@ -974,9 +1053,15 @@ mod tests {
                         .with_port(client_port)
                         .into();
 
-                    handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                        .await
-                        .unwrap();
+                    handle_announce(
+                        remote_addr,
+                        &request,
+                        &tracker,
+                        &stats_event_sender,
+                        sample_cookie_valid_range(),
+                    )
+                    .await
+                    .unwrap();
 
                     let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -1015,7 +1100,9 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let tracker = public_tracker();
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1033,9 +1120,15 @@ mod tests {
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -1049,6 +1142,10 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
+
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
 
@@ -1058,9 +1155,15 @@ mod tests {
                     .with_connection_id(make(gen_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                let response = handle_announce(remote_addr, &request, &public_tracker(), sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                let response = handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let empty_peer_vector: Vec<ResponsePeer<Ipv6AddrBytes>> = vec![];
                 assert_eq!(
@@ -1083,7 +1186,9 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let tracker = public_tracker();
+                let (tracker, stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1103,9 +1208,15 @@ mod tests {
                     .with_port(client_port)
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
 
                 let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -1129,6 +1240,9 @@ mod tests {
             }
 
             async fn announce_a_new_peer_using_ipv6(tracker: Arc<core::Tracker>) -> Response {
+                let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+                let stats_event_sender = Arc::new(stats_event_sender);
+
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
                 let client_port = 8080;
@@ -1137,14 +1251,21 @@ mod tests {
                     .with_connection_id(make(gen_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap()
+                handle_announce(
+                    remote_addr,
+                    &request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap()
             }
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv6_the_response_should_not_include_peers_using_ipv4() {
-                let tracker = public_tracker();
+                let (tracker, _stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
 
                 add_a_torrent_peer_using_ipv4(&tracker);
 
@@ -1167,9 +1288,10 @@ mod tests {
                     .with(eq(statistics::event::Event::Udp6Announce))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-                let stats_event_sender = Box::new(stats_event_sender_mock);
+                let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                    Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+                let tracker = Arc::new(test_tracker_factory());
 
                 let remote_addr = sample_ipv6_remote_addr();
 
@@ -1177,20 +1299,27 @@ mod tests {
                     .with_connection_id(make(gen_remote_fingerprint(&remote_addr), sample_issue_time()).unwrap())
                     .into();
 
-                handle_announce(remote_addr, &announce_request, &tracker, sample_cookie_valid_range())
-                    .await
-                    .unwrap();
+                handle_announce(
+                    remote_addr,
+                    &announce_request,
+                    &tracker,
+                    &stats_event_sender,
+                    sample_cookie_valid_range(),
+                )
+                .await
+                .unwrap();
             }
 
             mod from_a_loopback_ip {
+                use std::future;
                 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
                 use std::sync::Arc;
 
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
+                use mockall::predicate::eq;
 
                 use crate::bootstrap::app::initialize_tracker_dependencies;
-                use crate::core;
-                use crate::core::statistics::keeper::Keeper;
+                use crate::core::{self, statistics};
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1201,19 +1330,19 @@ mod tests {
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
-                    let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-                    let (stats_event_sender, stats_repository) = Keeper::new_active_instance();
 
-                    let tracker = Arc::new(
-                        core::Tracker::new(
-                            &config.core,
-                            &database,
-                            &whitelist_manager,
-                            Some(stats_event_sender),
-                            stats_repository,
-                        )
-                        .unwrap(),
-                    );
+                    let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+
+                    let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                    stats_event_sender_mock
+                        .expect_send_event()
+                        .with(eq(statistics::event::Event::Udp6Announce))
+                        .times(1)
+                        .returning(|_| Box::pin(future::ready(Some(Ok(())))));
+                    let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                        Arc::new(Some(Box::new(stats_event_sender_mock)));
+
+                    let tracker = Arc::new(core::Tracker::new(&config.core, &database, &whitelist_manager).unwrap());
 
                     let loopback_ipv4 = Ipv4Addr::new(127, 0, 0, 1);
                     let loopback_ipv6 = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
@@ -1235,9 +1364,15 @@ mod tests {
                         .with_port(client_port)
                         .into();
 
-                    handle_announce(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                        .await
-                        .unwrap();
+                    handle_announce(
+                        remote_addr,
+                        &request,
+                        &tracker,
+                        &stats_event_sender,
+                        sample_cookie_valid_range(),
+                    )
+                    .await
+                    .unwrap();
 
                     let peers = tracker.get_torrent_peers(&info_hash.0.into());
 
@@ -1266,6 +1401,7 @@ mod tests {
         };
 
         use super::{gen_remote_fingerprint, TorrentPeerBuilder};
+        use crate::core::services::statistics;
         use crate::core::{self};
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
@@ -1283,6 +1419,10 @@ mod tests {
 
         #[tokio::test]
         async fn should_return_no_stats_when_the_tracker_does_not_have_any_torrent() {
+            let (tracker, stats_event_sender) = public_tracker();
+            let tracker = Arc::new(tracker);
+            let stats_event_sender = Arc::new(stats_event_sender);
+
             let remote_addr = sample_ipv4_remote_addr();
 
             let info_hash = InfoHash([0u8; 20]);
@@ -1294,9 +1434,15 @@ mod tests {
                 info_hashes,
             };
 
-            let response = handle_scrape(remote_addr, &request, &public_tracker(), sample_cookie_valid_range())
-                .await
-                .unwrap();
+            let response = handle_scrape(
+                remote_addr,
+                &request,
+                &tracker,
+                &stats_event_sender,
+                sample_cookie_valid_range(),
+            )
+            .await
+            .unwrap();
 
             let expected_torrent_stats = vec![zeroed_torrent_statistics()];
 
@@ -1332,6 +1478,9 @@ mod tests {
         }
 
         async fn add_a_sample_seeder_and_scrape(tracker: Arc<core::Tracker>) -> Response {
+            let (stats_event_sender, _stats_repository) = statistics::setup::factory(false);
+            let stats_event_sender = Arc::new(stats_event_sender);
+
             let remote_addr = sample_ipv4_remote_addr();
             let info_hash = InfoHash([0u8; 20]);
 
@@ -1339,9 +1488,15 @@ mod tests {
 
             let request = build_scrape_request(&remote_addr, &info_hash);
 
-            handle_scrape(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                .await
-                .unwrap()
+            handle_scrape(
+                remote_addr,
+                &request,
+                &tracker,
+                &stats_event_sender,
+                sample_cookie_valid_range(),
+            )
+            .await
+            .unwrap()
         }
 
         fn match_scrape_response(response: Response) -> Option<ScrapeResponse> {
@@ -1352,6 +1507,8 @@ mod tests {
         }
 
         mod with_a_public_tracker {
+            use std::sync::Arc;
+
             use aquatic_udp_protocol::{NumberOfDownloads, NumberOfPeers, TorrentScrapeStatistics};
 
             use crate::servers::udp::handlers::tests::public_tracker;
@@ -1359,7 +1516,8 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
-                let tracker = public_tracker();
+                let (tracker, _stats_event_sender) = public_tracker();
+                let tracker = Arc::new(tracker);
 
                 let torrent_stats = match_scrape_response(add_a_sample_seeder_and_scrape(tracker.clone()).await);
 
@@ -1374,6 +1532,8 @@ mod tests {
         }
 
         mod with_a_whitelisted_tracker {
+            use std::sync::Arc;
+
             use aquatic_udp_protocol::{InfoHash, NumberOfDownloads, NumberOfPeers, TorrentScrapeStatistics};
 
             use crate::servers::udp::handlers::handle_scrape;
@@ -1384,7 +1544,9 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
-                let tracker = whitelisted_tracker();
+                let (tracker, stats_event_sender) = whitelisted_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
@@ -1399,9 +1561,15 @@ mod tests {
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
                 let torrent_stats = match_scrape_response(
-                    handle_scrape(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                        .await
-                        .unwrap(),
+                    handle_scrape(
+                        remote_addr,
+                        &request,
+                        &tracker,
+                        &stats_event_sender,
+                        sample_cookie_valid_range(),
+                    )
+                    .await
+                    .unwrap(),
                 )
                 .unwrap();
 
@@ -1416,7 +1584,9 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
-                let tracker = whitelisted_tracker();
+                let (tracker, stats_event_sender) = whitelisted_tracker();
+                let tracker = Arc::new(tracker);
+                let stats_event_sender = Arc::new(stats_event_sender);
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
@@ -1426,9 +1596,15 @@ mod tests {
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
                 let torrent_stats = match_scrape_response(
-                    handle_scrape(remote_addr, &request, &tracker, sample_cookie_valid_range())
-                        .await
-                        .unwrap(),
+                    handle_scrape(
+                        remote_addr,
+                        &request,
+                        &tracker,
+                        &stats_event_sender,
+                        sample_cookie_valid_range(),
+                    )
+                    .await
+                    .unwrap(),
                 )
                 .unwrap();
 
@@ -1470,15 +1646,17 @@ mod tests {
                     .with(eq(statistics::event::Event::Udp4Scrape))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-                let stats_event_sender = Box::new(stats_event_sender_mock);
+                let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                    Arc::new(Some(Box::new(stats_event_sender_mock)));
 
                 let remote_addr = sample_ipv4_remote_addr();
-                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+                let tracker = Arc::new(test_tracker_factory());
 
                 handle_scrape(
                     remote_addr,
                     &sample_scrape_request(&remote_addr),
                     &tracker,
+                    &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
@@ -1507,15 +1685,17 @@ mod tests {
                     .with(eq(statistics::event::Event::Udp6Scrape))
                     .times(1)
                     .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-                let stats_event_sender = Box::new(stats_event_sender_mock);
+                let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                    Arc::new(Some(Box::new(stats_event_sender_mock)));
 
                 let remote_addr = sample_ipv6_remote_addr();
-                let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+                let tracker = Arc::new(test_tracker_factory());
 
                 handle_scrape(
                     remote_addr,
                     &sample_scrape_request(&remote_addr),
                     &tracker,
+                    &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await

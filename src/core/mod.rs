@@ -422,7 +422,7 @@
 //! For example, the HTTP tracker would send an event like the following when it handles an `announce` request received from a peer using IP version 4.
 //!
 //! ```text
-//! tracker.send_stats_event(statistics::event::Event::Tcp4Announce).await
+//! stats_event_sender.send_stats_event(statistics::event::Event::Tcp4Announce).await
 //! ```
 //!
 //! Refer to [`statistics`] module for more information about statistics.
@@ -458,7 +458,6 @@ use std::time::Duration;
 use auth::PeerKey;
 use bittorrent_primitives::info_hash::InfoHash;
 use error::PeerKeyError;
-use tokio::sync::mpsc::error::SendError;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_located_error::Located;
@@ -502,12 +501,6 @@ pub struct Tracker {
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
-
-    /// Service to send stats events.
-    stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
-
-    /// The in-memory stats repo.
-    stats_repository: statistics::repository::Repository,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -576,8 +569,6 @@ impl Tracker {
         config: &Core,
         database: &Arc<Box<dyn Database>>,
         whitelist_manager: &Arc<WhiteListManager>,
-        stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>,
-        stats_repository: statistics::repository::Repository,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
@@ -585,8 +576,6 @@ impl Tracker {
             keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
             whitelist_manager: whitelist_manager.clone(),
             torrents: Arc::default(),
-            stats_event_sender,
-            stats_repository,
         })
     }
 
@@ -1052,26 +1041,6 @@ impl Tracker {
             info_hash: *info_hash,
             location: Location::caller(),
         })
-    }
-
-    /// It return the `Tracker` [`statistics::metrics::Metrics`].
-    ///
-    /// # Context: Statistics
-    pub async fn get_stats(&self) -> tokio::sync::RwLockReadGuard<'_, statistics::metrics::Metrics> {
-        self.stats_repository.get_stats().await
-    }
-
-    /// It allows to send a statistic events which eventually will be used to update [`statistics::metrics::Metrics`].
-    ///
-    /// # Context: Statistics
-    pub async fn send_stats_event(
-        &self,
-        event: statistics::event::Event,
-    ) -> Option<Result<(), SendError<statistics::event::Event>>> {
-        match &self.stats_event_sender {
-            None => None,
-            Some(stats_event_sender) => stats_event_sender.send_event(event).await,
-        }
     }
 
     /// It drops the database tables.

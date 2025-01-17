@@ -31,6 +31,8 @@ use tracing::instrument;
 
 use super::make_rust_tls;
 use crate::core;
+use crate::core::statistics::event::sender::Sender;
+use crate::core::statistics::repository::Repository;
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -56,11 +58,13 @@ pub struct ApiServerJobStarted();
 /// It would panic if unable to send the  `ApiServerJobStarted` notice.
 ///
 ///
-#[instrument(skip(config, tracker, ban_service, form))]
+#[instrument(skip(config, tracker, ban_service, stats_event_sender, stats_repository, form))]
 pub async fn start_job(
     config: &HttpApi,
     tracker: Arc<core::Tracker>,
     ban_service: Arc<RwLock<BanService>>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    stats_repository: Arc<Repository>,
     form: ServiceRegistrationForm,
     version: Version,
 ) -> Option<JoinHandle<()>> {
@@ -73,22 +77,53 @@ pub async fn start_job(
     let access_tokens = Arc::new(config.access_tokens.clone());
 
     match version {
-        Version::V1 => Some(start_v1(bind_to, tls, tracker.clone(), ban_service.clone(), form, access_tokens).await),
+        Version::V1 => Some(
+            start_v1(
+                bind_to,
+                tls,
+                tracker.clone(),
+                ban_service.clone(),
+                stats_event_sender.clone(),
+                stats_repository.clone(),
+                form,
+                access_tokens,
+            )
+            .await,
+        ),
     }
 }
 
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(socket, tls, tracker, ban_service, form, access_tokens))]
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip(
+    socket,
+    tls,
+    tracker,
+    ban_service,
+    stats_event_sender,
+    stats_repository,
+    form,
+    access_tokens
+))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
     ban_service: Arc<RwLock<BanService>>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    stats_repository: Arc<Repository>,
     form: ServiceRegistrationForm,
     access_tokens: Arc<AccessTokens>,
 ) -> JoinHandle<()> {
     let server = ApiServer::new(Launcher::new(socket, tls))
-        .start(tracker, ban_service, form, access_tokens)
+        .start(
+            tracker,
+            stats_event_sender,
+            stats_repository,
+            ban_service,
+            form,
+            access_tokens,
+        )
         .await
         .expect("it should be able to start to the tracker api");
 
@@ -107,6 +142,7 @@ mod tests {
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::tracker_apis::start_job;
+    use crate::core::services::statistics;
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -116,12 +152,26 @@ mod tests {
     async fn it_should_start_http_tracker() {
         let cfg = Arc::new(ephemeral_public());
         let config = &cfg.http_api.clone().unwrap();
-        let tracker = initialize_with_configuration(&cfg);
+
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+        let (stats_event_sender, stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+        let stats_repository = Arc::new(stats_repository);
+
+        let tracker = initialize_with_configuration(&cfg);
+
         let version = Version::V1;
 
-        start_job(config, tracker, ban_service, Registar::default().give_form(), version)
-            .await
-            .expect("it should be able to join to the tracker api start-job");
+        start_job(
+            config,
+            tracker,
+            ban_service,
+            stats_event_sender,
+            stats_repository,
+            Registar::default().give_form(),
+            version,
+        )
+        .await
+        .expect("it should be able to join to the tracker api start-job");
     }
 }

@@ -19,7 +19,8 @@ use torrust_tracker_configuration::HttpTracker;
 use tracing::instrument;
 
 use super::make_rust_tls;
-use crate::core;
+use crate::core::statistics::event::sender::Sender;
+use crate::core::{self, statistics};
 use crate::servers::http::server::{HttpServer, Launcher};
 use crate::servers::http::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -33,10 +34,11 @@ use crate::servers::registar::ServiceRegistrationForm;
 ///
 /// It would panic if the `config::HttpTracker` struct would contain inappropriate values.
 ///
-#[instrument(skip(config, tracker, form))]
+#[instrument(skip(config, tracker, stats_event_sender, form))]
 pub async fn start_job(
     config: &HttpTracker,
     tracker: Arc<core::Tracker>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     form: ServiceRegistrationForm,
     version: Version,
 ) -> Option<JoinHandle<()>> {
@@ -47,20 +49,21 @@ pub async fn start_job(
         .map(|tls| tls.expect("it should have a valid http tracker tls configuration"));
 
     match version {
-        Version::V1 => Some(start_v1(socket, tls, tracker.clone(), form).await),
+        Version::V1 => Some(start_v1(socket, tls, tracker.clone(), stats_event_sender.clone(), form).await),
     }
 }
 
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(socket, tls, tracker, form))]
+#[instrument(skip(socket, tls, tracker, stats_event_sender, form))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
     form: ServiceRegistrationForm,
 ) -> JoinHandle<()> {
     let server = HttpServer::new(Launcher::new(socket, tls))
-        .start(tracker, form)
+        .start(tracker, stats_event_sender, form)
         .await
         .expect("it should be able to start to the http tracker");
 
@@ -85,6 +88,7 @@ mod tests {
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::http_tracker::start_job;
+    use crate::core::services::statistics;
     use crate::servers::http::Version;
     use crate::servers::registar::Registar;
 
@@ -93,10 +97,12 @@ mod tests {
         let cfg = Arc::new(ephemeral_public());
         let http_tracker = cfg.http_trackers.clone().expect("missing HTTP tracker configuration");
         let config = &http_tracker[0];
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
         let tracker = initialize_with_configuration(&cfg);
         let version = Version::V1;
 
-        start_job(config, tracker, Registar::default().give_form(), version)
+        start_job(config, tracker, stats_event_sender, Registar::default().give_form(), version)
             .await
             .expect("it should be able to join to the http tracker start-job");
     }
