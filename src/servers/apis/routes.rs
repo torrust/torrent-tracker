@@ -30,6 +30,8 @@ use tracing::{instrument, Level, Span};
 use super::v1;
 use super::v1::context::health_check::handlers::health_check_handler;
 use super::v1::middlewares::auth::State;
+use crate::core::statistics::event::sender::Sender;
+use crate::core::statistics::repository::Repository;
 use crate::core::Tracker;
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::logging::Latency;
@@ -37,10 +39,12 @@ use crate::servers::udp::server::banning::BanService;
 
 /// Add all API routes to the router.
 #[allow(clippy::needless_pass_by_value)]
-#[instrument(skip(tracker, ban_service, access_tokens))]
+#[instrument(skip(tracker, ban_service, stats_event_sender, stats_repository, access_tokens))]
 pub fn router(
     tracker: Arc<Tracker>,
     ban_service: Arc<RwLock<BanService>>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    stats_repository: Arc<Repository>,
     access_tokens: Arc<AccessTokens>,
     server_socket_addr: SocketAddr,
 ) -> Router {
@@ -48,7 +52,14 @@ pub fn router(
 
     let api_url_prefix = "/api";
 
-    let router = v1::routes::add(api_url_prefix, router, tracker.clone(), ban_service.clone());
+    let router = v1::routes::add(
+        api_url_prefix,
+        router,
+        tracker.clone(),
+        ban_service.clone(),
+        stats_event_sender.clone(),
+        stats_repository.clone(),
+    );
 
     let state = State { access_tokens };
 

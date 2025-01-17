@@ -13,6 +13,7 @@ use super::banning::BanService;
 use super::spawner::Spawner;
 use super::{Server, UdpError};
 use crate::bootstrap::jobs::Started;
+use crate::core::statistics::event::sender::Sender;
 use crate::core::Tracker;
 use crate::servers::registar::{ServiceRegistration, ServiceRegistrationForm};
 use crate::servers::signals::Halted;
@@ -64,10 +65,11 @@ impl Server<Stopped> {
     ///
     /// It panics if unable to receive the bound socket address from service.
     ///
-    #[instrument(skip(self, tracker, ban_service, form), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, opt_stats_event_sender, ban_service, form), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         form: ServiceRegistrationForm,
         cookie_lifetime: Duration,
@@ -78,10 +80,14 @@ impl Server<Stopped> {
         assert!(!tx_halt.is_closed(), "Halt channel for UDP tracker should be open");
 
         // May need to wrap in a task to about a tokio bug.
-        let task = self
-            .state
-            .spawner
-            .spawn_launcher(tracker, ban_service, cookie_lifetime, tx_start, rx_halt);
+        let task = self.state.spawner.spawn_launcher(
+            tracker,
+            opt_stats_event_sender,
+            ban_service,
+            cookie_lifetime,
+            tx_start,
+            rx_halt,
+        );
 
         let local_addr = rx_start.await.expect("it should be able to start the service").address;
 

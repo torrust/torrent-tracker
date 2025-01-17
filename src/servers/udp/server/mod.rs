@@ -64,6 +64,7 @@ mod tests {
     use super::spawner::Spawner;
     use super::Server;
     use crate::bootstrap::app::initialize_with_configuration;
+    use crate::core::services::statistics;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -72,8 +73,10 @@ mod tests {
     async fn it_should_be_able_to_start_and_stop() {
         let cfg = Arc::new(ephemeral_public());
 
-        let tracker = initialize_with_configuration(&cfg);
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+        let tracker = initialize_with_configuration(&cfg);
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -83,7 +86,13 @@ mod tests {
         let stopped = Server::new(Spawner::new(bind_to));
 
         let started = stopped
-            .start(tracker, ban_service, register.give_form(), config.cookie_lifetime)
+            .start(
+                tracker,
+                stats_event_sender,
+                ban_service,
+                register.give_form(),
+                config.cookie_lifetime,
+            )
             .await
             .expect("it should start the server");
 
@@ -98,8 +107,10 @@ mod tests {
     async fn it_should_be_able_to_start_and_stop_with_wait() {
         let cfg = Arc::new(ephemeral_public());
 
-        let tracker = initialize_with_configuration(&cfg);
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+        let tracker = initialize_with_configuration(&cfg);
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;
@@ -108,7 +119,13 @@ mod tests {
         let stopped = Server::new(Spawner::new(bind_to));
 
         let started = stopped
-            .start(tracker, ban_service, register.give_form(), config.cookie_lifetime)
+            .start(
+                tracker,
+                stats_event_sender,
+                ban_service,
+                register.give_form(),
+                config.cookie_lifetime,
+            )
             .await
             .expect("it should start the server");
 

@@ -15,7 +15,9 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
-use crate::core::{statistics, PeersWanted, Tracker};
+use crate::core::statistics::event::sender::Sender;
+use crate::core::statistics::{self};
+use crate::core::{PeersWanted, Tracker};
 
 /// The HTTP tracker `announce` service.
 ///
@@ -29,6 +31,7 @@ use crate::core::{statistics, PeersWanted, Tracker};
 /// > each `announce` request.
 pub async fn invoke(
     tracker: Arc<Tracker>,
+    opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     info_hash: InfoHash,
     peer: &mut peer::Peer,
     peers_wanted: &PeersWanted,
@@ -38,12 +41,14 @@ pub async fn invoke(
     // The tracker could change the original peer ip
     let announce_data = tracker.announce(&info_hash, peer, &original_peer_ip, peers_wanted);
 
-    match original_peer_ip {
-        IpAddr::V4(_) => {
-            tracker.send_stats_event(statistics::event::Event::Tcp4Announce).await;
-        }
-        IpAddr::V6(_) => {
-            tracker.send_stats_event(statistics::event::Event::Tcp6Announce).await;
+    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+        match original_peer_ip {
+            IpAddr::V4(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Tcp4Announce).await;
+            }
+            IpAddr::V6(_) => {
+                stats_event_sender.send_event(statistics::event::Event::Tcp6Announce).await;
+            }
         }
     }
 
@@ -53,6 +58,7 @@ pub async fn invoke(
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+    use std::sync::Arc;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
@@ -60,13 +66,20 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::bootstrap::app::initialize_tracker_dependencies;
-    use crate::core::services::tracker_factory;
+    use crate::core::services::{statistics, tracker_factory};
+    use crate::core::statistics::event::sender::Sender;
     use crate::core::Tracker;
 
-    fn public_tracker() -> Tracker {
+    fn public_tracker() -> (Tracker, Arc<Option<Box<dyn Sender>>>) {
         let config = configuration::ephemeral_public();
-        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
-        tracker_factory(&config, &database, &whitelist_manager, &stats_event_sender, &stats_repository)
+
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+
+        let tracker = tracker_factory(&config, &database, &whitelist_manager);
+
+        (tracker, stats_event_sender)
     }
 
     fn sample_info_hash() -> InfoHash {
@@ -115,32 +128,30 @@ mod tests {
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
 
-        fn test_tracker_factory(stats_event_sender: Option<Box<dyn statistics::event::sender::Sender>>) -> Tracker {
+        fn test_tracker_factory() -> Tracker {
             let config = configuration::ephemeral();
 
-            let (database, whitelist_manager, _stats_event_sender, _stats_repository) = initialize_tracker_dependencies(&config);
+            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
 
-            let stats_event_sender = Arc::new(stats_event_sender);
-
-            let stats_repository = Arc::new(statistics::repository::Repository::new());
-
-            Tracker::new(
-                &config.core,
-                &database,
-                &whitelist_manager,
-                &stats_event_sender,
-                &stats_repository,
-            )
-            .unwrap()
+            Tracker::new(&config.core, &database, &whitelist_manager).unwrap()
         }
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
-            let tracker = Arc::new(public_tracker());
+            let (tracker, stats_event_sender) = public_tracker();
+
+            let tracker = Arc::new(tracker);
 
             let mut peer = sample_peer();
 
-            let announce_data = invoke(tracker.clone(), sample_info_hash(), &mut peer, &PeersWanted::All).await;
+            let announce_data = invoke(
+                tracker.clone(),
+                stats_event_sender.clone(),
+                sample_info_hash(),
+                &mut peer,
+                &PeersWanted::All,
+            )
+            .await;
 
             let expected_announce_data = AnnounceData {
                 peers: vec![],
@@ -163,22 +174,23 @@ mod tests {
                 .with(eq(statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender = Box::new(stats_event_sender_mock);
+            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+            let tracker = Arc::new(test_tracker_factory());
 
             let mut peer = sample_peer_using_ipv4();
 
-            let _announce_data = invoke(tracker, sample_info_hash(), &mut peer, &PeersWanted::All).await;
+            let _announce_data = invoke(tracker, stats_event_sender, sample_info_hash(), &mut peer, &PeersWanted::All).await;
         }
 
-        fn tracker_with_an_ipv6_external_ip(stats_event_sender: Box<dyn statistics::event::sender::Sender>) -> Tracker {
+        fn tracker_with_an_ipv6_external_ip() -> Tracker {
             let mut configuration = configuration::ephemeral();
             configuration.core.net.external_ip = Some(IpAddr::V6(Ipv6Addr::new(
                 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969,
             )));
 
-            test_tracker_factory(Some(stats_event_sender))
+            test_tracker_factory()
         }
 
         fn peer_with_the_ipv4_loopback_ip() -> peer::Peer {
@@ -200,12 +212,14 @@ mod tests {
                 .with(eq(statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender = Box::new(stats_event_sender_mock);
+            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(stats_event_sender_mock)));
 
             let mut peer = peer_with_the_ipv4_loopback_ip();
 
             let _announce_data = invoke(
-                tracker_with_an_ipv6_external_ip(stats_event_sender).into(),
+                tracker_with_an_ipv6_external_ip().into(),
+                stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,
@@ -222,13 +236,14 @@ mod tests {
                 .with(eq(statistics::event::Event::Tcp6Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender = Box::new(stats_event_sender_mock);
+            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let tracker = Arc::new(test_tracker_factory(Some(stats_event_sender)));
+            let tracker = Arc::new(test_tracker_factory());
 
             let mut peer = sample_peer_using_ipv6();
 
-            let _announce_data = invoke(tracker, sample_info_hash(), &mut peer, &PeersWanted::All).await;
+            let _announce_data = invoke(tracker, stats_event_sender, sample_info_hash(), &mut peer, &PeersWanted::All).await;
         }
     }
 }

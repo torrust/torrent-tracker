@@ -11,7 +11,7 @@ use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
-use crate::core::Tracker;
+use crate::core::{statistics, Tracker};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::STARTED_ON;
@@ -42,8 +42,14 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    #[instrument(skip(self, tracker, tx_start, rx_halt))]
-    fn start(&self, tracker: Arc<Tracker>, tx_start: Sender<Started>, rx_halt: Receiver<Halted>) -> BoxFuture<'static, ()> {
+    #[instrument(skip(self, tracker, stats_event_sender, tx_start, rx_halt))]
+    fn start(
+        &self,
+        tracker: Arc<Tracker>,
+        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        tx_start: Sender<Started>,
+        rx_halt: Receiver<Halted>,
+    ) -> BoxFuture<'static, ()> {
         let socket = std::net::TcpListener::bind(self.bind_to).expect("Could not bind tcp_listener to address.");
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
@@ -60,7 +66,7 @@ impl Launcher {
 
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
-        let app = router(tracker, address);
+        let app = router(tracker, stats_event_sender, address);
 
         let running = Box::pin(async {
             match tls {
@@ -153,14 +159,19 @@ impl HttpServer<Stopped> {
     ///
     /// It would panic spawned HTTP server launcher cannot send the bound `SocketAddr`
     /// back to the main thread.
-    pub async fn start(self, tracker: Arc<Tracker>, form: ServiceRegistrationForm) -> Result<HttpServer<Running>, Error> {
+    pub async fn start(
+        self,
+        tracker: Arc<Tracker>,
+        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        form: ServiceRegistrationForm,
+    ) -> Result<HttpServer<Running>, Error> {
         let (tx_start, rx_start) = tokio::sync::oneshot::channel::<Started>();
         let (tx_halt, rx_halt) = tokio::sync::oneshot::channel::<Halted>();
 
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
-            let server = launcher.start(tracker, tx_start, rx_halt);
+            let server = launcher.start(tracker, stats_event_sender, tx_start, rx_halt);
 
             server.await;
 
@@ -233,13 +244,18 @@ mod tests {
 
     use crate::bootstrap::app::initialize_with_configuration;
     use crate::bootstrap::jobs::make_rust_tls;
+    use crate::core::services::statistics;
     use crate::servers::http::server::{HttpServer, Launcher};
     use crate::servers::registar::Registar;
 
     #[tokio::test]
     async fn it_should_be_able_to_start_and_stop() {
         let cfg = Arc::new(ephemeral_public());
+
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
         let tracker = initialize_with_configuration(&cfg);
+
         let http_trackers = cfg.http_trackers.clone().expect("missing HTTP trackers configuration");
         let config = &http_trackers[0];
 
@@ -253,7 +269,7 @@ mod tests {
 
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
         let started = stopped
-            .start(tracker, register.give_form())
+            .start(tracker, stats_event_sender, register.give_form())
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

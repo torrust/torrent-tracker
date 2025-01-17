@@ -8,6 +8,9 @@ use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::{Configuration, HttpApi};
 use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
+use torrust_tracker_lib::core::services::statistics;
+use torrust_tracker_lib::core::statistics::event::sender::Sender;
+use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::whitelist::WhiteListManager;
 use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
@@ -22,6 +25,8 @@ where
 {
     pub config: Arc<HttpApi>,
     pub tracker: Arc<Tracker>,
+    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub stats_repository: Arc<Repository>,
     pub whitelist_manager: Arc<WhiteListManager>,
     pub ban_service: Arc<RwLock<BanService>>,
     pub registar: Registar,
@@ -40,12 +45,15 @@ where
 
 impl Environment<Stopped> {
     pub fn new(configuration: &Arc<Configuration>) -> Self {
+        let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+        let stats_repository = Arc::new(stats_repository);
+        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+
         let tracker = initialize_with_configuration(configuration);
 
-        // todo: get from `initialize_with_configuration`
+        // todo: instantiate outside of `initialize_with_configuration`
         let whitelist_manager = tracker.whitelist_manager.clone();
-
-        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
         let config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));
 
@@ -58,6 +66,8 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker,
+            stats_event_sender,
+            stats_repository,
             whitelist_manager,
             ban_service,
             registar: Registar::default(),
@@ -71,12 +81,21 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            stats_event_sender: self.stats_event_sender.clone(),
+            stats_repository: self.stats_repository.clone(),
             whitelist_manager: self.whitelist_manager.clone(),
             ban_service: self.ban_service.clone(),
             registar: self.registar.clone(),
             server: self
                 .server
-                .start(self.tracker, self.ban_service, self.registar.give_form(), access_tokens)
+                .start(
+                    self.tracker,
+                    self.stats_event_sender,
+                    self.stats_repository,
+                    self.ban_service,
+                    self.registar.give_form(),
+                    access_tokens,
+                )
                 .await
                 .unwrap(),
         }
@@ -92,6 +111,8 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            stats_event_sender: self.stats_event_sender,
+            stats_repository: self.stats_repository,
             whitelist_manager: self.whitelist_manager,
             ban_service: self.ban_service,
             registar: Registar::default(),

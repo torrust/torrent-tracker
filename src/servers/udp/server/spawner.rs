@@ -11,6 +11,7 @@ use tokio::task::JoinHandle;
 use super::banning::BanService;
 use super::launcher::Launcher;
 use crate::bootstrap::jobs::Started;
+use crate::core::statistics::event::sender::Sender;
 use crate::core::Tracker;
 use crate::servers::signals::Halted;
 
@@ -29,6 +30,7 @@ impl Spawner {
     pub fn spawn_launcher(
         &self,
         tracker: Arc<Tracker>,
+        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
@@ -37,7 +39,16 @@ impl Spawner {
         let spawner = Self::new(self.bind_to);
 
         tokio::spawn(async move {
-            Launcher::run_with_graceful_shutdown(tracker, ban_service, spawner.bind_to, cookie_lifetime, tx_start, rx_halt).await;
+            Launcher::run_with_graceful_shutdown(
+                tracker,
+                opt_stats_event_sender,
+                ban_service,
+                spawner.bind_to,
+                cookie_lifetime,
+                tx_start,
+                rx_halt,
+            )
+            .await;
             spawner
         })
     }

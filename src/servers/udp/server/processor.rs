@@ -10,6 +10,7 @@ use tracing::{instrument, Level};
 
 use super::banning::BanService;
 use super::bound_socket::BoundSocket;
+use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::event::UdpResponseKind;
 use crate::core::{statistics, Tracker};
 use crate::servers::udp::handlers::CookieTimeValues;
@@ -18,14 +19,21 @@ use crate::servers::udp::{handlers, RawRequest};
 pub struct Processor {
     socket: Arc<BoundSocket>,
     tracker: Arc<Tracker>,
+    opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     cookie_lifetime: f64,
 }
 
 impl Processor {
-    pub fn new(socket: Arc<BoundSocket>, tracker: Arc<Tracker>, cookie_lifetime: f64) -> Self {
+    pub fn new(
+        socket: Arc<BoundSocket>,
+        tracker: Arc<Tracker>,
+        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+        cookie_lifetime: f64,
+    ) -> Self {
         Self {
             socket,
             tracker,
+            opt_stats_event_sender,
             cookie_lifetime,
         }
     }
@@ -39,6 +47,7 @@ impl Processor {
         let response = handlers::handle_packet(
             request,
             &self.tracker,
+            &self.opt_stats_event_sender,
             self.socket.address(),
             CookieTimeValues::new(self.cookie_lifetime),
             ban_service,
@@ -84,22 +93,24 @@ impl Processor {
                             tracing::debug!(%bytes_count, %sent_bytes, "sent {response_type}");
                         }
 
-                        match target.ip() {
-                            IpAddr::V4(_) => {
-                                self.tracker
-                                    .send_stats_event(statistics::event::Event::Udp4Response {
-                                        kind: response_kind,
-                                        req_processing_time,
-                                    })
-                                    .await;
-                            }
-                            IpAddr::V6(_) => {
-                                self.tracker
-                                    .send_stats_event(statistics::event::Event::Udp6Response {
-                                        kind: response_kind,
-                                        req_processing_time,
-                                    })
-                                    .await;
+                        if let Some(stats_event_sender) = self.opt_stats_event_sender.as_deref() {
+                            match target.ip() {
+                                IpAddr::V4(_) => {
+                                    stats_event_sender
+                                        .send_event(statistics::event::Event::Udp4Response {
+                                            kind: response_kind,
+                                            req_processing_time,
+                                        })
+                                        .await;
+                                }
+                                IpAddr::V6(_) => {
+                                    stats_event_sender
+                                        .send_event(statistics::event::Event::Udp6Response {
+                                            kind: response_kind,
+                                            req_processing_time,
+                                        })
+                                        .await;
+                                }
                             }
                         }
                     }

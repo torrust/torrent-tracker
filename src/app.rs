@@ -29,6 +29,8 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use crate::bootstrap::jobs::{health_check_api, http_tracker, torrent_cleanup, tracker_apis, udp_tracker};
+use crate::core::statistics::event::sender::Sender;
+use crate::core::statistics::repository::Repository;
 use crate::servers::registar::Registar;
 use crate::servers::udp::server::banning::BanService;
 use crate::{core, servers};
@@ -39,11 +41,13 @@ use crate::{core, servers};
 ///
 /// - Can't retrieve tracker keys from database.
 /// - Can't load whitelist from database.
-#[instrument(skip(config, tracker, ban_service))]
+#[instrument(skip(config, tracker, ban_service, stats_event_sender, stats_repository))]
 pub async fn start(
     config: &Configuration,
     tracker: Arc<core::Tracker>,
     ban_service: Arc<RwLock<BanService>>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    stats_repository: Arc<Repository>,
 ) -> Vec<JoinHandle<()>> {
     if config.http_api.is_none()
         && (config.udp_trackers.is_none() || config.udp_trackers.as_ref().map_or(true, std::vec::Vec::is_empty))
@@ -83,7 +87,14 @@ pub async fn start(
                 );
             } else {
                 jobs.push(
-                    udp_tracker::start_job(udp_tracker_config, tracker.clone(), ban_service.clone(), registar.give_form()).await,
+                    udp_tracker::start_job(
+                        udp_tracker_config,
+                        tracker.clone(),
+                        stats_event_sender.clone(),
+                        ban_service.clone(),
+                        registar.give_form(),
+                    )
+                    .await,
                 );
             }
         }
@@ -97,6 +108,7 @@ pub async fn start(
             if let Some(job) = http_tracker::start_job(
                 http_tracker_config,
                 tracker.clone(),
+                stats_event_sender.clone(),
                 registar.give_form(),
                 servers::http::Version::V1,
             )
@@ -115,6 +127,8 @@ pub async fn start(
             http_api_config,
             tracker.clone(),
             ban_service.clone(),
+            stats_event_sender.clone(),
+            stats_repository.clone(),
             registar.give_form(),
             servers::apis::Version::V1,
         )

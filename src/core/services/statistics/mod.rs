@@ -10,7 +10,7 @@
 //! The factory function builds two structs:
 //!
 //! - An statistics event [`Sender`](crate::core::statistics::event::sender::Sender)
-//! - An statistics [`Repository`](crate::core::statistics::repository::Repository)
+//! - An statistics [`Repository`]
 //!
 //! ```text
 //! let (stats_event_sender, stats_repository) = factory(tracker_usage_statistics);
@@ -44,6 +44,7 @@ use tokio::sync::RwLock;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
 use crate::core::statistics::metrics::Metrics;
+use crate::core::statistics::repository::Repository;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 
@@ -62,9 +63,13 @@ pub struct TrackerMetrics {
 }
 
 /// It returns all the [`TrackerMetrics`]
-pub async fn get_metrics(tracker: Arc<Tracker>, ban_service: Arc<RwLock<BanService>>) -> TrackerMetrics {
+pub async fn get_metrics(
+    tracker: Arc<Tracker>,
+    ban_service: Arc<RwLock<BanService>>,
+    stats_repository: Arc<Repository>,
+) -> TrackerMetrics {
     let torrents_metrics = tracker.get_torrents_metrics();
-    let stats = tracker.get_stats().await;
+    let stats = stats_repository.get_stats().await;
     let udp_banned_ips_total = ban_service.read().await.get_banned_ips_total();
 
     TrackerMetrics {
@@ -114,7 +119,7 @@ mod tests {
 
     use crate::bootstrap::app::initialize_tracker_dependencies;
     use crate::core;
-    use crate::core::services::statistics::{get_metrics, TrackerMetrics};
+    use crate::core::services::statistics::{self, get_metrics, TrackerMetrics};
     use crate::core::services::tracker_factory;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -127,18 +132,15 @@ mod tests {
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let config = tracker_configuration();
 
-        let (database, whitelist_manager, stats_event_sender, stats_repository) = initialize_tracker_dependencies(&config);
-        let tracker = Arc::new(tracker_factory(
-            &config,
-            &database,
-            &whitelist_manager,
-            &stats_event_sender,
-            &stats_repository,
-        ));
+        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+        let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_repository = Arc::new(stats_repository);
+
+        let tracker = Arc::new(tracker_factory(&config, &database, &whitelist_manager));
 
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
-        let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone()).await;
+        let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone(), stats_repository.clone()).await;
 
         assert_eq!(
             tracker_metrics,

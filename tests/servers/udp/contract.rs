@@ -229,7 +229,6 @@ mod receiving_an_announce_request {
         logging::setup();
 
         let env = Started::new(&configuration::ephemeral().into()).await;
-        let tracker = env.tracker.clone();
         let ban_service = env.ban_service.clone();
 
         let client = match UdpTrackerClient::new(env.bind_address(), DEFAULT_TIMEOUT).await {
@@ -271,7 +270,7 @@ mod receiving_an_announce_request {
             info_hash,
         );
 
-        let udp_requests_banned_before = tracker.get_stats().await.udp_requests_banned;
+        let udp_requests_banned_before = env.stats_repository.get_stats().await.udp_requests_banned;
 
         // This should return a timeout error
         match client.send(announce_request.into()).await {
@@ -281,7 +280,7 @@ mod receiving_an_announce_request {
 
         assert!(client.receive().await.is_err());
 
-        let udp_requests_banned_after = tracker.get_stats().await.udp_requests_banned;
+        let udp_requests_banned_after = env.stats_repository.get_stats().await.udp_requests_banned;
         let udp_banned_ips_total_after = ban_service.read().await.get_banned_ips_total();
 
         // UDP counter for banned requests should be increased by 1

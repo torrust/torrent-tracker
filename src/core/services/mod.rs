@@ -14,8 +14,6 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
-use super::statistics::event::sender::Sender;
-use super::statistics::repository::Repository;
 use super::whitelist::persisted::DatabaseWhitelist;
 use super::whitelist::WhiteListManager;
 use crate::core::Tracker;
@@ -30,18 +28,8 @@ pub fn tracker_factory(
     config: &Configuration,
     database: &Arc<Box<dyn Database>>,
     whitelist_manager: &Arc<WhiteListManager>,
-    stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
-    stats_repository: &Arc<Repository>,
 ) -> Tracker {
-    //let (stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-    match Tracker::new(
-        &Arc::new(config).core,
-        database,
-        whitelist_manager,
-        stats_event_sender,
-        stats_repository,
-    ) {
+    match Tracker::new(&Arc::new(config).core, database, whitelist_manager) {
         Ok(tracker) => tracker,
         Err(error) => {
             panic!("{}", error)
