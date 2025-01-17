@@ -28,7 +28,7 @@ use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
 use crate::shared::crypto::keys::{self, Keeper as _};
 
-/// It loads the configuration from the environment and builds the main domain [`Tracker`] struct.
+/// It loads the configuration from the environment and builds app container.
 ///
 /// # Panics
 ///
