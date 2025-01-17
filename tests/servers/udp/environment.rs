@@ -4,7 +4,7 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
-use torrust_tracker_lib::bootstrap::app::initialize_with_configuration;
+use torrust_tracker_lib::bootstrap::app::initialize_globals_and_tracker;
 use torrust_tracker_lib::core::services::statistics;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
@@ -49,7 +49,7 @@ impl Environment<Stopped> {
         let stats_repository = Arc::new(stats_repository);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
-        let tracker = initialize_with_configuration(configuration);
+        let tracker = initialize_globals_and_tracker(configuration);
 
         let udp_tracker = configuration.udp_trackers.clone().expect("missing UDP tracker configuration");
 

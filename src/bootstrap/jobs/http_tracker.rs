@@ -86,7 +86,7 @@ mod tests {
 
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
-    use crate::bootstrap::app::initialize_with_configuration;
+    use crate::bootstrap::app::initialize_globals_and_tracker;
     use crate::bootstrap::jobs::http_tracker::start_job;
     use crate::core::services::statistics;
     use crate::servers::http::Version;
@@ -99,7 +99,7 @@ mod tests {
         let config = &http_tracker[0];
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
-        let tracker = initialize_with_configuration(&cfg);
+        let tracker = initialize_globals_and_tracker(&cfg);
         let version = Version::V1;
 
         start_job(config, tracker, stats_event_sender, Registar::default().give_form(), version)
