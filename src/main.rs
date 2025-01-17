@@ -2,9 +2,9 @@ use torrust_tracker_lib::{app, bootstrap};
 
 #[tokio::main]
 async fn main() {
-    let (config, tracker, udp_ban_service, stats_event_sender, stats_repository) = bootstrap::app::setup();
+    let (config, app_container) = bootstrap::app::setup();
 
-    let jobs = app::start(&config, tracker, udp_ban_service, stats_event_sender, stats_repository).await;
+    let jobs = app::start(&config, &app_container).await;
 
     // handle the signals
     tokio::select! {

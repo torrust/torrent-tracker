@@ -21,10 +21,9 @@ use tracing::instrument;
 
 use super::config::initialize_configuration;
 use crate::bootstrap;
+use crate::container::AppContainer;
 use crate::core::databases::Database;
 use crate::core::services::{initialize_database, initialize_whitelist, statistics, tracker_factory};
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::repository::Repository;
 use crate::core::whitelist::WhiteListManager;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
@@ -38,15 +37,8 @@ use crate::shared::crypto::keys::{self, Keeper as _};
 ///
 /// Setup can file if the configuration is invalid.
 #[must_use]
-#[allow(clippy::type_complexity)]
 #[instrument(skip())]
-pub fn setup() -> (
-    Configuration,
-    Arc<Tracker>,
-    Arc<RwLock<BanService>>,
-    Arc<Option<Box<dyn Sender>>>,
-    Arc<Repository>,
-) {
+pub fn setup() -> (Configuration, AppContainer) {
     #[cfg(not(test))]
     check_seed();
 
@@ -62,13 +54,21 @@ pub fn setup() -> (
     let stats_event_sender = Arc::new(stats_event_sender);
     let stats_repository = Arc::new(stats_repository);
 
-    let udp_ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+    let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
     let tracker = initialize_with_configuration(&configuration);
 
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
-    (configuration, tracker, udp_ban_service, stats_event_sender, stats_repository)
+    (
+        configuration,
+        AppContainer {
+            tracker,
+            ban_service,
+            stats_event_sender,
+            stats_repository,
+        },
+    )
 }
 
 /// checks if the seed is the instance seed in production.
