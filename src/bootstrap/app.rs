@@ -69,16 +69,6 @@ pub fn check_seed() {
     assert_eq!(seed, instance, "maybe using zeroed seed in production!?");
 }
 
-/// It initializes the application with the given configuration.
-///
-/// The configuration may be obtained from the environment (via config file or env vars).
-#[must_use]
-#[instrument(skip())]
-pub fn initialize_globals_and_tracker(configuration: &Configuration) -> Arc<Tracker> {
-    initialize_global_services(configuration);
-    Arc::new(initialize_tracker(configuration))
-}
-
 /// It initializes the global services.
 #[instrument(skip())]
 pub fn initialize_global_services(configuration: &Configuration) {
@@ -86,7 +76,7 @@ pub fn initialize_global_services(configuration: &Configuration) {
     initialize_logging(configuration);
 }
 
-/// It initializes the stIoC Container.
+/// It initializes the IoC Container.
 #[instrument(skip())]
 pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);

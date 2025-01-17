@@ -6,7 +6,7 @@ use futures::executor::block_on;
 use tokio::sync::RwLock;
 use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::{Configuration, HttpApi};
-use torrust_tracker_lib::bootstrap::app::initialize_globals_and_tracker;
+use torrust_tracker_lib::bootstrap::app::{initialize_global_services, initialize_tracker};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::core::services::statistics;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
@@ -50,9 +50,10 @@ impl Environment<Stopped> {
         let stats_repository = Arc::new(stats_repository);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
-        let tracker = initialize_globals_and_tracker(configuration);
+        initialize_global_services(configuration);
+        let tracker = Arc::new(initialize_tracker(configuration));
 
-        // todo: instantiate outside of `initialize_globals_and_tracker`
+        // todo: instantiate outside of `initialize_tracker_dependencies`
         let whitelist_manager = tracker.whitelist_manager.clone();
 
         let config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));

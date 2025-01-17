@@ -63,7 +63,7 @@ mod tests {
 
     use super::spawner::Spawner;
     use super::Server;
-    use crate::bootstrap::app::initialize_globals_and_tracker;
+    use crate::bootstrap::app::{initialize_global_services, initialize_tracker};
     use crate::core::services::statistics;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -76,7 +76,9 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-        let tracker = initialize_globals_and_tracker(&cfg);
+
+        initialize_global_services(&cfg);
+        let tracker = Arc::new(initialize_tracker(&cfg));
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -110,7 +112,9 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-        let tracker = initialize_globals_and_tracker(&cfg);
+
+        initialize_global_services(&cfg);
+        let tracker = Arc::new(initialize_tracker(&cfg));
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;

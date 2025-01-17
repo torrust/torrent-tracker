@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
-use torrust_tracker_lib::bootstrap::app::initialize_globals_and_tracker;
+use torrust_tracker_lib::bootstrap::app::{initialize_global_services, initialize_tracker};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::core::services::statistics;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
@@ -38,9 +38,10 @@ impl Environment<Stopped> {
         let stats_event_sender = Arc::new(stats_event_sender);
         let stats_repository = Arc::new(stats_repository);
 
-        let tracker = initialize_globals_and_tracker(configuration);
+        initialize_global_services(configuration);
+        let tracker = Arc::new(initialize_tracker(configuration));
 
-        // todo: instantiate outside of `initialize_globals_and_tracker`
+        // todo: instantiate outside of `initialize_tracker_dependencies`
         let whitelist_manager = tracker.whitelist_manager.clone();
 
         let http_tracker = configuration

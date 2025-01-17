@@ -333,7 +333,7 @@ mod tests {
     use tokio::sync::RwLock;
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
-    use crate::bootstrap::app::initialize_globals_and_tracker;
+    use crate::bootstrap::app::{initialize_global_services, initialize_tracker};
     use crate::bootstrap::jobs::make_rust_tls;
     use crate::core::services::statistics;
     use crate::servers::apis::server::{ApiServer, Launcher};
@@ -350,7 +350,9 @@ mod tests {
         let (stats_event_sender, stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let stats_repository = Arc::new(stats_repository);
-        let tracker = initialize_globals_and_tracker(&cfg);
+
+        initialize_global_services(&cfg);
+        let tracker = Arc::new(initialize_tracker(&cfg));
 
         let bind_to = config.bind_address;
 
