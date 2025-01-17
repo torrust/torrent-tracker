@@ -48,27 +48,13 @@ pub fn setup() -> (Configuration, AppContainer) {
         panic!("Configuration error: {e}");
     }
 
-    // Initialize services
-
-    let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-    let stats_event_sender = Arc::new(stats_event_sender);
-    let stats_repository = Arc::new(stats_repository);
-
-    let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-
-    let tracker = initialize_globals_and_tracker(&configuration);
+    initialize_global_services(&configuration);
 
     tracing::info!("Configuration:\n{}", configuration.clone().mask_secrets().to_json());
 
-    (
-        configuration,
-        AppContainer {
-            tracker,
-            ban_service,
-            stats_event_sender,
-            stats_repository,
-        },
-    )
+    let app_container = initialize_app_container(&configuration);
+
+    (configuration, app_container)
 }
 
 /// checks if the seed is the instance seed in production.
@@ -98,6 +84,25 @@ pub fn initialize_globals_and_tracker(configuration: &Configuration) -> Arc<Trac
 pub fn initialize_global_services(configuration: &Configuration) {
     initialize_static();
     initialize_logging(configuration);
+}
+
+/// It initializes the stIoC Container.
+#[instrument(skip())]
+pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
+    let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
+    let stats_event_sender = Arc::new(stats_event_sender);
+    let stats_repository = Arc::new(stats_repository);
+
+    let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+
+    let tracker = Arc::new(initialize_tracker(configuration));
+
+    AppContainer {
+        tracker,
+        ban_service,
+        stats_event_sender,
+        stats_repository,
+    }
 }
 
 /// It initializes the application static values.
