@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 
-use super::databases::{self, Database};
+use crate::core::databases::{self, Database};
 
 /// The persisted list of allowed torrents.
 pub struct DatabaseWhitelist {

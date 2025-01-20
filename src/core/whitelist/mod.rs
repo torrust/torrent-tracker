@@ -1,11 +1,10 @@
-pub mod in_memory;
-pub mod persisted;
+pub mod repository;
 
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use in_memory::InMemoryWhitelist;
-use persisted::DatabaseWhitelist;
+use repository::in_memory::InMemoryWhitelist;
+use repository::persisted::DatabaseWhitelist;
 
 use super::databases::{self};
 

@@ -14,7 +14,7 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
-use super::whitelist::persisted::DatabaseWhitelist;
+use super::whitelist::repository::persisted::DatabaseWhitelist;
 use super::whitelist::WhiteListManager;
 use crate::core::Tracker;
 
