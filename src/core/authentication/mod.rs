@@ -81,7 +81,7 @@ impl Facade {
     /// # Errors
     ///
     /// Will return a `key::Error` if unable to get any `auth_key`.
-    async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
+    pub async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
         match self.keys.read().await.get(key) {
             None => Err(Error::UnableToReadKey {
                 location: Location::caller(),
@@ -268,8 +268,15 @@ impl Facade {
     /// Will return a `database::Error` if unable to remove the `key` to the database.
     pub async fn remove_auth_key(&self, key: &Key) -> Result<(), databases::error::Error> {
         self.database.remove_key_from_keys(key)?;
-        self.keys.write().await.remove(key);
+        self.remove_in_memory_auth_key(key).await;
         Ok(())
+    }
+
+    /// It removes an authentication key from memory.
+    ///
+    /// # Context: Authentication    
+    pub async fn remove_in_memory_auth_key(&self, key: &Key) {
+        self.keys.write().await.remove(key);
     }
 
     /// The `Tracker` stores the authentication keys in memory and in the database.

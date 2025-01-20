@@ -133,11 +133,11 @@ mod tests {
     fn private_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_private();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -145,11 +145,11 @@ mod tests {
     fn whitelisted_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_listed();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -157,11 +157,11 @@ mod tests {
     fn tracker_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_with_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -169,11 +169,11 @@ mod tests {
     fn tracker_not_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_without_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }

@@ -371,7 +371,7 @@
 //!
 //! To learn more about tracker authentication, refer to the following modules :
 //!
-//! - [`auth`] module.
+//! - [`authentication`] module.
 //! - [`core`](crate::core) module.
 //! - [`http`](crate::servers::http) module.
 //!
@@ -451,16 +451,14 @@ pub mod peer_tests;
 
 use std::cmp::max;
 use std::net::IpAddr;
-use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
-use authentication::PeerKey;
+use authentication::AddKeyRequest;
 use bittorrent_primitives::info_hash::InfoHash;
 use error::PeerKeyError;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
-use torrust_tracker_located_error::Located;
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
@@ -490,14 +488,14 @@ pub struct Tracker {
     /// or [`MySQL`](crate::core::databases::mysql)
     database: Arc<Box<dyn Database>>,
 
-    /// Tracker users' keys. Only for private trackers.
-    keys: tokio::sync::RwLock<std::collections::HashMap<Key, authentication::PeerKey>>,
-
     /// The service to check is a torrent is whitelisted.
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
+
+    /// The service to authenticate peers.
+    authentication: Arc<authentication::Facade>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -542,20 +540,6 @@ impl From<i32> for PeersWanted {
     }
 }
 
-/// This type contains the info needed to add a new tracker key.
-///
-/// You can upload a pre-generated key or let the app to generate a new one.
-/// You can also set an expiration date or leave it empty (`None`) if you want
-/// to create a permanent key that does not expire.
-#[derive(Debug)]
-pub struct AddKeyRequest {
-    /// The pre-generated key. Use `None` to generate a random key.
-    pub opt_key: Option<String>,
-
-    /// How long the key will be valid in seconds. Use `None` for permanent keys.
-    pub opt_seconds_valid: Option<u64>,
-}
-
 impl Tracker {
     /// `Tracker` constructor.
     ///
@@ -566,45 +550,53 @@ impl Tracker {
         config: &Core,
         database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+        authentication: &Arc<authentication::Facade>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
             database: database.clone(),
-            keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
             whitelist_authorization: whitelist_authorization.clone(),
             torrents: Arc::default(),
+            authentication: authentication.clone(),
         })
     }
 
     /// Returns `true` is the tracker is in public mode.
+    #[must_use]
     pub fn is_public(&self) -> bool {
         !self.config.private
     }
 
     /// Returns `true` is the tracker is in private mode.
+    #[must_use]
     pub fn is_private(&self) -> bool {
         self.config.private
     }
 
     /// Returns `true` is the tracker is in whitelisted mode.
+    #[must_use]
     pub fn is_listed(&self) -> bool {
         self.config.listed
     }
 
     /// Returns `true` if the tracker requires authentication.
+    #[must_use]
     pub fn requires_authentication(&self) -> bool {
         self.is_private()
     }
 
     /// Returns `true` is the tracker is in whitelisted mode.
+    #[must_use]
     pub fn is_behind_reverse_proxy(&self) -> bool {
         self.config.net.on_reverse_proxy
     }
 
+    #[must_use]
     pub fn get_announce_policy(&self) -> AnnouncePolicy {
         self.config.announce_policy
     }
 
+    #[must_use]
     pub fn get_maybe_external_ip(&self) -> Option<IpAddr> {
         self.config.net.external_ip
     }
@@ -709,6 +701,7 @@ impl Tracker {
     /// # Context: Tracker
     ///
     /// Get torrent peers for a given torrent.
+    #[must_use]
     pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
         match self.torrents.get(info_hash) {
             None => vec![],
@@ -721,6 +714,7 @@ impl Tracker {
     /// needed for a `announce` request response.
     ///
     /// # Context: Tracker
+    #[must_use]
     pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
         let swarm_metadata_before = match self.torrents.get_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
@@ -760,6 +754,7 @@ impl Tracker {
     ///
     /// # Panics
     /// Panics if unable to get the torrent metrics.
+    #[must_use]
     pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
         self.torrents.get_metrics()
     }
@@ -781,22 +776,20 @@ impl Tracker {
     /// It authenticates the peer `key` against the `Tracker` authentication
     /// key list.
     ///
+    /// # Context: Authentication
+    ///
     /// # Errors
     ///
     /// Will return an error if the the authentication key cannot be verified.
-    ///
-    /// # Context: Authentication
     pub async fn authenticate(&self, key: &Key) -> Result<(), authentication::Error> {
-        if self.is_private() {
-            self.verify_auth_key(key).await
-        } else {
-            Ok(())
-        }
+        self.authentication.authenticate(key).await
     }
 
     /// Adds new peer keys to the tracker.
     ///
     /// Keys can be pre-generated or randomly created. They can also be permanent or expire.
+    ///
+    /// # Context: Authentication
     ///
     /// # Errors
     ///
@@ -806,67 +799,7 @@ impl Tracker {
     /// - The provided pre-generated key is invalid.
     /// - The key could not been persisted due to database issues.
     pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<authentication::PeerKey, PeerKeyError> {
-        // code-review: all methods related to keys should be moved to a new independent "keys" service.
-
-        match add_key_req.opt_key {
-            // Upload pre-generated key
-            Some(pre_existing_key) => {
-                if let Some(seconds_valid) = add_key_req.opt_seconds_valid {
-                    // Expiring key
-                    let Some(valid_until) = CurrentClock::now_add(&Duration::from_secs(seconds_valid)) else {
-                        return Err(PeerKeyError::DurationOverflow { seconds_valid });
-                    };
-
-                    let key = pre_existing_key.parse::<Key>();
-
-                    match key {
-                        Ok(key) => match self.add_auth_key(key, Some(valid_until)).await {
-                            Ok(auth_key) => Ok(auth_key),
-                            Err(err) => Err(PeerKeyError::DatabaseError {
-                                source: Located(err).into(),
-                            }),
-                        },
-                        Err(err) => Err(PeerKeyError::InvalidKey {
-                            key: pre_existing_key,
-                            source: Located(err).into(),
-                        }),
-                    }
-                } else {
-                    // Permanent key
-                    let key = pre_existing_key.parse::<Key>();
-
-                    match key {
-                        Ok(key) => match self.add_permanent_auth_key(key).await {
-                            Ok(auth_key) => Ok(auth_key),
-                            Err(err) => Err(PeerKeyError::DatabaseError {
-                                source: Located(err).into(),
-                            }),
-                        },
-                        Err(err) => Err(PeerKeyError::InvalidKey {
-                            key: pre_existing_key,
-                            source: Located(err).into(),
-                        }),
-                    }
-                }
-            }
-            // Generate a new random key
-            None => match add_key_req.opt_seconds_valid {
-                // Expiring key
-                Some(seconds_valid) => match self.generate_auth_key(Some(Duration::from_secs(seconds_valid))).await {
-                    Ok(auth_key) => Ok(auth_key),
-                    Err(err) => Err(PeerKeyError::DatabaseError {
-                        source: Located(err).into(),
-                    }),
-                },
-                // Permanent key
-                None => match self.generate_permanent_auth_key().await {
-                    Ok(auth_key) => Ok(auth_key),
-                    Err(err) => Err(PeerKeyError::DatabaseError {
-                        source: Located(err).into(),
-                    }),
-                },
-            },
-        }
+        self.authentication.add_peer_key(add_key_req).await
     }
 
     /// It generates a new permanent authentication key.
@@ -879,7 +812,7 @@ impl Tracker {
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the database.
     pub async fn generate_permanent_auth_key(&self) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.generate_auth_key(None).await
+        self.authentication.generate_auth_key(None).await
     }
 
     /// It generates a new expiring authentication key.
@@ -900,11 +833,7 @@ impl Tracker {
         &self,
         lifetime: Option<Duration>,
     ) -> Result<authentication::PeerKey, databases::error::Error> {
-        let auth_key = authentication::key::generate_key(lifetime);
-
-        self.database.add_key_to_keys(&auth_key)?;
-        self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
-        Ok(auth_key)
+        self.authentication.generate_auth_key(lifetime).await
     }
 
     /// It adds a pre-generated permanent authentication key.
@@ -922,7 +851,7 @@ impl Tracker {
     ///
     /// * `key` - The pre-generated key.
     pub async fn add_permanent_auth_key(&self, key: Key) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.add_auth_key(key, None).await
+        self.authentication.add_auth_key(key, None).await
     }
 
     /// It adds a pre-generated authentication key.
@@ -946,14 +875,7 @@ impl Tracker {
         key: Key,
         valid_until: Option<DurationSinceUnixEpoch>,
     ) -> Result<authentication::PeerKey, databases::error::Error> {
-        let auth_key = PeerKey { key, valid_until };
-
-        // code-review: should we return a friendly error instead of the DB
-        // constrain error when the key already exist? For now, it's returning
-        // the specif error for each DB driver when a UNIQUE constrain fails.
-        self.database.add_key_to_keys(&auth_key)?;
-        self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
-        Ok(auth_key)
+        self.authentication.add_auth_key(key, valid_until).await
     }
 
     /// It removes an authentication key.
@@ -964,35 +886,7 @@ impl Tracker {
     ///
     /// Will return a `database::Error` if unable to remove the `key` to the database.
     pub async fn remove_auth_key(&self, key: &Key) -> Result<(), databases::error::Error> {
-        self.database.remove_key_from_keys(key)?;
-        self.keys.write().await.remove(key);
-        Ok(())
-    }
-
-    /// It verifies an authentication key.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `key::Error` if unable to get any `auth_key`.
-    async fn verify_auth_key(&self, key: &Key) -> Result<(), authentication::Error> {
-        match self.keys.read().await.get(key) {
-            None => Err(authentication::Error::UnableToReadKey {
-                location: Location::caller(),
-                key: Box::new(key.clone()),
-            }),
-            Some(key) => match self.config.private_mode {
-                Some(private_mode) => {
-                    if private_mode.check_keys_expiration {
-                        return authentication::key::verify_key_expiration(key);
-                    }
-
-                    Ok(())
-                }
-                None => authentication::key::verify_key_expiration(key),
-            },
-        }
+        self.authentication.remove_auth_key(key).await
     }
 
     /// The `Tracker` stores the authentication keys in memory and in the database.
@@ -1006,16 +900,7 @@ impl Tracker {
     ///
     /// Will return a `database::Error` if unable to `load_keys` from the database.
     pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
-        let keys_from_database = self.database.load_keys()?;
-        let mut keys = self.keys.write().await;
-
-        keys.clear();
-
-        for key in keys_from_database {
-            keys.insert(key.key.clone(), key);
-        }
-
-        Ok(())
+        self.authentication.load_keys_from_database().await
     }
 
     /// It drops the database tables.
@@ -1051,6 +936,7 @@ mod tests {
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
         use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
         use bittorrent_primitives::info_hash::InfoHash;
+        use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
         use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
@@ -1063,36 +949,56 @@ mod tests {
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
-            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+                initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
         }
 
         fn private_tracker() -> Tracker {
             let config = configuration::ephemeral_private();
-            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+                initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
 
-            let (database, in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+            let (database, in_memory_whitelist, whitelist_authorization, authentication) =
+                initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+            let tracker = initialize_tracker(&config, &database, &whitelist_authorization, &authentication);
 
             (tracker, whitelist_authorization, whitelist_manager)
+        }
+
+        fn private_tracker_without_checking_keys_expiration() -> Tracker {
+            let mut config = configuration::ephemeral_private();
+
+            config.core.private_mode = Some(PrivateMode {
+                check_keys_expiration: false,
+            });
+
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+                initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
         }
 
         pub fn tracker_persisting_torrents_in_database() -> Tracker {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
-            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+                initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -1203,7 +1109,7 @@ mod tests {
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
 
             let peers = tracker.get_torrent_peers(&info_hash);
 
@@ -1245,7 +1151,7 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
             }
 
             let peers = tracker.get_torrent_peers(&info_hash);
@@ -1260,7 +1166,7 @@ mod tests {
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
 
             let peers = tracker.get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
 
@@ -1275,7 +1181,7 @@ mod tests {
 
             let excluded_peer = sample_peer();
 
-            tracker.upsert_peer_and_get_stats(&info_hash, &excluded_peer);
+            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &excluded_peer);
 
             // Add 74 peers
             for idx in 2..=75 {
@@ -1289,7 +1195,7 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
             }
 
             let peers = tracker.get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
@@ -1301,7 +1207,7 @@ mod tests {
         async fn it_should_return_the_torrent_metrics() {
             let tracker = public_tracker();
 
-            tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
+            let _ = tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
 
             let torrent_metrics = tracker.get_torrents_metrics();
 
@@ -1322,7 +1228,7 @@ mod tests {
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
-                tracker.upsert_peer_and_get_stats(&gen_seeded_infohash(&i), &leecher());
+                let _ = tracker.upsert_peer_and_get_stats(&gen_seeded_infohash(&i), &leecher());
             }
             let result_a = start_time.elapsed();
 
@@ -1769,7 +1675,7 @@ mod tests {
 
                     let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
-                    assert!(tracker.verify_auth_key(&unregistered_key).await.is_err());
+                    assert!(tracker.authentication.verify_auth_key(&unregistered_key).await.is_err());
                 }
 
                 #[tokio::test]
@@ -1781,7 +1687,7 @@ mod tests {
                     let result = tracker.remove_auth_key(&expiring_key.key()).await;
 
                     assert!(result.is_ok());
-                    assert!(tracker.verify_auth_key(&expiring_key.key()).await.is_err());
+                    assert!(tracker.authentication.verify_auth_key(&expiring_key.key()).await.is_err());
                 }
 
                 #[tokio::test]
@@ -1791,12 +1697,12 @@ mod tests {
                     let expiring_key = tracker.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
 
                     // Remove the newly generated key in memory
-                    tracker.keys.write().await.remove(&expiring_key.key());
+                    tracker.authentication.remove_in_memory_auth_key(&expiring_key.key()).await;
 
                     let result = tracker.load_keys_from_database().await;
 
                     assert!(result.is_ok());
-                    assert!(tracker.verify_auth_key(&expiring_key.key()).await.is_ok());
+                    assert!(tracker.authentication.verify_auth_key(&expiring_key.key()).await.is_ok());
                 }
 
                 mod with_expiring_and {
@@ -1805,10 +1711,11 @@ mod tests {
                         use std::time::Duration;
 
                         use torrust_tracker_clock::clock::Time;
-                        use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
 
                         use crate::core::authentication::Key;
-                        use crate::core::tests::the_tracker::private_tracker;
+                        use crate::core::tests::the_tracker::{
+                            private_tracker, private_tracker_without_checking_keys_expiration,
+                        };
                         use crate::CurrentClock;
 
                         #[tokio::test]
@@ -1836,11 +1743,7 @@ mod tests {
 
                         #[tokio::test]
                         async fn it_should_accept_an_expired_key_when_checking_expiration_is_disabled_in_configuration() {
-                            let mut tracker = private_tracker();
-
-                            tracker.config.private_mode = Some(PrivateMode {
-                                check_keys_expiration: false,
-                            });
+                            let tracker = private_tracker_without_checking_keys_expiration();
 
                             let past_timestamp = Duration::ZERO;
 
@@ -1859,9 +1762,8 @@ mod tests {
                         use torrust_tracker_clock::clock::Time;
                         use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
 
-                        use crate::core::authentication::Key;
+                        use crate::core::authentication::{AddKeyRequest, Key};
                         use crate::core::tests::the_tracker::private_tracker;
-                        use crate::core::AddKeyRequest;
                         use crate::CurrentClock;
 
                         #[tokio::test]
@@ -1947,9 +1849,8 @@ mod tests {
                     }
 
                     mod pre_generated_keys {
-                        use crate::core::authentication::Key;
+                        use crate::core::authentication::{AddKeyRequest, Key};
                         use crate::core::tests::the_tracker::private_tracker;
-                        use crate::core::AddKeyRequest;
 
                         #[tokio::test]
                         async fn it_should_add_a_pre_generated_key() {

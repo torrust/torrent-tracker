@@ -65,8 +65,8 @@ mod tests {
     use super::Server;
     use crate::bootstrap::app::initialize_global_services;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
-    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::core::{authentication, whitelist};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -88,7 +88,8 @@ mod tests {
             &in_memory_whitelist.clone(),
         ));
         let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -132,8 +133,8 @@ mod tests {
             &cfg.core,
             &in_memory_whitelist.clone(),
         ));
-
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;

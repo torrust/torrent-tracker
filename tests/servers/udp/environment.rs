@@ -36,7 +36,7 @@ where
     /// Add a torrent to the tracker
     #[allow(dead_code)]
     pub fn add_torrent(&self, info_hash: &InfoHash, peer: &peer::Peer) {
-        self.tracker.upsert_peer_and_get_stats(info_hash, peer);
+        let _ = self.tracker.upsert_peer_and_get_stats(info_hash, peer);
     }
 }
 

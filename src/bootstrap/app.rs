@@ -23,8 +23,8 @@ use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::container::AppContainer;
 use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
-use crate::core::whitelist;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+use crate::core::{authentication, whitelist};
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -89,8 +89,14 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &in_memory_whitelist.clone(),
     ));
     let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+    let authentication = Arc::new(authentication::Facade::new(&configuration.core, &database.clone()));
 
-    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_authorization));
+    let tracker = Arc::new(initialize_tracker(
+        configuration,
+        &database,
+        &whitelist_authorization,
+        &authentication,
+    ));
 
     AppContainer {
         tracker,
@@ -99,6 +105,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         stats_event_sender,
         stats_repository,
         whitelist_manager,
+        authentication,
     }
 }
 

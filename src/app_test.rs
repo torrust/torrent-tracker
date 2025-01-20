@@ -5,8 +5,8 @@ use torrust_tracker_configuration::Configuration;
 
 use crate::core::databases::Database;
 use crate::core::services::initialize_database;
-use crate::core::whitelist;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+use crate::core::{authentication, whitelist};
 
 /// Initialize the tracker dependencies.
 #[allow(clippy::type_complexity)]
@@ -17,6 +17,7 @@ pub fn initialize_tracker_dependencies(
     Arc<Box<dyn Database>>,
     Arc<InMemoryWhitelist>,
     Arc<whitelist::authorization::Authorization>,
+    Arc<authentication::Facade>,
 ) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
@@ -24,6 +25,7 @@ pub fn initialize_tracker_dependencies(
         &config.core,
         &in_memory_whitelist.clone(),
     ));
+    let authentication = Arc::new(authentication::Facade::new(&config.core, &database.clone()));
 
-    (database, in_memory_whitelist, whitelist_authorization)
+    (database, in_memory_whitelist, whitelist_authorization, authentication)
 }

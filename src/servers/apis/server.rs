@@ -343,8 +343,8 @@ mod tests {
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::make_rust_tls;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
-    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::core::{authentication, whitelist};
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -369,7 +369,9 @@ mod tests {
             &in_memory_whitelist.clone(),
         ));
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 
         let bind_to = config.bind_address;
 
