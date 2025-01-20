@@ -30,9 +30,10 @@ use torrust_tracker_configuration::{AccessTokens, HttpApi};
 use tracing::instrument;
 
 use super::make_rust_tls;
-use crate::core;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::whitelist::manager::WhiteListManager;
+use crate::core::{self};
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -58,10 +59,12 @@ pub struct ApiServerJobStarted();
 /// It would panic if unable to send the  `ApiServerJobStarted` notice.
 ///
 ///
-#[instrument(skip(config, tracker, ban_service, stats_event_sender, stats_repository, form))]
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip(config, tracker, whitelist_manager, ban_service, stats_event_sender, stats_repository, form))]
 pub async fn start_job(
     config: &HttpApi,
     tracker: Arc<core::Tracker>,
+    whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,
@@ -82,6 +85,7 @@ pub async fn start_job(
                 bind_to,
                 tls,
                 tracker.clone(),
+                whitelist_manager.clone(),
                 ban_service.clone(),
                 stats_event_sender.clone(),
                 stats_repository.clone(),
@@ -99,6 +103,7 @@ pub async fn start_job(
     socket,
     tls,
     tracker,
+    whitelist_manager,
     ban_service,
     stats_event_sender,
     stats_repository,
@@ -109,6 +114,7 @@ async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,
@@ -118,6 +124,7 @@ async fn start_v1(
     let server = ApiServer::new(Launcher::new(socket, tls))
         .start(
             tracker,
+            whitelist_manager,
             stats_event_sender,
             stats_repository,
             ban_service,
@@ -142,7 +149,9 @@ mod tests {
 
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::tracker_apis::start_job;
-    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -161,14 +170,21 @@ mod tests {
         initialize_global_services(&cfg);
 
         let database = initialize_database(&cfg);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+            &cfg.core,
+            &in_memory_whitelist.clone(),
+        ));
+        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let version = Version::V1;
 
         start_job(
             config,
             tracker,
+            whitelist_manager,
             ban_service,
             stats_event_sender,
             stats_repository,

@@ -22,7 +22,9 @@ use tracing::instrument;
 use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::container::AppContainer;
-use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
+use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+use crate::core::whitelist;
+use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -81,11 +83,18 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let stats_repository = Arc::new(stats_repository);
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
     let database = initialize_database(configuration);
-    let whitelist_manager = initialize_whitelist(database.clone());
-    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_manager));
+    let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+    let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+        &configuration.core,
+        &in_memory_whitelist.clone(),
+    ));
+    let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+
+    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_authorization));
 
     AppContainer {
         tracker,
+        whitelist_authorization,
         ban_service,
         stats_event_sender,
         stats_repository,

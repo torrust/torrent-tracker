@@ -34,7 +34,7 @@ impl InMemoryWhitelist {
 mod tests {
     use bittorrent_primitives::info_hash::InfoHash;
 
-    use crate::core::whitelist::in_memory::InMemoryWhitelist;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
     fn sample_info_hash() -> InfoHash {
         "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap() // # DevSkim: ignore DS173237

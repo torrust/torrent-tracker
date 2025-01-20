@@ -64,7 +64,9 @@ mod tests {
     use super::spawner::Spawner;
     use super::Server;
     use crate::bootstrap::app::initialize_global_services;
-    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -80,8 +82,13 @@ mod tests {
         initialize_global_services(&cfg);
 
         let database = initialize_database(&cfg);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+            &cfg.core,
+            &in_memory_whitelist.clone(),
+        ));
+        let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -93,6 +100,7 @@ mod tests {
         let started = stopped
             .start(
                 tracker,
+                whitelist_authorization,
                 stats_event_sender,
                 ban_service,
                 register.give_form(),
@@ -119,8 +127,13 @@ mod tests {
         initialize_global_services(&cfg);
 
         let database = initialize_database(&cfg);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+            &cfg.core,
+            &in_memory_whitelist.clone(),
+        ));
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;
@@ -131,6 +144,7 @@ mod tests {
         let started = stopped
             .start(
                 tracker,
+                whitelist_authorization,
                 stats_event_sender,
                 ban_service,
                 register.give_form(),

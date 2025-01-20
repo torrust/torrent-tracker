@@ -12,7 +12,7 @@ use super::banning::BanService;
 use super::launcher::Launcher;
 use crate::bootstrap::jobs::Started;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::Tracker;
+use crate::core::{whitelist, Tracker};
 use crate::servers::signals::Halted;
 
 #[derive(Constructor, Copy, Clone, Debug, Display)]
@@ -27,9 +27,11 @@ impl Spawner {
     /// # Panics
     ///
     /// It would panic if unable to resolve the `local_addr` from the supplied ´socket´.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_launcher(
         &self,
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         cookie_lifetime: Duration,
@@ -41,6 +43,7 @@ impl Spawner {
         tokio::spawn(async move {
             Launcher::run_with_graceful_shutdown(
                 tracker,
+                whitelist_authorization,
                 opt_stats_event_sender,
                 ban_service,
                 spawner.bind_to,

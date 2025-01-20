@@ -7,7 +7,7 @@ use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
-use torrust_tracker_lib::core::Tracker;
+use torrust_tracker_lib::core::{whitelist, Tracker};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
@@ -21,6 +21,7 @@ where
 {
     pub config: Arc<UdpTracker>,
     pub tracker: Arc<Tracker>,
+    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
     pub ban_service: Arc<RwLock<BanService>>,
@@ -57,6 +58,7 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker: app_container.tracker.clone(),
+            whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             stats_repository: app_container.stats_repository.clone(),
             ban_service: app_container.ban_service.clone(),
@@ -71,6 +73,7 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
             stats_repository: self.stats_repository.clone(),
             ban_service: self.ban_service.clone(),
@@ -79,6 +82,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.whitelist_authorization,
                     self.stats_event_sender,
                     self.ban_service,
                     self.registar.give_form(),
@@ -106,6 +110,7 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,
             stats_repository: self.stats_repository,
             ban_service: self.ban_service,

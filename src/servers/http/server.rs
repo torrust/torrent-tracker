@@ -11,7 +11,7 @@ use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
-use crate::core::{statistics, Tracker};
+use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::STARTED_ON;
@@ -42,10 +42,11 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    #[instrument(skip(self, tracker, stats_event_sender, tx_start, rx_halt))]
+    #[instrument(skip(self, tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt))]
     fn start(
         &self,
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
@@ -66,7 +67,7 @@ impl Launcher {
 
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
-        let app = router(tracker, stats_event_sender, address);
+        let app = router(tracker, whitelist_authorization, stats_event_sender, address);
 
         let running = Box::pin(async {
             match tls {
@@ -162,6 +163,7 @@ impl HttpServer<Stopped> {
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         form: ServiceRegistrationForm,
     ) -> Result<HttpServer<Running>, Error> {
@@ -171,7 +173,7 @@ impl HttpServer<Stopped> {
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
-            let server = launcher.start(tracker, stats_event_sender, tx_start, rx_halt);
+            let server = launcher.start(tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt);
 
             server.await;
 
@@ -244,7 +246,9 @@ mod tests {
 
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::make_rust_tls;
-    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist, statistics};
+    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::servers::http::server::{HttpServer, Launcher};
     use crate::servers::registar::Registar;
 
@@ -258,8 +262,13 @@ mod tests {
         initialize_global_services(&cfg);
 
         let database = initialize_database(&cfg);
-        let whitelist_manager = initialize_whitelist(database.clone());
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_manager));
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+            &cfg.core,
+            &in_memory_whitelist.clone(),
+        ));
+        let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let http_trackers = cfg.http_trackers.clone().expect("missing HTTP trackers configuration");
         let config = &http_trackers[0];
@@ -274,7 +283,7 @@ mod tests {
 
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
         let started = stopped
-            .start(tracker, stats_event_sender, register.give_form())
+            .start(tracker, whitelist_authorization, stats_event_sender, register.give_form())
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

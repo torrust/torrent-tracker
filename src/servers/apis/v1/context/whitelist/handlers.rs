@@ -10,7 +10,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use super::responses::{
     failed_to_reload_whitelist_response, failed_to_remove_torrent_from_whitelist_response, failed_to_whitelist_torrent_response,
 };
-use crate::core::whitelist::WhiteListManager;
+use crate::core::whitelist::manager::WhiteListManager;
 use crate::servers::apis::v1::responses::{invalid_info_hash_param_response, ok_response};
 use crate::servers::apis::InfoHashParam;
 
