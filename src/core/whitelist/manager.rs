@@ -9,7 +9,7 @@ use crate::core::databases;
 /// It handles the list of allowed torrents. Only for listed trackers.
 pub struct WhiteListManager {
     /// The in-memory list of allowed torrents.
-    in_memory_whitelist: InMemoryWhitelist,
+    in_memory_whitelist: Arc<InMemoryWhitelist>,
 
     /// The persisted list of allowed torrents.
     database_whitelist: Arc<DatabaseWhitelist>,
@@ -17,9 +17,9 @@ pub struct WhiteListManager {
 
 impl WhiteListManager {
     #[must_use]
-    pub fn new(database_whitelist: Arc<DatabaseWhitelist>) -> Self {
+    pub fn new(database_whitelist: Arc<DatabaseWhitelist>, in_memory_whitelist: Arc<InMemoryWhitelist>) -> Self {
         Self {
-            in_memory_whitelist: InMemoryWhitelist::default(),
+            in_memory_whitelist,
             database_whitelist,
         }
     }

@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 use super::context::{auth_key, stats, torrent, whitelist};
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::whitelist::manager::WhiteListManager;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 
@@ -15,6 +16,7 @@ pub fn add(
     prefix: &str,
     router: Router,
     tracker: Arc<Tracker>,
+    whitelist_manager: &Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,
@@ -30,7 +32,7 @@ pub fn add(
         stats_event_sender,
         stats_repository,
     );
-    let router = whitelist::routes::add(&v1_prefix, router, &tracker);
+    let router = whitelist::routes::add(&v1_prefix, router, whitelist_manager);
 
     torrent::routes::add(&v1_prefix, router, tracker)
 }

@@ -61,7 +61,6 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     // Load whitelisted torrents
     if app_container.tracker.is_listed() {
         app_container
-            .tracker
             .whitelist_manager
             .load_whitelist_from_database()
             .await
@@ -81,6 +80,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
                     udp_tracker::start_job(
                         udp_tracker_config,
                         app_container.tracker.clone(),
+                        app_container.whitelist_authorization.clone(),
                         app_container.stats_event_sender.clone(),
                         app_container.ban_service.clone(),
                         registar.give_form(),
@@ -99,6 +99,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
             if let Some(job) = http_tracker::start_job(
                 http_tracker_config,
                 app_container.tracker.clone(),
+                app_container.whitelist_authorization.clone(),
                 app_container.stats_event_sender.clone(),
                 registar.give_form(),
                 servers::http::Version::V1,
@@ -117,6 +118,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
         if let Some(job) = tracker_apis::start_job(
             http_api_config,
             app_container.tracker.clone(),
+            app_container.whitelist_manager.clone(),
             app_container.ban_service.clone(),
             app_container.stats_event_sender.clone(),
             app_container.stats_repository.clone(),

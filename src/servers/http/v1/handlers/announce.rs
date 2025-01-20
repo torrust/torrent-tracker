@@ -23,7 +23,7 @@ use torrust_tracker_primitives::peer;
 
 use crate::core::auth::Key;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{PeersWanted, Tracker};
+use crate::core::{whitelist, PeersWanted, Tracker};
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
@@ -36,13 +36,17 @@ use crate::CurrentClock;
 #[allow(clippy::unused_async)]
 #[allow(clippy::type_complexity)]
 pub async fn handle_without_key(
-    State(state): State<(Arc<Tracker>, Arc<Option<Box<dyn Sender>>>)>,
+    State(state): State<(
+        Arc<Tracker>,
+        Arc<whitelist::authorization::Authorization>,
+        Arc<Option<Box<dyn Sender>>>,
+    )>,
     ExtractRequest(announce_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
 ) -> Response {
     tracing::debug!("http announce request: {:#?}", announce_request);
 
-    handle(&state.0, &state.1, &announce_request, &client_ip_sources, None).await
+    handle(&state.0, &state.1, &state.2, &announce_request, &client_ip_sources, None).await
 }
 
 /// It handles the `announce` request when the HTTP tracker requires
@@ -50,14 +54,18 @@ pub async fn handle_without_key(
 #[allow(clippy::unused_async)]
 #[allow(clippy::type_complexity)]
 pub async fn handle_with_key(
-    State(state): State<(Arc<Tracker>, Arc<Option<Box<dyn Sender>>>)>,
+    State(state): State<(
+        Arc<Tracker>,
+        Arc<whitelist::authorization::Authorization>,
+        Arc<Option<Box<dyn Sender>>>,
+    )>,
     ExtractRequest(announce_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
     ExtractKey(key): ExtractKey,
 ) -> Response {
     tracing::debug!("http announce request: {:#?}", announce_request);
 
-    handle(&state.0, &state.1, &announce_request, &client_ip_sources, Some(key)).await
+    handle(&state.0, &state.1, &state.2, &announce_request, &client_ip_sources, Some(key)).await
 }
 
 /// It handles the `announce` request.
@@ -66,6 +74,7 @@ pub async fn handle_with_key(
 /// `unauthenticated` modes.
 async fn handle(
     tracker: &Arc<Tracker>,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
@@ -73,6 +82,7 @@ async fn handle(
 ) -> Response {
     let announce_data = match handle_announce(
         tracker,
+        whitelist_authorization,
         opt_stats_event_sender,
         announce_request,
         client_ip_sources,
@@ -94,6 +104,7 @@ async fn handle(
 
 async fn handle_announce(
     tracker: &Arc<Tracker>,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
@@ -115,7 +126,7 @@ async fn handle_announce(
     }
 
     // Authorization
-    match tracker.authorize(&announce_request.info_hash).await {
+    match whitelist_authorization.authorize(&announce_request.info_hash).await {
         Ok(()) => (),
         Err(error) => return Err(responses::error::Error::from(error)),
     }
@@ -198,52 +209,51 @@ pub fn map_to_torrust_event(event: &Option<Event>) -> AnnounceEvent {
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
     use aquatic_udp_protocol::PeerId;
     use bittorrent_http_protocol::v1::requests::announce::Announce;
     use bittorrent_http_protocol::v1::responses;
     use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
     use bittorrent_primitives::info_hash::InfoHash;
+    use torrust_tracker_configuration::Configuration;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::services::{initialize_tracker, statistics};
     use crate::core::statistics::event::sender::Sender;
-    use crate::core::Tracker;
+    use crate::core::{whitelist, Tracker};
 
-    fn private_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
-        let config = configuration::ephemeral_private();
+    type TrackerAndDeps = (
+        Arc<Tracker>,
+        Arc<Option<Box<dyn Sender>>>,
+        Arc<whitelist::authorization::Authorization>,
+    );
 
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
+    fn private_tracker() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_private())
     }
 
-    fn whitelisted_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
-        let config = configuration::ephemeral_listed();
-
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
+    fn whitelisted_tracker() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_listed())
     }
 
-    fn tracker_on_reverse_proxy() -> (Tracker, Option<Box<dyn Sender>>) {
-        let config = configuration::ephemeral_with_reverse_proxy();
-
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
+    fn tracker_on_reverse_proxy() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_with_reverse_proxy())
     }
 
-    fn tracker_not_on_reverse_proxy() -> (Tracker, Option<Box<dyn Sender>>) {
-        let config = configuration::ephemeral_without_reverse_proxy();
+    fn tracker_not_on_reverse_proxy() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_without_reverse_proxy())
+    }
 
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+    /// Initialize tracker's dependencies and tracker.
+    fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
+        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
 
-        (initialize_tracker(&config, &database, &whitelist_manager), stats_event_sender)
+        (tracker, stats_event_sender, whitelist_authorization)
     }
 
     fn sample_announce_request() -> Announce {
@@ -286,7 +296,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_missing() {
-            let (tracker, stats_event_sender) = private_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization) = private_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -295,6 +305,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
@@ -311,7 +322,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_invalid() {
-            let (tracker, stats_event_sender) = private_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization) = private_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -322,6 +333,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
@@ -344,7 +356,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_announced_torrent_is_not_whitelisted() {
-            let (tracker, stats_event_sender) = whitelisted_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization) = whitelisted_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -353,6 +365,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &whitelist_authorization,
                 &stats_event_sender,
                 &announce_request,
                 &sample_client_ip_sources(),
@@ -383,7 +396,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (tracker, stats_event_sender) = tracker_on_reverse_proxy();
+            let (tracker, stats_event_sender, whitelist_authorization) = tracker_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -395,6 +408,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,
@@ -422,7 +436,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (tracker, stats_event_sender) = tracker_not_on_reverse_proxy();
+            let (tracker, stats_event_sender, whitelist_authorization) = tracker_not_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -434,6 +448,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,

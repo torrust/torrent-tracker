@@ -467,11 +467,8 @@ use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
-use tracing::instrument;
-use whitelist::manager::WhiteListManager;
 
 use self::auth::Key;
-use self::error::Error;
 use self::torrent::Torrents;
 use crate::core::databases::Database;
 use crate::CurrentClock;
@@ -496,8 +493,8 @@ pub struct Tracker {
     /// Tracker users' keys. Only for private trackers.
     keys: tokio::sync::RwLock<std::collections::HashMap<Key, auth::PeerKey>>,
 
-    /// The list of allowed torrents. Only for listed trackers.
-    pub whitelist_manager: Arc<WhiteListManager>,
+    /// The service to check is a torrent is whitelisted.
+    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
@@ -568,13 +565,13 @@ impl Tracker {
     pub fn new(
         config: &Core,
         database: &Arc<Box<dyn Database>>,
-        whitelist_manager: &Arc<WhiteListManager>,
+        whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
             database: database.clone(),
             keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
-            whitelist_manager: whitelist_manager.clone(),
+            whitelist_authorization: whitelist_authorization.clone(),
             torrents: Arc::default(),
         })
     }
@@ -663,7 +660,7 @@ impl Tracker {
         let mut scrape_data = ScrapeData::empty();
 
         for info_hash in info_hashes {
-            let swarm_metadata = match self.authorize(info_hash).await {
+            let swarm_metadata = match self.whitelist_authorization.authorize(info_hash).await {
                 Ok(()) => self.get_swarm_metadata(info_hash),
                 Err(_) => SwarmMetadata::zeroed(),
             };
@@ -1018,31 +1015,6 @@ impl Tracker {
         Ok(())
     }
 
-    /// Right now, there is only authorization when the `Tracker` runs in
-    /// `listed` or `private_listed` modes.
-    ///
-    /// # Context: Authorization
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if the tracker is running in `listed` mode
-    /// and the infohash is not whitelisted.
-    #[instrument(skip(self, info_hash), err)]
-    pub async fn authorize(&self, info_hash: &InfoHash) -> Result<(), Error> {
-        if !self.is_listed() {
-            return Ok(());
-        }
-
-        if self.whitelist_manager.is_info_hash_whitelisted(info_hash).await {
-            return Ok(());
-        }
-
-        Err(Error::TorrentNotWhitelisted {
-            info_hash: *info_hash,
-            location: Location::caller(),
-        })
-    }
-
     /// It drops the database tables.
     ///
     /// # Errors
@@ -1082,35 +1054,42 @@ mod tests {
 
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
-        use crate::core::services::initialize_tracker;
+        use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
         use crate::core::whitelist::manager::WhiteListManager;
-        use crate::core::{TorrentsMetrics, Tracker};
+        use crate::core::{whitelist, TorrentsMetrics, Tracker};
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            initialize_tracker(&config, &database, &whitelist_manager)
+            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization)
         }
 
         fn private_tracker() -> Tracker {
             let config = configuration::ephemeral_private();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            initialize_tracker(&config, &database, &whitelist_manager)
+            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization)
         }
 
-        fn whitelisted_tracker() -> (Tracker, Arc<WhiteListManager>) {
+        fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            let tracker = initialize_tracker(&config, &database, &whitelist_manager);
 
-            (tracker, whitelist_manager)
+            let (database, in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+
+            let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+
+            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+
+            (tracker, whitelist_authorization, whitelist_manager)
         }
 
         pub fn tracker_persisting_torrents_in_database() -> Tracker {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
-            let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
-            initialize_tracker(&config, &database, &whitelist_manager)
+            let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+
+            initialize_tracker(&config, &database, &whitelist_authorization)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -1637,24 +1616,24 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (tracker, whitelist_manager) = whitelisted_tracker();
+                    let (tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
                     let result = whitelist_manager.add_torrent_to_whitelist(&info_hash).await;
                     assert!(result.is_ok());
 
-                    let result = tracker.authorize(&info_hash).await;
+                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_ok());
                 }
 
                 #[tokio::test]
                 async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (tracker, _whitelist_manager) = whitelisted_tracker();
+                    let (tracker, _whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
-                    let result = tracker.authorize(&info_hash).await;
+                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_err());
                 }
             }
@@ -1669,7 +1648,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_add_a_torrent_to_the_whitelist() {
-                    let (_tracker, whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1680,7 +1659,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_remove_a_torrent_from_the_whitelist() {
-                    let (_tracker, whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1696,7 +1675,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn it_should_load_the_whitelist_from_the_database() {
-                        let (_tracker, whitelist_manager) = whitelisted_tracker();
+                        let (_tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                         let info_hash = sample_info_hash();
 
@@ -1739,7 +1718,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {
-                    let (tracker, _whitelist_manager) = whitelisted_tracker();
+                    let (tracker, _whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap();
 

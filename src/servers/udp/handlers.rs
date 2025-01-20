@@ -21,7 +21,7 @@ use super::connection_cookie::{check, make};
 use super::server::banning::BanService;
 use super::RawRequest;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{statistics, PeersWanted, Tracker};
+use crate::core::{statistics, whitelist, PeersWanted, Tracker};
 use crate::servers::udp::error::Error;
 use crate::servers::udp::{peer_builder, UDP_TRACKER_LOG_TARGET};
 use crate::shared::bit_torrent::common::MAX_SCRAPE_TORRENTS;
@@ -54,10 +54,11 @@ impl CookieTimeValues {
 /// - Delegating the request to the correct handler depending on the request type.
 ///
 /// It will return an `Error` response if the request is invalid.
-#[instrument(fields(request_id), skip(udp_request, tracker, opt_stats_event_sender, cookie_time_values, ban_service), ret(level = Level::TRACE))]
+#[instrument(fields(request_id), skip(udp_request, tracker, whitelist_authorization, opt_stats_event_sender, cookie_time_values, ban_service), ret(level = Level::TRACE))]
 pub(crate) async fn handle_packet(
     udp_request: RawRequest,
     tracker: &Tracker,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     local_addr: SocketAddr,
     cookie_time_values: CookieTimeValues,
@@ -76,6 +77,7 @@ pub(crate) async fn handle_packet(
                 request,
                 udp_request.from,
                 tracker,
+                whitelist_authorization,
                 opt_stats_event_sender,
                 cookie_time_values.clone(),
             )
@@ -131,11 +133,19 @@ pub(crate) async fn handle_packet(
 /// # Errors
 ///
 /// If a error happens in the `handle_request` function, it will just return the  `ServerError`.
-#[instrument(skip(request, remote_addr, tracker, opt_stats_event_sender, cookie_time_values))]
+#[instrument(skip(
+    request,
+    remote_addr,
+    tracker,
+    whitelist_authorization,
+    opt_stats_event_sender,
+    cookie_time_values
+))]
 pub async fn handle_request(
     request: Request,
     remote_addr: SocketAddr,
     tracker: &Tracker,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_time_values: CookieTimeValues,
 ) -> Result<Response, (Error, TransactionId)> {
@@ -154,6 +164,7 @@ pub async fn handle_request(
                 remote_addr,
                 &announce_request,
                 tracker,
+                whitelist_authorization,
                 opt_stats_event_sender,
                 cookie_time_values.valid_range,
             )
@@ -216,11 +227,12 @@ pub async fn handle_connect(
 /// # Errors
 ///
 /// If a error happens in the `handle_announce` function, it will just return the  `ServerError`.
-#[instrument(fields(transaction_id, connection_id, info_hash), skip(tracker, opt_stats_event_sender), ret(level = Level::TRACE))]
+#[instrument(fields(transaction_id, connection_id, info_hash), skip(tracker, whitelist_authorization, opt_stats_event_sender), ret(level = Level::TRACE))]
 pub async fn handle_announce(
     remote_addr: SocketAddr,
     request: &AnnounceRequest,
     tracker: &Tracker,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_valid_range: Range<f64>,
 ) -> Result<Response, (Error, TransactionId)> {
@@ -242,7 +254,7 @@ pub async fn handle_announce(
     let remote_client_ip = remote_addr.ip();
 
     // Authorization
-    tracker
+    whitelist_authorization
         .authorize(&info_hash)
         .await
         .map_err(|e| Error::TrackerError {
@@ -462,6 +474,7 @@ mod tests {
 
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
     use std::ops::Range;
+    use std::sync::Arc;
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
     use torrust_tracker_clock::clock::Time;
@@ -471,10 +484,20 @@ mod tests {
 
     use super::gen_remote_fingerprint;
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::{initialize_tracker, statistics};
+    use crate::core::services::{initialize_tracker, initialize_whitelist_manager, statistics};
     use crate::core::statistics::event::sender::Sender;
-    use crate::core::Tracker;
+    use crate::core::whitelist::manager::WhiteListManager;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::core::{whitelist, Tracker};
     use crate::CurrentClock;
+
+    type TrackerAndDeps = (
+        Arc<Tracker>,
+        Arc<Option<Box<dyn Sender>>>,
+        Arc<InMemoryWhitelist>,
+        Arc<WhiteListManager>,
+        Arc<whitelist::authorization::Authorization>,
+    );
 
     fn tracker_configuration() -> Configuration {
         default_testing_tracker_configuration()
@@ -484,19 +507,29 @@ mod tests {
         configuration::ephemeral()
     }
 
-    fn public_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
-        initialized_tracker(&configuration::ephemeral_public())
+    fn public_tracker() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_public())
     }
 
-    fn whitelisted_tracker() -> (Tracker, Option<Box<dyn Sender>>) {
-        initialized_tracker(&configuration::ephemeral_listed())
+    fn whitelisted_tracker() -> TrackerAndDeps {
+        initialize_tracker_and_deps(&configuration::ephemeral_listed())
     }
 
-    fn initialized_tracker(config: &Configuration) -> (Tracker, Option<Box<dyn Sender>>) {
-        let (database, whitelist_manager) = initialize_tracker_dependencies(config);
+    fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
+        let (database, in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-        (initialize_tracker(config, &database, &whitelist_manager), stats_event_sender)
+        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
+
+        (
+            tracker,
+            stats_event_sender,
+            in_memory_whitelist,
+            whitelist_manager,
+            whitelist_authorization,
+        )
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {
@@ -593,12 +626,14 @@ mod tests {
         }
     }
 
-    fn test_tracker_factory() -> Tracker {
+    fn test_tracker_factory() -> (Arc<Tracker>, Arc<whitelist::authorization::Authorization>) {
         let config = tracker_configuration();
 
-        let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
 
-        Tracker::new(&config.core, &database, &whitelist_manager).unwrap()
+        let tracker = Arc::new(Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
+
+        (tracker, whitelist_authorization)
     }
 
     mod connect_request {
@@ -811,7 +846,7 @@ mod tests {
             };
             use mockall::predicate::eq;
 
-            use crate::core::{self, statistics};
+            use crate::core::{self, statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
@@ -822,9 +857,8 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let client_ip = Ipv4Addr::new(126, 0, 0, 1);
                 let client_port = 8080;
@@ -845,6 +879,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -863,9 +898,8 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
 
@@ -877,6 +911,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -904,9 +939,8 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -930,6 +964,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -957,7 +992,10 @@ mod tests {
                 tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv6);
             }
 
-            async fn announce_a_new_peer_using_ipv4(tracker: Arc<core::Tracker>) -> Response {
+            async fn announce_a_new_peer_using_ipv4(
+                tracker: Arc<core::Tracker>,
+                whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+            ) -> Response {
                 let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -970,6 +1008,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -979,12 +1018,12 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv4_the_response_should_not_include_peers_using_ipv6() {
-                let (tracker, _stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
+                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 add_a_torrent_peer_using_ipv6(&tracker);
 
-                let response = announce_a_new_peer_using_ipv4(tracker.clone()).await;
+                let response = announce_a_new_peer_using_ipv4(tracker.clone(), whitelist_authorization).await;
 
                 // The response should not contain the peer using IPV6
                 let peers: Option<Vec<ResponsePeer<Ipv6AddrBytes>>> = match response {
@@ -1006,12 +1045,13 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let tracker = Arc::new(test_tracker_factory());
+                let (tracker, whitelist_authorization) = test_tracker_factory();
 
                 handle_announce(
                     sample_ipv4_socket_address(),
                     &AnnounceRequestBuilder::default().into(),
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1034,9 +1074,8 @@ mod tests {
 
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration_if_defined() {
-                    let (tracker, stats_event_sender) = public_tracker();
-                    let tracker = Arc::new(tracker);
-                    let stats_event_sender = Arc::new(stats_event_sender);
+                    let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                        public_tracker();
 
                     let client_ip = Ipv4Addr::new(127, 0, 0, 1);
                     let client_port = 8080;
@@ -1057,6 +1096,7 @@ mod tests {
                         remote_addr,
                         &request,
                         &tracker,
+                        &whitelist_authorization,
                         &stats_event_sender,
                         sample_cookie_valid_range(),
                     )
@@ -1089,7 +1129,7 @@ mod tests {
             };
             use mockall::predicate::eq;
 
-            use crate::core::{self, statistics};
+            use crate::core::{self, statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
@@ -1100,9 +1140,8 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1124,6 +1163,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1142,9 +1182,8 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1159,6 +1198,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1186,9 +1226,8 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (tracker, stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1212,6 +1251,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1239,7 +1279,10 @@ mod tests {
                 tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv4);
             }
 
-            async fn announce_a_new_peer_using_ipv6(tracker: Arc<core::Tracker>) -> Response {
+            async fn announce_a_new_peer_using_ipv6(
+                tracker: Arc<core::Tracker>,
+                whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+            ) -> Response {
                 let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -1255,6 +1298,7 @@ mod tests {
                     remote_addr,
                     &request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1264,12 +1308,12 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv6_the_response_should_not_include_peers_using_ipv4() {
-                let (tracker, _stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
+                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
+                    public_tracker();
 
                 add_a_torrent_peer_using_ipv4(&tracker);
 
-                let response = announce_a_new_peer_using_ipv6(tracker.clone()).await;
+                let response = announce_a_new_peer_using_ipv6(tracker.clone(), whitelist_authorization).await;
 
                 // The response should not contain the peer using IPV4
                 let peers: Option<Vec<ResponsePeer<Ipv4AddrBytes>>> = match response {
@@ -1291,7 +1335,7 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let tracker = Arc::new(test_tracker_factory());
+                let (tracker, whitelist_authorization) = test_tracker_factory();
 
                 let remote_addr = sample_ipv6_remote_addr();
 
@@ -1303,6 +1347,7 @@ mod tests {
                     remote_addr,
                     &announce_request,
                     &tracker,
+                    &whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1331,7 +1376,7 @@ mod tests {
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
-                    let (database, whitelist_manager) = initialize_tracker_dependencies(&config);
+                    let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
 
                     let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                     stats_event_sender_mock
@@ -1342,7 +1387,7 @@ mod tests {
                     let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                         Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                    let tracker = Arc::new(core::Tracker::new(&config.core, &database, &whitelist_manager).unwrap());
+                    let tracker = Arc::new(core::Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
 
                     let loopback_ipv4 = Ipv4Addr::new(127, 0, 0, 1);
                     let loopback_ipv6 = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
@@ -1368,6 +1413,7 @@ mod tests {
                         remote_addr,
                         &request,
                         &tracker,
+                        &whitelist_authorization,
                         &stats_event_sender,
                         sample_cookie_valid_range(),
                     )
@@ -1419,9 +1465,8 @@ mod tests {
 
         #[tokio::test]
         async fn should_return_no_stats_when_the_tracker_does_not_have_any_torrent() {
-            let (tracker, stats_event_sender) = public_tracker();
-            let tracker = Arc::new(tracker);
-            let stats_event_sender = Arc::new(stats_event_sender);
+            let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
+                public_tracker();
 
             let remote_addr = sample_ipv4_remote_addr();
 
@@ -1507,8 +1552,6 @@ mod tests {
         }
 
         mod with_a_public_tracker {
-            use std::sync::Arc;
-
             use aquatic_udp_protocol::{NumberOfDownloads, NumberOfPeers, TorrentScrapeStatistics};
 
             use crate::servers::udp::handlers::tests::public_tracker;
@@ -1516,8 +1559,8 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
-                let (tracker, _stats_event_sender) = public_tracker();
-                let tracker = Arc::new(tracker);
+                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
+                    public_tracker();
 
                 let torrent_stats = match_scrape_response(add_a_sample_seeder_and_scrape(tracker.clone()).await);
 
@@ -1532,8 +1575,6 @@ mod tests {
         }
 
         mod with_a_whitelisted_tracker {
-            use std::sync::Arc;
-
             use aquatic_udp_protocol::{InfoHash, NumberOfDownloads, NumberOfPeers, TorrentScrapeStatistics};
 
             use crate::servers::udp::handlers::handle_scrape;
@@ -1544,19 +1585,15 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
-                let (tracker, stats_event_sender) = whitelisted_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
+                    whitelisted_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
 
                 add_a_seeder(tracker.clone(), &remote_addr, &info_hash).await;
 
-                tracker
-                    .whitelist_manager
-                    .add_torrent_to_memory_whitelist(&info_hash.0.into())
-                    .await;
+                in_memory_whitelist.add(&info_hash.0.into()).await;
 
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
@@ -1584,9 +1621,8 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
-                let (tracker, stats_event_sender) = whitelisted_tracker();
-                let tracker = Arc::new(tracker);
-                let stats_event_sender = Arc::new(stats_event_sender);
+                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
+                    whitelisted_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
@@ -1650,7 +1686,8 @@ mod tests {
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
                 let remote_addr = sample_ipv4_remote_addr();
-                let tracker = Arc::new(test_tracker_factory());
+
+                let (tracker, _whitelist_authorization) = test_tracker_factory();
 
                 handle_scrape(
                     remote_addr,
@@ -1689,7 +1726,8 @@ mod tests {
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
                 let remote_addr = sample_ipv6_remote_addr();
-                let tracker = Arc::new(test_tracker_factory());
+
+                let (tracker, _whitelist_authorization) = test_tracker_factory();
 
                 handle_scrape(
                     remote_addr,

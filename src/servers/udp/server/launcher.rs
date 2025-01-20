@@ -14,7 +14,7 @@ use super::banning::BanService;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{statistics, Tracker};
+use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
 use crate::servers::signals::{shutdown_signal_with_message, Halted};
@@ -40,10 +40,19 @@ impl Launcher {
     /// It panics if unable to bind to udp socket, and get the address from the udp socket.
     /// It panics if unable to send address of socket.
     /// It panics if the udp server is loaded when the tracker is private.
-    ///
-    #[instrument(skip(tracker, opt_stats_event_sender, ban_service, bind_to, tx_start, rx_halt))]
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(skip(
+        tracker,
+        whitelist_authorization,
+        opt_stats_event_sender,
+        ban_service,
+        bind_to,
+        tx_start,
+        rx_halt
+    ))]
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         bind_to: SocketAddr,
@@ -86,6 +95,7 @@ impl Launcher {
                 let () = Self::run_udp_server_main(
                     receiver,
                     tracker.clone(),
+                    whitelist_authorization.clone(),
                     opt_stats_event_sender.clone(),
                     ban_service.clone(),
                     cookie_lifetime,
@@ -127,10 +137,11 @@ impl Launcher {
         ServiceHealthCheckJob::new(binding, info, job)
     }
 
-    #[instrument(skip(receiver, tracker, opt_stats_event_sender, ban_service))]
+    #[instrument(skip(receiver, tracker, whitelist_authorization, opt_stats_event_sender, ban_service))]
     async fn run_udp_server_main(
         mut receiver: Receiver,
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         cookie_lifetime: Duration,
@@ -201,6 +212,7 @@ impl Launcher {
                 let processor = Processor::new(
                     receiver.socket.clone(),
                     tracker.clone(),
+                    whitelist_authorization.clone(),
                     opt_stats_event_sender.clone(),
                     cookie_lifetime,
                 );

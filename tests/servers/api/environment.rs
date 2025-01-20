@@ -82,6 +82,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.whitelist_manager,
                     self.stats_event_sender,
                     self.stats_repository,
                     self.ban_service,

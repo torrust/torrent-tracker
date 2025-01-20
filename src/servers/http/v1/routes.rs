@@ -23,7 +23,7 @@ use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
 use crate::core::statistics::event::sender::Sender;
-use crate::core::Tracker;
+use crate::core::{whitelist, Tracker};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::Latency;
 
@@ -32,19 +32,32 @@ use crate::servers::logging::Latency;
 /// > **NOTICE**: it's added a layer to get the client IP from the connection
 /// > info. The tracker could use the connection info to get the client IP.
 #[allow(clippy::needless_pass_by_value)]
-#[instrument(skip(tracker, stats_event_sender, server_socket_addr))]
-pub fn router(tracker: Arc<Tracker>, stats_event_sender: Arc<Option<Box<dyn Sender>>>, server_socket_addr: SocketAddr) -> Router {
+#[instrument(skip(tracker, whitelist_authorization, stats_event_sender, server_socket_addr))]
+pub fn router(
+    tracker: Arc<Tracker>,
+    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    server_socket_addr: SocketAddr,
+) -> Router {
     Router::new()
         // Health check
         .route("/health_check", get(health_check::handler))
         // Announce request
         .route(
             "/announce",
-            get(announce::handle_without_key).with_state((tracker.clone(), stats_event_sender.clone())),
+            get(announce::handle_without_key).with_state((
+                tracker.clone(),
+                whitelist_authorization.clone(),
+                stats_event_sender.clone(),
+            )),
         )
         .route(
             "/announce/{key}",
-            get(announce::handle_with_key).with_state((tracker.clone(), stats_event_sender.clone())),
+            get(announce::handle_with_key).with_state((
+                tracker.clone(),
+                whitelist_authorization.clone(),
+                stats_event_sender.clone(),
+            )),
         )
         // Scrape request
         .route(

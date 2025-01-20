@@ -12,13 +12,14 @@ use super::banning::BanService;
 use super::bound_socket::BoundSocket;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::event::UdpResponseKind;
-use crate::core::{statistics, Tracker};
+use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
     tracker: Arc<Tracker>,
+    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     cookie_lifetime: f64,
 }
@@ -27,12 +28,14 @@ impl Processor {
     pub fn new(
         socket: Arc<BoundSocket>,
         tracker: Arc<Tracker>,
+        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         cookie_lifetime: f64,
     ) -> Self {
         Self {
             socket,
             tracker,
+            whitelist_authorization,
             opt_stats_event_sender,
             cookie_lifetime,
         }
@@ -47,6 +50,7 @@ impl Processor {
         let response = handlers::handle_packet(
             request,
             &self.tracker,
+            &self.whitelist_authorization,
             &self.opt_stats_event_sender,
             self.socket.address(),
             CookieTimeValues::new(self.cookie_lifetime),

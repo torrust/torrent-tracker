@@ -4,15 +4,26 @@ use std::sync::Arc;
 use torrust_tracker_configuration::Configuration;
 
 use crate::core::databases::Database;
-use crate::core::services::{initialize_database, initialize_whitelist};
-use crate::core::whitelist::manager::WhiteListManager;
+use crate::core::services::initialize_database;
+use crate::core::whitelist;
+use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
 /// Initialize the tracker dependencies.
 #[allow(clippy::type_complexity)]
 #[must_use]
-pub fn initialize_tracker_dependencies(config: &Configuration) -> (Arc<Box<dyn Database>>, Arc<WhiteListManager>) {
+pub fn initialize_tracker_dependencies(
+    config: &Configuration,
+) -> (
+    Arc<Box<dyn Database>>,
+    Arc<InMemoryWhitelist>,
+    Arc<whitelist::authorization::Authorization>,
+) {
     let database = initialize_database(config);
-    let whitelist_manager = initialize_whitelist(database.clone());
+    let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+    let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+        &config.core,
+        &in_memory_whitelist.clone(),
+    ));
 
-    (database, whitelist_manager)
+    (database, in_memory_whitelist, whitelist_authorization)
 }

@@ -14,7 +14,9 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
+use super::whitelist;
 use super::whitelist::manager::WhiteListManager;
+use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::repository::persisted::DatabaseWhitelist;
 use crate::core::Tracker;
 
@@ -27,9 +29,9 @@ use crate::core::Tracker;
 pub fn initialize_tracker(
     config: &Configuration,
     database: &Arc<Box<dyn Database>>,
-    whitelist_manager: &Arc<WhiteListManager>,
+    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
 ) -> Tracker {
-    match Tracker::new(&Arc::new(config).core, database, whitelist_manager) {
+    match Tracker::new(&Arc::new(config).core, database, whitelist_authorization) {
         Ok(tracker) => tracker,
         Err(error) => {
             panic!("{}", error)
@@ -51,7 +53,10 @@ pub fn initialize_database(config: &Configuration) -> Arc<Box<dyn Database>> {
 }
 
 #[must_use]
-pub fn initialize_whitelist(database: Arc<Box<dyn Database>>) -> Arc<WhiteListManager> {
+pub fn initialize_whitelist_manager(
+    database: Arc<Box<dyn Database>>,
+    in_memory_whitelist: Arc<InMemoryWhitelist>,
+) -> Arc<WhiteListManager> {
     let database_whitelist = Arc::new(DatabaseWhitelist::new(database));
-    Arc::new(WhiteListManager::new(database_whitelist))
+    Arc::new(WhiteListManager::new(database_whitelist, in_memory_whitelist))
 }
