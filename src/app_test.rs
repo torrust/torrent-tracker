@@ -5,7 +5,7 @@ use torrust_tracker_configuration::Configuration;
 
 use crate::core::databases::Database;
 use crate::core::services::{initialize_database, initialize_whitelist};
-use crate::core::whitelist::WhiteListManager;
+use crate::core::whitelist::manager::WhiteListManager;
 
 /// Initialize the tracker dependencies.
 #[allow(clippy::type_complexity)]

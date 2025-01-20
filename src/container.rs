@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
-use crate::core::whitelist::WhiteListManager;
+use crate::core::whitelist::manager::WhiteListManager;
 use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 

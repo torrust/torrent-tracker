@@ -468,7 +468,7 @@ use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
 use tracing::instrument;
-use whitelist::WhiteListManager;
+use whitelist::manager::WhiteListManager;
 
 use self::auth::Key;
 use self::error::Error;
@@ -1083,7 +1083,7 @@ mod tests {
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
         use crate::core::services::initialize_tracker;
-        use crate::core::whitelist::WhiteListManager;
+        use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{TorrentsMetrics, Tracker};
 
         fn public_tracker() -> Tracker {

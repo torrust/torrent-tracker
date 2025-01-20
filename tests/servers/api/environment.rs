@@ -10,7 +10,7 @@ use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_g
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
-use torrust_tracker_lib::core::whitelist::WhiteListManager;
+use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
 use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
