@@ -12,7 +12,7 @@ use bittorrent_http_protocol::v1::responses;
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::LocatedError;
 
-use super::{auth::key::ParseKeyError, databases};
+use super::{authentication::key::ParseKeyError, databases};
 
 /// Authentication or authorization error returned by the core `Tracker`
 #[derive(thiserror::Error, Debug, Clone)]
@@ -20,7 +20,7 @@ pub enum Error {
     // Authentication errors
     #[error("The supplied key: {key:?}, is not valid: {source}")]
     PeerKeyNotValid {
-        key: super::auth::Key,
+        key: super::authentication::Key,
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
     },
 

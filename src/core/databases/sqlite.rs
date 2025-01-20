@@ -11,7 +11,7 @@ use torrust_tracker_primitives::{DurationSinceUnixEpoch, PersistentTorrents};
 
 use super::driver::Driver;
 use super::{Database, Error};
-use crate::core::auth::{self, Key};
+use crate::core::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::Sqlite3;
 
@@ -106,7 +106,7 @@ impl Database for Sqlite {
     }
 
     /// Refer to [`databases::Database::load_keys`](crate::core::databases::Database::load_keys).
-    fn load_keys(&self) -> Result<Vec<auth::PeerKey>, Error> {
+    fn load_keys(&self) -> Result<Vec<authentication::PeerKey>, Error> {
         let conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let mut stmt = conn.prepare("SELECT key, valid_until FROM keys")?;
@@ -116,18 +116,18 @@ impl Database for Sqlite {
             let opt_valid_until: Option<i64> = row.get(1)?;
 
             match opt_valid_until {
-                Some(valid_until) => Ok(auth::PeerKey {
+                Some(valid_until) => Ok(authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: Some(DurationSinceUnixEpoch::from_secs(valid_until.unsigned_abs())),
                 }),
-                None => Ok(auth::PeerKey {
+                None => Ok(authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: None,
                 }),
             }
         })?;
 
-        let keys: Vec<auth::PeerKey> = keys_iter.filter_map(std::result::Result::ok).collect();
+        let keys: Vec<authentication::PeerKey> = keys_iter.filter_map(std::result::Result::ok).collect();
 
         Ok(keys)
     }
@@ -216,7 +216,7 @@ impl Database for Sqlite {
     }
 
     /// Refer to [`databases::Database::get_key_from_keys`](crate::core::databases::Database::get_key_from_keys).
-    fn get_key_from_keys(&self, key: &Key) -> Result<Option<auth::PeerKey>, Error> {
+    fn get_key_from_keys(&self, key: &Key) -> Result<Option<authentication::PeerKey>, Error> {
         let conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let mut stmt = conn.prepare("SELECT key, valid_until FROM keys WHERE key = ?")?;
@@ -230,11 +230,11 @@ impl Database for Sqlite {
             let key: String = f.get(0).unwrap();
 
             match valid_until {
-                Some(valid_until) => auth::PeerKey {
+                Some(valid_until) => authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: Some(DurationSinceUnixEpoch::from_secs(valid_until.unsigned_abs())),
                 },
-                None => auth::PeerKey {
+                None => authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: None,
                 },
@@ -243,7 +243,7 @@ impl Database for Sqlite {
     }
 
     /// Refer to [`databases::Database::add_key_to_keys`](crate::core::databases::Database::add_key_to_keys).
-    fn add_key_to_keys(&self, auth_key: &auth::PeerKey) -> Result<usize, Error> {
+    fn add_key_to_keys(&self, auth_key: &authentication::PeerKey) -> Result<usize, Error> {
         let conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let insert = match auth_key.valid_until {

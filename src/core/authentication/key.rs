@@ -12,7 +12,7 @@
 //! Keys are stored in this struct:
 //!
 //! ```rust,no_run
-//! use torrust_tracker_lib::core::auth::Key;
+//! use torrust_tracker_lib::core::authentication::Key;
 //! use torrust_tracker_primitives::DurationSinceUnixEpoch;
 //!
 //! pub struct PeerKey {
@@ -28,14 +28,14 @@
 //! You can generate a new key valid for `9999` seconds and `0` nanoseconds from the current time with the following:
 //!
 //! ```rust,no_run
-//! use torrust_tracker_lib::core::auth;
+//! use torrust_tracker_lib::core::authentication;
 //! use std::time::Duration;
 //!
-//! let expiring_key = auth::key::generate_key(Some(Duration::new(9999, 0)));
+//! let expiring_key = authentication::key::generate_key(Some(Duration::new(9999, 0)));
 //!
 //! // And you can later verify it with:
 //!
-//! assert!(auth::key::verify_key_expiration(&expiring_key).is_ok());
+//! assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
 //! ```
 
 use std::panic::Location;
@@ -199,7 +199,7 @@ impl Key {
 /// Error returned when a key cannot be parsed from a string.
 ///
 /// ```text
-/// use torrust_tracker_lib::core::auth::Key;
+/// use torrust_tracker_lib::core::authentication::Key;
 /// use std::str::FromStr;
 ///
 /// let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
@@ -229,7 +229,7 @@ impl FromStr for Key {
 }
 
 /// Verification error. Error returned when an [`PeerKey`] cannot be
-/// verified with the (`crate::core::auth::verify_key`) function.
+/// verified with the (`crate::core::authentication::verify_key`) function.
 #[derive(Debug, Error)]
 #[allow(dead_code)]
 pub enum Error {
@@ -260,7 +260,7 @@ mod tests {
     mod key {
         use std::str::FromStr;
 
-        use crate::core::auth::Key;
+        use crate::core::authentication::Key;
 
         #[test]
         fn should_be_parsed_from_an_string() {
@@ -295,12 +295,12 @@ mod tests {
         use torrust_tracker_clock::clock;
         use torrust_tracker_clock::clock::stopped::Stopped as _;
 
-        use crate::core::auth;
+        use crate::core::authentication;
 
         #[test]
         fn should_be_parsed_from_an_string() {
             let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
-            let auth_key = auth::Key::from_str(key_string);
+            let auth_key = authentication::Key::from_str(key_string);
 
             assert!(auth_key.is_ok());
             assert_eq!(auth_key.unwrap().to_string(), key_string);
@@ -311,7 +311,7 @@ mod tests {
             // Set the time to the current time.
             clock::Stopped::local_set_to_unix_epoch();
 
-            let expiring_key = auth::key::generate_key(Some(Duration::from_secs(0)));
+            let expiring_key = authentication::key::generate_key(Some(Duration::from_secs(0)));
 
             assert_eq!(
                 expiring_key.to_string(),
@@ -321,9 +321,9 @@ mod tests {
 
         #[test]
         fn should_be_generated_with_a_expiration_time() {
-            let expiring_key = auth::key::generate_key(Some(Duration::new(9999, 0)));
+            let expiring_key = authentication::key::generate_key(Some(Duration::new(9999, 0)));
 
-            assert!(auth::key::verify_key_expiration(&expiring_key).is_ok());
+            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
         }
 
         #[test]
@@ -332,17 +332,17 @@ mod tests {
             clock::Stopped::local_set_to_system_time_now();
 
             // Make key that is valid for 19 seconds.
-            let expiring_key = auth::key::generate_key(Some(Duration::from_secs(19)));
+            let expiring_key = authentication::key::generate_key(Some(Duration::from_secs(19)));
 
             // Mock the time has passed 10 sec.
             clock::Stopped::local_add(&Duration::from_secs(10)).unwrap();
 
-            assert!(auth::key::verify_key_expiration(&expiring_key).is_ok());
+            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
 
             // Mock the time has passed another 10 sec.
             clock::Stopped::local_add(&Duration::from_secs(10)).unwrap();
 
-            assert!(auth::key::verify_key_expiration(&expiring_key).is_err());
+            assert!(authentication::key::verify_key_expiration(&expiring_key).is_err());
         }
     }
 }

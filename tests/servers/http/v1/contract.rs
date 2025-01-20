@@ -1381,7 +1381,7 @@ mod configured_as_private {
         use std::time::Duration;
 
         use bittorrent_primitives::info_hash::InfoHash;
-        use torrust_tracker_lib::core::auth::Key;
+        use torrust_tracker_lib::core::authentication::Key;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::common::logging;
@@ -1467,7 +1467,7 @@ mod configured_as_private {
 
         use aquatic_udp_protocol::PeerId;
         use bittorrent_primitives::info_hash::InfoHash;
-        use torrust_tracker_lib::core::auth::Key;
+        use torrust_tracker_lib::core::authentication::Key;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
 

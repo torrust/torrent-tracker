@@ -21,7 +21,7 @@ use torrust_tracker_clock::clock::Time;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
-use crate::core::auth::Key;
+use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, PeersWanted, Tracker};
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
@@ -290,7 +290,7 @@ mod tests {
         use std::sync::Arc;
 
         use super::{private_tracker, sample_announce_request, sample_client_ip_sources};
-        use crate::core::auth;
+        use crate::core::authentication;
         use crate::servers::http::v1::handlers::announce::handle_announce;
         use crate::servers::http::v1::handlers::announce::tests::assert_error_response;
 
@@ -327,7 +327,7 @@ mod tests {
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let unregistered_key = auth::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
             let maybe_key = Some(unregistered_key);
 

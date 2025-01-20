@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 use torrust_tracker_api_client::v1::client::{headers_with_request_id, AddKeyForm, Client};
-use torrust_tracker_lib::core::auth::Key;
+use torrust_tracker_lib::core::authentication::Key;
 use torrust_tracker_test_helpers::configuration;
 use uuid::Uuid;
 
@@ -463,7 +463,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
 mod deprecated_generate_key_endpoint {
 
     use torrust_tracker_api_client::v1::client::{headers_with_request_id, Client};
-    use torrust_tracker_lib::core::auth::Key;
+    use torrust_tracker_lib::core::authentication::Key;
     use torrust_tracker_test_helpers::configuration;
     use uuid::Uuid;
 

@@ -439,7 +439,7 @@
 //! - Torrent metrics
 //!
 //! Refer to [`databases`] module for more information about persistence.
-pub mod auth;
+pub mod authentication;
 pub mod databases;
 pub mod error;
 pub mod services;
@@ -455,7 +455,7 @@ use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
-use auth::PeerKey;
+use authentication::PeerKey;
 use bittorrent_primitives::info_hash::InfoHash;
 use error::PeerKeyError;
 use torrust_tracker_clock::clock::Time;
@@ -468,7 +468,7 @@ use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
 
-use self::auth::Key;
+use self::authentication::Key;
 use self::torrent::Torrents;
 use crate::core::databases::Database;
 use crate::CurrentClock;
@@ -491,7 +491,7 @@ pub struct Tracker {
     database: Arc<Box<dyn Database>>,
 
     /// Tracker users' keys. Only for private trackers.
-    keys: tokio::sync::RwLock<std::collections::HashMap<Key, auth::PeerKey>>,
+    keys: tokio::sync::RwLock<std::collections::HashMap<Key, authentication::PeerKey>>,
 
     /// The service to check is a torrent is whitelisted.
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -786,7 +786,7 @@ impl Tracker {
     /// Will return an error if the the authentication key cannot be verified.
     ///
     /// # Context: Authentication
-    pub async fn authenticate(&self, key: &Key) -> Result<(), auth::Error> {
+    pub async fn authenticate(&self, key: &Key) -> Result<(), authentication::Error> {
         if self.is_private() {
             self.verify_auth_key(key).await
         } else {
@@ -805,7 +805,7 @@ impl Tracker {
     /// - The key duration overflows the duration type maximum value.
     /// - The provided pre-generated key is invalid.
     /// - The key could not been persisted due to database issues.
-    pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<auth::PeerKey, PeerKeyError> {
+    pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<authentication::PeerKey, PeerKeyError> {
         // code-review: all methods related to keys should be moved to a new independent "keys" service.
 
         match add_key_req.opt_key {
@@ -878,7 +878,7 @@ impl Tracker {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the database.
-    pub async fn generate_permanent_auth_key(&self) -> Result<auth::PeerKey, databases::error::Error> {
+    pub async fn generate_permanent_auth_key(&self) -> Result<authentication::PeerKey, databases::error::Error> {
         self.generate_auth_key(None).await
     }
 
@@ -896,8 +896,11 @@ impl Tracker {
     ///
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
-    pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<auth::PeerKey, databases::error::Error> {
-        let auth_key = auth::key::generate_key(lifetime);
+    pub async fn generate_auth_key(
+        &self,
+        lifetime: Option<Duration>,
+    ) -> Result<authentication::PeerKey, databases::error::Error> {
+        let auth_key = authentication::key::generate_key(lifetime);
 
         self.database.add_key_to_keys(&auth_key)?;
         self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
@@ -918,7 +921,7 @@ impl Tracker {
     /// # Arguments
     ///
     /// * `key` - The pre-generated key.
-    pub async fn add_permanent_auth_key(&self, key: Key) -> Result<auth::PeerKey, databases::error::Error> {
+    pub async fn add_permanent_auth_key(&self, key: Key) -> Result<authentication::PeerKey, databases::error::Error> {
         self.add_auth_key(key, None).await
     }
 
@@ -942,7 +945,7 @@ impl Tracker {
         &self,
         key: Key,
         valid_until: Option<DurationSinceUnixEpoch>,
-    ) -> Result<auth::PeerKey, databases::error::Error> {
+    ) -> Result<authentication::PeerKey, databases::error::Error> {
         let auth_key = PeerKey { key, valid_until };
 
         // code-review: should we return a friendly error instead of the DB
@@ -973,21 +976,21 @@ impl Tracker {
     /// # Errors
     ///
     /// Will return a `key::Error` if unable to get any `auth_key`.
-    async fn verify_auth_key(&self, key: &Key) -> Result<(), auth::Error> {
+    async fn verify_auth_key(&self, key: &Key) -> Result<(), authentication::Error> {
         match self.keys.read().await.get(key) {
-            None => Err(auth::Error::UnableToReadKey {
+            None => Err(authentication::Error::UnableToReadKey {
                 location: Location::caller(),
                 key: Box::new(key.clone()),
             }),
             Some(key) => match self.config.private_mode {
                 Some(private_mode) => {
                     if private_mode.check_keys_expiration {
-                        return auth::key::verify_key_expiration(key);
+                        return authentication::key::verify_key_expiration(key);
                     }
 
                     Ok(())
                 }
-                None => auth::key::verify_key_expiration(key),
+                None => authentication::key::verify_key_expiration(key),
             },
         }
     }
@@ -1746,14 +1749,14 @@ mod tests {
                 use std::str::FromStr;
                 use std::time::Duration;
 
-                use crate::core::auth::{self};
+                use crate::core::authentication::{self};
                 use crate::core::tests::the_tracker::private_tracker;
 
                 #[tokio::test]
                 async fn it_should_fail_authenticating_a_peer_when_it_uses_an_unregistered_key() {
                     let tracker = private_tracker();
 
-                    let unregistered_key = auth::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+                    let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
                     let result = tracker.authenticate(&unregistered_key).await;
 
@@ -1764,7 +1767,7 @@ mod tests {
                 async fn it_should_fail_verifying_an_unregistered_authentication_key() {
                     let tracker = private_tracker();
 
-                    let unregistered_key = auth::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+                    let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
                     assert!(tracker.verify_auth_key(&unregistered_key).await.is_err());
                 }
@@ -1804,7 +1807,7 @@ mod tests {
                         use torrust_tracker_clock::clock::Time;
                         use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
 
-                        use crate::core::auth::Key;
+                        use crate::core::authentication::Key;
                         use crate::core::tests::the_tracker::private_tracker;
                         use crate::CurrentClock;
 
@@ -1856,7 +1859,7 @@ mod tests {
                         use torrust_tracker_clock::clock::Time;
                         use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
 
-                        use crate::core::auth::Key;
+                        use crate::core::authentication::Key;
                         use crate::core::tests::the_tracker::private_tracker;
                         use crate::core::AddKeyRequest;
                         use crate::CurrentClock;
@@ -1944,7 +1947,7 @@ mod tests {
                     }
 
                     mod pre_generated_keys {
-                        use crate::core::auth::Key;
+                        use crate::core::authentication::Key;
                         use crate::core::tests::the_tracker::private_tracker;
                         use crate::core::AddKeyRequest;
 

@@ -12,7 +12,7 @@ use super::responses::{
     auth_key_response, failed_to_delete_key_response, failed_to_generate_key_response, failed_to_reload_keys_response,
     invalid_auth_key_duration_response, invalid_auth_key_response,
 };
-use crate::core::auth::Key;
+use crate::core::authentication::Key;
 use crate::core::{AddKeyRequest, Tracker};
 use crate::servers::apis::v1::context::auth_key::resources::AuthKey;
 use crate::servers::apis::v1::responses::{invalid_auth_key_param_response, ok_response};

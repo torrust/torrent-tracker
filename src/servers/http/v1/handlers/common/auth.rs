@@ -6,7 +6,7 @@ use std::panic::Location;
 use bittorrent_http_protocol::v1::responses;
 use thiserror::Error;
 
-use crate::core::auth;
+use crate::core::authentication;
 
 /// Authentication error.
 ///
@@ -31,8 +31,8 @@ impl From<Error> for responses::error::Error {
     }
 }
 
-impl From<auth::Error> for responses::error::Error {
-    fn from(err: auth::Error) -> Self {
+impl From<authentication::Error> for responses::error::Error {
+    fn from(err: authentication::Error) -> Self {
         responses::error::Error {
             failure_reason: format!("Authentication error: {err}"),
         }
