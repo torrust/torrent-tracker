@@ -897,7 +897,7 @@ impl Tracker {
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
     pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<auth::PeerKey, databases::error::Error> {
-        let auth_key = auth::generate_key(lifetime);
+        let auth_key = auth::key::generate_key(lifetime);
 
         self.database.add_key_to_keys(&auth_key)?;
         self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
@@ -982,12 +982,12 @@ impl Tracker {
             Some(key) => match self.config.private_mode {
                 Some(private_mode) => {
                     if private_mode.check_keys_expiration {
-                        return auth::verify_key_expiration(key);
+                        return auth::key::verify_key_expiration(key);
                     }
 
                     Ok(())
                 }
-                None => auth::verify_key_expiration(key),
+                None => auth::key::verify_key_expiration(key),
             },
         }
     }

@@ -12,8 +12,7 @@ use bittorrent_http_protocol::v1::responses;
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::LocatedError;
 
-use super::auth::ParseKeyError;
-use super::databases;
+use super::{auth::key::ParseKeyError, databases};
 
 /// Authentication or authorization error returned by the core `Tracker`
 #[derive(thiserror::Error, Debug, Clone)]
