@@ -27,4 +27,15 @@ impl InMemoryKeyRepository {
         let mut keys = self.keys.write().await;
         keys.clear();
     }
+
+    /// It resets the authentication keys with a new list of keys.
+    pub async fn reset_with(&self, peer_keys: Vec<PeerKey>) {
+        let mut keys_lock = self.keys.write().await;
+
+        keys_lock.clear();
+
+        for key in peer_keys {
+            keys_lock.insert(key.key.clone(), key.clone());
+        }
+    }
 }

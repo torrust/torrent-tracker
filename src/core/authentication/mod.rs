@@ -239,10 +239,10 @@ impl Facade {
         self.in_memory_key_repository.remove(key).await;
     }
 
-    /// The `Tracker` stores the authentication keys in memory and in the database.
-    /// In case you need to restart the `Tracker` you can load the keys from the database
-    /// into memory with this function. Keys are automatically stored in the database when they
-    /// are generated.
+    /// The `Tracker` stores the authentication keys in memory and in the 
+    /// database. In case you need to restart the `Tracker` you can load the 
+    /// keys from the database into memory with this function. Keys are 
+    /// automatically stored in the database when they are generated.
     ///
     /// # Errors
     ///
@@ -250,11 +250,7 @@ impl Facade {
     pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
         let keys_from_database = self.db_key_repository.load_keys()?;
 
-        self.in_memory_key_repository.clear().await;
-
-        for key in keys_from_database {
-            self.in_memory_key_repository.insert(&key).await;
-        }
+        self.in_memory_key_repository.reset_with(keys_from_database).await;
 
         Ok(())
     }
