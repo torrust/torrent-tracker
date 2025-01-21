@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use torrust_tracker_clock::conv::convert_from_iso_8601_to_timestamp;
 
-use crate::core::auth::{self, Key};
+use crate::core::authentication::{self, Key};
 
 /// A resource that represents an authentication key.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -17,9 +17,9 @@ pub struct AuthKey {
     pub expiry_time: Option<String>,
 }
 
-impl From<AuthKey> for auth::PeerKey {
+impl From<AuthKey> for authentication::PeerKey {
     fn from(auth_key_resource: AuthKey) -> Self {
-        auth::PeerKey {
+        authentication::PeerKey {
             key: auth_key_resource.key.parse::<Key>().unwrap(),
             valid_until: auth_key_resource
                 .expiry_time
@@ -29,8 +29,8 @@ impl From<AuthKey> for auth::PeerKey {
 }
 
 #[allow(deprecated)]
-impl From<auth::PeerKey> for AuthKey {
-    fn from(auth_key: auth::PeerKey) -> Self {
+impl From<authentication::PeerKey> for AuthKey {
+    fn from(auth_key: authentication::PeerKey) -> Self {
         match (auth_key.valid_until, auth_key.expiry_time()) {
             (Some(valid_until), Some(expiry_time)) => AuthKey {
                 key: auth_key.key.to_string(),
@@ -54,7 +54,7 @@ mod tests {
     use torrust_tracker_clock::clock::{self, Time};
 
     use super::AuthKey;
-    use crate::core::auth::{self, Key};
+    use crate::core::authentication::{self, Key};
     use crate::CurrentClock;
 
     struct TestTime {
@@ -86,8 +86,8 @@ mod tests {
         };
 
         assert_eq!(
-            auth::PeerKey::from(auth_key_resource),
-            auth::PeerKey {
+            authentication::PeerKey::from(auth_key_resource),
+            authentication::PeerKey {
                 key: "IaWDneuFNZi8IB4MPA3qW1CD0M30EZSM".parse::<Key>().unwrap(), // cspell:disable-line
                 valid_until: Some(CurrentClock::now_add(&Duration::new(one_hour_after_unix_epoch().timestamp, 0)).unwrap())
             }
@@ -99,7 +99,7 @@ mod tests {
     fn it_should_be_convertible_from_an_auth_key() {
         clock::Stopped::local_set_to_unix_epoch();
 
-        let auth_key = auth::PeerKey {
+        let auth_key = authentication::PeerKey {
             key: "IaWDneuFNZi8IB4MPA3qW1CD0M30EZSM".parse::<Key>().unwrap(), // cspell:disable-line
             valid_until: Some(CurrentClock::now_add(&Duration::new(one_hour_after_unix_epoch().timestamp, 0)).unwrap()),
         };

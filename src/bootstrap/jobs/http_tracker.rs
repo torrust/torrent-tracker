@@ -101,8 +101,8 @@ mod tests {
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::http_tracker::start_job;
     use crate::core::services::{initialize_database, initialize_tracker, statistics};
-    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::core::{authentication, whitelist};
     use crate::servers::http::Version;
     use crate::servers::registar::Registar;
 
@@ -123,7 +123,9 @@ mod tests {
             &cfg.core,
             &in_memory_whitelist.clone(),
         ));
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 
         let version = Version::V1;
 

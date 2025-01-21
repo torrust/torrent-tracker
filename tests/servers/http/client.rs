@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 use reqwest::{Client as ReqwestClient, Response};
-use torrust_tracker_lib::core::auth::Key;
+use torrust_tracker_lib::core::authentication::Key;
 
 use super::requests::announce::{self, Query};
 use super::requests::scrape;

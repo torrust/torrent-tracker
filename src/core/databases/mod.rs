@@ -54,7 +54,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::PersistentTorrents;
 
 use self::error::Error;
-use crate::core::auth::{self, Key};
+use crate::core::authentication::{self, Key};
 
 struct Builder<T>
 where
@@ -195,11 +195,11 @@ pub trait Database: Sync + Send {
     /// # Errors
     ///
     /// Will return `Err` if unable to load.
-    fn load_keys(&self) -> Result<Vec<auth::PeerKey>, Error>;
+    fn load_keys(&self) -> Result<Vec<authentication::PeerKey>, Error>;
 
     /// It gets an expiring authentication key from the database.
     ///
-    /// It returns `Some(PeerKey)` if a [`PeerKey`](crate::core::auth::PeerKey)
+    /// It returns `Some(PeerKey)` if a [`PeerKey`](crate::core::authentication::PeerKey)
     /// with the input [`Key`] exists, `None` otherwise.
     ///
     /// # Context: Authentication Keys
@@ -207,7 +207,7 @@ pub trait Database: Sync + Send {
     /// # Errors
     ///
     /// Will return `Err` if unable to load.
-    fn get_key_from_keys(&self, key: &Key) -> Result<Option<auth::PeerKey>, Error>;
+    fn get_key_from_keys(&self, key: &Key) -> Result<Option<authentication::PeerKey>, Error>;
 
     /// It adds an expiring authentication key to the database.
     ///
@@ -216,7 +216,7 @@ pub trait Database: Sync + Send {
     /// # Errors
     ///
     /// Will return `Err` if unable to save.
-    fn add_key_to_keys(&self, auth_key: &auth::PeerKey) -> Result<usize, Error>;
+    fn add_key_to_keys(&self, auth_key: &authentication::PeerKey) -> Result<usize, Error>;
 
     /// It removes an expiring authentication key from the database.
     ///

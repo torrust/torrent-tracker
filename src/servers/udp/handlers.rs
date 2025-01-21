@@ -516,12 +516,17 @@ mod tests {
     }
 
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
-        let (database, in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(config);
+        let (database, in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
+        let tracker = Arc::new(initialize_tracker(
+            config,
+            &database,
+            &whitelist_authorization,
+            &authentication,
+        ));
 
         (
             tracker,
@@ -629,9 +634,9 @@ mod tests {
     fn test_tracker_factory() -> (Arc<Tracker>, Arc<whitelist::authorization::Authorization>) {
         let config = tracker_configuration();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
 
-        let tracker = Arc::new(Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
+        let tracker = Arc::new(Tracker::new(&config.core, &database, &whitelist_authorization, &authentication).unwrap());
 
         (tracker, whitelist_authorization)
     }
@@ -989,7 +994,7 @@ mod tests {
                     .with_peer_address(SocketAddr::new(IpAddr::V6(client_ip_v6), client_port))
                     .into();
 
-                tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv6);
+                let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv6);
             }
 
             async fn announce_a_new_peer_using_ipv4(
@@ -1276,7 +1281,7 @@ mod tests {
                     .with_peer_address(SocketAddr::new(IpAddr::V4(client_ip_v4), client_port))
                     .into();
 
-                tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv4);
+                let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv4);
             }
 
             async fn announce_a_new_peer_using_ipv6(
@@ -1376,7 +1381,8 @@ mod tests {
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
-                    let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+                    let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+                        initialize_tracker_dependencies(&config);
 
                     let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                     stats_event_sender_mock
@@ -1387,7 +1393,8 @@ mod tests {
                     let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                         Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                    let tracker = Arc::new(core::Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
+                    let tracker =
+                        Arc::new(core::Tracker::new(&config.core, &database, &whitelist_authorization, &authentication).unwrap());
 
                     let loopback_ipv4 = Ipv4Addr::new(127, 0, 0, 1);
                     let loopback_ipv6 = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
@@ -1509,7 +1516,7 @@ mod tests {
                 .with_number_of_bytes_left(0)
                 .into();
 
-            tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer);
+            let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer);
         }
 
         fn build_scrape_request(remote_addr: &SocketAddr, info_hash: &InfoHash) -> ScrapeRequest {

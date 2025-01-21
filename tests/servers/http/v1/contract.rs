@@ -1381,7 +1381,7 @@ mod configured_as_private {
         use std::time::Duration;
 
         use bittorrent_primitives::info_hash::InfoHash;
-        use torrust_tracker_lib::core::auth::Key;
+        use torrust_tracker_lib::core::authentication::Key;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::common::logging;
@@ -1396,7 +1396,12 @@ mod configured_as_private {
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
-            let expiring_key = env.tracker.generate_auth_key(Some(Duration::from_secs(60))).await.unwrap();
+            let expiring_key = env
+                .tracker
+                .authentication
+                .generate_auth_key(Some(Duration::from_secs(60)))
+                .await
+                .unwrap();
 
             let response = Client::authenticated(*env.bind_address(), expiring_key.key())
                 .announce(&QueryBuilder::default().query())
@@ -1467,7 +1472,7 @@ mod configured_as_private {
 
         use aquatic_udp_protocol::PeerId;
         use bittorrent_primitives::info_hash::InfoHash;
-        use torrust_tracker_lib::core::auth::Key;
+        use torrust_tracker_lib::core::authentication::Key;
         use torrust_tracker_primitives::peer::fixture::PeerBuilder;
         use torrust_tracker_test_helpers::configuration;
 
@@ -1541,7 +1546,12 @@ mod configured_as_private {
                     .build(),
             );
 
-            let expiring_key = env.tracker.generate_auth_key(Some(Duration::from_secs(60))).await.unwrap();
+            let expiring_key = env
+                .tracker
+                .authentication
+                .generate_auth_key(Some(Duration::from_secs(60)))
+                .await
+                .unwrap();
 
             let response = Client::authenticated(*env.bind_address(), expiring_key.key())
                 .scrape(

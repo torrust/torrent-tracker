@@ -37,7 +37,7 @@ where
 {
     /// Add a torrent to the tracker
     pub fn add_torrent_peer(&self, info_hash: &InfoHash, peer: &peer::Peer) {
-        self.tracker.upsert_peer_and_get_stats(info_hash, peer);
+        let _ = self.tracker.upsert_peer_and_get_stats(info_hash, peer);
     }
 }
 

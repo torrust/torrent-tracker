@@ -15,7 +15,7 @@ use bittorrent_http_protocol::v1::services::peer_ip_resolver::{self, ClientIpSou
 use hyper::StatusCode;
 use torrust_tracker_primitives::core::ScrapeData;
 
-use crate::core::auth::Key;
+use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::Tracker;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
@@ -84,7 +84,7 @@ async fn handle_scrape(
     // Authentication
     let return_real_scrape_data = if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authenticate(&key).await {
+            Some(key) => match tracker.authentication.authenticate(&key).await {
                 Ok(()) => true,
                 Err(_error) => false,
             },
@@ -133,11 +133,11 @@ mod tests {
     fn private_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_private();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -145,11 +145,11 @@ mod tests {
     fn whitelisted_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_listed();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -157,11 +157,11 @@ mod tests {
     fn tracker_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_with_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -169,11 +169,11 @@ mod tests {
     fn tracker_not_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
         let config = configuration::ephemeral_without_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
         )
     }
@@ -205,7 +205,7 @@ mod tests {
         use torrust_tracker_primitives::core::ScrapeData;
 
         use super::{private_tracker, sample_client_ip_sources, sample_scrape_request};
-        use crate::core::auth;
+        use crate::core::authentication;
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
 
         #[tokio::test]
@@ -239,7 +239,7 @@ mod tests {
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let scrape_request = sample_scrape_request();
-            let unregistered_key = auth::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
             let maybe_key = Some(unregistered_key);
 
             let scrape_data = handle_scrape(

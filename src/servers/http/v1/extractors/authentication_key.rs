@@ -53,7 +53,7 @@ use bittorrent_http_protocol::v1::responses;
 use hyper::StatusCode;
 use serde::Deserialize;
 
-use crate::core::auth::Key;
+use crate::core::authentication::Key;
 use crate::servers::http::v1::handlers::common::auth;
 
 /// Extractor for the [`Key`] struct.

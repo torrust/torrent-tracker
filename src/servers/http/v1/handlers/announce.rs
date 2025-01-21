@@ -21,7 +21,7 @@ use torrust_tracker_clock::clock::Time;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
-use crate::core::auth::Key;
+use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, PeersWanted, Tracker};
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
@@ -113,7 +113,7 @@ async fn handle_announce(
     // Authentication
     if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authenticate(&key).await {
+            Some(key) => match tracker.authentication.authenticate(&key).await {
                 Ok(()) => (),
                 Err(error) => return Err(responses::error::Error::from(error)),
             },
@@ -248,10 +248,16 @@ mod tests {
 
     /// Initialize tracker's dependencies and tracker.
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
-        let (database, _in_memory_whitelist, whitelist_authorization) = initialize_tracker_dependencies(config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
-        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
+
+        let tracker = Arc::new(initialize_tracker(
+            config,
+            &database,
+            &whitelist_authorization,
+            &authentication,
+        ));
 
         (tracker, stats_event_sender, whitelist_authorization)
     }
@@ -290,7 +296,7 @@ mod tests {
         use std::sync::Arc;
 
         use super::{private_tracker, sample_announce_request, sample_client_ip_sources};
-        use crate::core::auth;
+        use crate::core::authentication;
         use crate::servers::http::v1::handlers::announce::handle_announce;
         use crate::servers::http::v1::handlers::announce::tests::assert_error_response;
 
@@ -327,7 +333,7 @@ mod tests {
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let unregistered_key = auth::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
             let maybe_key = Some(unregistered_key);
 

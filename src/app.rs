@@ -53,6 +53,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     if app_container.tracker.is_private() {
         app_container
             .tracker
+            .authentication
             .load_keys_from_database()
             .await
             .expect("Could not retrieve keys from database.");

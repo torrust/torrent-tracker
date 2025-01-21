@@ -1,4 +1,4 @@
-use torrust_tracker_lib::core::auth::Key;
+use torrust_tracker_lib::core::authentication::Key;
 
 #[derive(Clone, Debug)]
 pub struct ConnectionInfo {

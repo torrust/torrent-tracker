@@ -11,7 +11,7 @@ use torrust_tracker_primitives::PersistentTorrents;
 
 use super::driver::Driver;
 use super::{Database, Error};
-use crate::core::auth::{self, Key};
+use crate::core::authentication::{self, Key};
 use crate::shared::bit_torrent::common::AUTH_KEY_LENGTH;
 
 const DRIVER: Driver = Driver::MySQL;
@@ -63,7 +63,7 @@ impl Database for Mysql {
           PRIMARY KEY (`id`),
           UNIQUE (`key`)
         );",
-            i8::try_from(AUTH_KEY_LENGTH).expect("auth::Auth Key Length Should fit within a i8!")
+            i8::try_from(AUTH_KEY_LENGTH).expect("authentication key length should fit within a i8!")
         );
 
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
@@ -118,17 +118,17 @@ impl Database for Mysql {
     }
 
     /// Refer to [`databases::Database::load_keys`](crate::core::databases::Database::load_keys).
-    fn load_keys(&self) -> Result<Vec<auth::PeerKey>, Error> {
+    fn load_keys(&self) -> Result<Vec<authentication::PeerKey>, Error> {
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let keys = conn.query_map(
             "SELECT `key`, valid_until FROM `keys`",
             |(key, valid_until): (String, Option<i64>)| match valid_until {
-                Some(valid_until) => auth::PeerKey {
+                Some(valid_until) => authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: Some(Duration::from_secs(valid_until.unsigned_abs())),
                 },
-                None => auth::PeerKey {
+                None => authentication::PeerKey {
                     key: key.parse::<Key>().unwrap(),
                     valid_until: None,
                 },
@@ -202,7 +202,7 @@ impl Database for Mysql {
     }
 
     /// Refer to [`databases::Database::get_key_from_keys`](crate::core::databases::Database::get_key_from_keys).
-    fn get_key_from_keys(&self, key: &Key) -> Result<Option<auth::PeerKey>, Error> {
+    fn get_key_from_keys(&self, key: &Key) -> Result<Option<authentication::PeerKey>, Error> {
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let query = conn.exec_first::<(String, Option<i64>), _, _>(
@@ -213,11 +213,11 @@ impl Database for Mysql {
         let key = query?;
 
         Ok(key.map(|(key, opt_valid_until)| match opt_valid_until {
-            Some(valid_until) => auth::PeerKey {
+            Some(valid_until) => authentication::PeerKey {
                 key: key.parse::<Key>().unwrap(),
                 valid_until: Some(Duration::from_secs(valid_until.unsigned_abs())),
             },
-            None => auth::PeerKey {
+            None => authentication::PeerKey {
                 key: key.parse::<Key>().unwrap(),
                 valid_until: None,
             },
@@ -225,7 +225,7 @@ impl Database for Mysql {
     }
 
     /// Refer to [`databases::Database::add_key_to_keys`](crate::core::databases::Database::add_key_to_keys).
-    fn add_key_to_keys(&self, auth_key: &auth::PeerKey) -> Result<usize, Error> {
+    fn add_key_to_keys(&self, auth_key: &authentication::PeerKey) -> Result<usize, Error> {
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
         let key = auth_key.key.to_string();
