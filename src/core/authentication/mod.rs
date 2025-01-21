@@ -1,4 +1,3 @@
-use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,6 +13,7 @@ use super::error::PeerKeyError;
 use crate::CurrentClock;
 
 pub mod key;
+pub mod service;
 
 pub type PeerKey = key::PeerKey;
 pub type Key = key::Key;
@@ -34,23 +34,25 @@ pub struct AddKeyRequest {
 }
 
 pub struct Facade {
-    /// The tracker configuration.
-    config: Core,
-
     /// The database repository for the authentication keys.
     db_key_repository: DatabaseKeyRepository,
 
     /// In-memory implementation of the authentication key repository.
-    in_memory_key_repository: InMemoryKeyRepository,
+    in_memory_key_repository: Arc<InMemoryKeyRepository>,
+
+    /// The authentication service.
+    authentication_service: service::Service,
 }
 
 impl Facade {
     #[must_use]
     pub fn new(config: &Core, database: &Arc<Box<dyn Database>>) -> Self {
+        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
         Self {
-            config: config.clone(),
             db_key_repository: DatabaseKeyRepository::new(database),
-            in_memory_key_repository: InMemoryKeyRepository::default(),
+            in_memory_key_repository: in_memory_key_repository.clone(),
+            authentication_service: service::Service::new(config, &in_memory_key_repository),
         }
     }
 
@@ -61,40 +63,7 @@ impl Facade {
     ///
     /// Will return an error if the the authentication key cannot be verified.
     pub async fn authenticate(&self, key: &Key) -> Result<(), Error> {
-        if self.is_private() {
-            self.verify_auth_key(key).await
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Returns `true` is the tracker is in private mode.
-    pub fn is_private(&self) -> bool {
-        self.config.private
-    }
-
-    /// It verifies an authentication key.
-    ///
-    /// # Errors
-    ///
-    /// Will return a `key::Error` if unable to get any `auth_key`.
-    pub async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
-        match self.in_memory_key_repository.get(key).await {
-            None => Err(Error::UnableToReadKey {
-                location: Location::caller(),
-                key: Box::new(key.clone()),
-            }),
-            Some(key) => match self.config.private_mode {
-                Some(private_mode) => {
-                    if private_mode.check_keys_expiration {
-                        return key::verify_key_expiration(&key);
-                    }
-
-                    Ok(())
-                }
-                None => key::verify_key_expiration(&key),
-            },
-        }
+        self.authentication_service.authenticate(key).await
     }
 
     /// Adds new peer keys to the tracker.
@@ -340,7 +309,11 @@ mod tests {
 
             let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
-            assert!(authentication.verify_auth_key(&unregistered_key).await.is_err());
+            assert!(authentication
+                .authentication_service
+                .verify_auth_key(&unregistered_key)
+                .await
+                .is_err());
         }
 
         #[tokio::test]
@@ -355,7 +328,11 @@ mod tests {
             let result = authentication.remove_auth_key(&expiring_key.key()).await;
 
             assert!(result.is_ok());
-            assert!(authentication.verify_auth_key(&expiring_key.key()).await.is_err());
+            assert!(authentication
+                .authentication_service
+                .verify_auth_key(&expiring_key.key())
+                .await
+                .is_err());
         }
 
         #[tokio::test]
@@ -373,7 +350,11 @@ mod tests {
             let result = authentication.load_keys_from_database().await;
 
             assert!(result.is_ok());
-            assert!(authentication.verify_auth_key(&expiring_key.key()).await.is_ok());
+            assert!(authentication
+                .authentication_service
+                .verify_auth_key(&expiring_key.key())
+                .await
+                .is_ok());
         }
 
         mod with_expiring_and {
