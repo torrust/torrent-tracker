@@ -186,7 +186,7 @@ impl Facade {
     /// # Arguments
     ///
     /// * `key` - The pre-generated key.
-    pub async fn add_permanent_auth_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
+    async fn add_permanent_auth_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
         self.add_auth_key(key, None).await
     }
 
@@ -239,9 +239,9 @@ impl Facade {
         self.in_memory_key_repository.remove(key).await;
     }
 
-    /// The `Tracker` stores the authentication keys in memory and in the 
-    /// database. In case you need to restart the `Tracker` you can load the 
-    /// keys from the database into memory with this function. Keys are 
+    /// The `Tracker` stores the authentication keys in memory and in the
+    /// database. In case you need to restart the `Tracker` you can load the
+    /// keys from the database into memory with this function. Keys are
     /// automatically stored in the database when they are generated.
     ///
     /// # Errors
