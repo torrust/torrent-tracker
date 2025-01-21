@@ -2,6 +2,7 @@ use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
+use key::repository::persisted::DatabaseKeyRepository;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_located_error::Located;
@@ -35,12 +36,11 @@ pub struct Facade {
     /// The tracker configuration.
     config: Core,
 
-    /// A database driver implementation: [`Sqlite3`](crate::core::databases::sqlite)
-    /// or [`MySQL`](crate::core::databases::mysql)
-    database: Arc<Box<dyn Database>>,
-
     /// Tracker users' keys. Only for private trackers.
     keys: tokio::sync::RwLock<std::collections::HashMap<Key, PeerKey>>,
+
+    /// The database repository for the authentication keys.
+    db_key_repository: DatabaseKeyRepository,
 }
 
 impl Facade {
@@ -48,8 +48,8 @@ impl Facade {
     pub fn new(config: &Core, database: &Arc<Box<dyn Database>>) -> Self {
         Self {
             config: config.clone(),
-            database: database.clone(),
             keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
+            db_key_repository: DatabaseKeyRepository::new(database),
         }
     }
 
@@ -205,7 +205,8 @@ impl Facade {
     pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<PeerKey, databases::error::Error> {
         let auth_key = key::generate_key(lifetime);
 
-        self.database.add_key_to_keys(&auth_key)?;
+        self.db_key_repository.add(&auth_key)?;
+
         self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
         Ok(auth_key)
     }
@@ -254,7 +255,8 @@ impl Facade {
         // code-review: should we return a friendly error instead of the DB
         // constrain error when the key already exist? For now, it's returning
         // the specif error for each DB driver when a UNIQUE constrain fails.
-        self.database.add_key_to_keys(&auth_key)?;
+        self.db_key_repository.add(&auth_key)?;
+
         self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
         Ok(auth_key)
     }
@@ -267,8 +269,10 @@ impl Facade {
     ///
     /// Will return a `database::Error` if unable to remove the `key` to the database.
     pub async fn remove_auth_key(&self, key: &Key) -> Result<(), databases::error::Error> {
-        self.database.remove_key_from_keys(key)?;
+        self.db_key_repository.remove(key)?;
+
         self.remove_in_memory_auth_key(key).await;
+
         Ok(())
     }
 
@@ -290,7 +294,8 @@ impl Facade {
     ///
     /// Will return a `database::Error` if unable to `load_keys` from the database.
     pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
-        let keys_from_database = self.database.load_keys()?;
+        let keys_from_database = self.db_key_repository.load_keys()?;
+
         let mut keys = self.keys.write().await;
 
         keys.clear();

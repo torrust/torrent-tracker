@@ -37,6 +37,7 @@
 //!
 //! assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
 //! ```
+pub mod repository;
 
 use std::panic::Location;
 use std::str::FromStr;
