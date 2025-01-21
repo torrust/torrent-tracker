@@ -113,7 +113,7 @@ async fn handle_announce(
     // Authentication
     if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authenticate(&key).await {
+            Some(key) => match tracker.authentication.authenticate(&key).await {
                 Ok(()) => (),
                 Err(error) => return Err(responses::error::Error::from(error)),
             },

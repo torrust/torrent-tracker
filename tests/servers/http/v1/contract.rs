@@ -1396,7 +1396,12 @@ mod configured_as_private {
 
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
-            let expiring_key = env.tracker.generate_auth_key(Some(Duration::from_secs(60))).await.unwrap();
+            let expiring_key = env
+                .tracker
+                .authentication
+                .generate_auth_key(Some(Duration::from_secs(60)))
+                .await
+                .unwrap();
 
             let response = Client::authenticated(*env.bind_address(), expiring_key.key())
                 .announce(&QueryBuilder::default().query())
@@ -1541,7 +1546,12 @@ mod configured_as_private {
                     .build(),
             );
 
-            let expiring_key = env.tracker.generate_auth_key(Some(Duration::from_secs(60))).await.unwrap();
+            let expiring_key = env
+                .tracker
+                .authentication
+                .generate_auth_key(Some(Duration::from_secs(60)))
+                .await
+                .unwrap();
 
             let response = Client::authenticated(*env.bind_address(), expiring_key.key())
                 .scrape(

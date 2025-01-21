@@ -454,19 +454,16 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use authentication::AddKeyRequest;
 use bittorrent_primitives::info_hash::InfoHash;
-use error::PeerKeyError;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
+use torrust_tracker_primitives::peer;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
-use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 use torrust_tracker_torrent_repository::entry::EntrySync;
 use torrust_tracker_torrent_repository::repository::Repository;
 
-use self::authentication::Key;
 use self::torrent::Torrents;
 use crate::core::databases::Database;
 use crate::CurrentClock;
@@ -495,7 +492,7 @@ pub struct Tracker {
     torrents: Arc<Torrents>,
 
     /// The service to authenticate peers.
-    authentication: Arc<authentication::Facade>,
+    pub authentication: Arc<authentication::Facade>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -771,136 +768,6 @@ impl Tracker {
         if self.config.tracker_policy.remove_peerless_torrents {
             self.torrents.remove_peerless_torrents(&self.config.tracker_policy);
         }
-    }
-
-    /// It authenticates the peer `key` against the `Tracker` authentication
-    /// key list.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if the the authentication key cannot be verified.
-    pub async fn authenticate(&self, key: &Key) -> Result<(), authentication::Error> {
-        self.authentication.authenticate(key).await
-    }
-
-    /// Adds new peer keys to the tracker.
-    ///
-    /// Keys can be pre-generated or randomly created. They can also be permanent or expire.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if:
-    ///
-    /// - The key duration overflows the duration type maximum value.
-    /// - The provided pre-generated key is invalid.
-    /// - The key could not been persisted due to database issues.
-    pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<authentication::PeerKey, PeerKeyError> {
-        self.authentication.add_peer_key(add_key_req).await
-    }
-
-    /// It generates a new permanent authentication key.
-    ///
-    /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `auth_key` to the database.
-    pub async fn generate_permanent_auth_key(&self) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.authentication.generate_auth_key(None).await
-    }
-
-    /// It generates a new expiring authentication key.
-    ///
-    /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `auth_key` to the database.
-    ///
-    /// # Arguments
-    ///
-    /// * `lifetime` - The duration in seconds for the new key. The key will be
-    ///   no longer valid after `lifetime` seconds.
-    pub async fn generate_auth_key(
-        &self,
-        lifetime: Option<Duration>,
-    ) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.authentication.generate_auth_key(lifetime).await
-    }
-
-    /// It adds a pre-generated permanent authentication key.
-    ///
-    /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `auth_key` to the
-    /// database. For example, if the key already exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The pre-generated key.
-    pub async fn add_permanent_auth_key(&self, key: Key) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.authentication.add_auth_key(key, None).await
-    }
-
-    /// It adds a pre-generated authentication key.
-    ///
-    /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `auth_key` to the
-    /// database. For example, if the key already exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The pre-generated key.
-    /// * `lifetime` - The duration in seconds for the new key. The key will be
-    ///   no longer valid after `lifetime` seconds.
-    pub async fn add_auth_key(
-        &self,
-        key: Key,
-        valid_until: Option<DurationSinceUnixEpoch>,
-    ) -> Result<authentication::PeerKey, databases::error::Error> {
-        self.authentication.add_auth_key(key, valid_until).await
-    }
-
-    /// It removes an authentication key.
-    ///
-    /// # Context: Authentication    
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `key` to the database.
-    pub async fn remove_auth_key(&self, key: &Key) -> Result<(), databases::error::Error> {
-        self.authentication.remove_auth_key(key).await
-    }
-
-    /// The `Tracker` stores the authentication keys in memory and in the database.
-    /// In case you need to restart the `Tracker` you can load the keys from the database
-    /// into memory with this function. Keys are automatically stored in the database when they
-    /// are generated.
-    ///
-    /// # Context: Authentication
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to `load_keys` from the database.
-    pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
-        self.authentication.load_keys_from_database().await
     }
 
     /// It drops the database tables.
@@ -1664,7 +1531,7 @@ mod tests {
 
                     let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
-                    let result = tracker.authenticate(&unregistered_key).await;
+                    let result = tracker.authentication.authenticate(&unregistered_key).await;
 
                     assert!(result.is_err());
                 }
@@ -1682,9 +1549,13 @@ mod tests {
                 async fn it_should_remove_an_authentication_key() {
                     let tracker = private_tracker();
 
-                    let expiring_key = tracker.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                    let expiring_key = tracker
+                        .authentication
+                        .generate_auth_key(Some(Duration::from_secs(100)))
+                        .await
+                        .unwrap();
 
-                    let result = tracker.remove_auth_key(&expiring_key.key()).await;
+                    let result = tracker.authentication.remove_auth_key(&expiring_key.key()).await;
 
                     assert!(result.is_ok());
                     assert!(tracker.authentication.verify_auth_key(&expiring_key.key()).await.is_err());
@@ -1694,12 +1565,16 @@ mod tests {
                 async fn it_should_load_authentication_keys_from_the_database() {
                     let tracker = private_tracker();
 
-                    let expiring_key = tracker.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                    let expiring_key = tracker
+                        .authentication
+                        .generate_auth_key(Some(Duration::from_secs(100)))
+                        .await
+                        .unwrap();
 
                     // Remove the newly generated key in memory
                     tracker.authentication.remove_in_memory_auth_key(&expiring_key.key()).await;
 
-                    let result = tracker.load_keys_from_database().await;
+                    let result = tracker.authentication.load_keys_from_database().await;
 
                     assert!(result.is_ok());
                     assert!(tracker.authentication.verify_auth_key(&expiring_key.key()).await.is_ok());
@@ -1722,7 +1597,11 @@ mod tests {
                         async fn it_should_generate_the_key() {
                             let tracker = private_tracker();
 
-                            let peer_key = tracker.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                            let peer_key = tracker
+                                .authentication
+                                .generate_auth_key(Some(Duration::from_secs(100)))
+                                .await
+                                .unwrap();
 
                             assert_eq!(
                                 peer_key.valid_until,
@@ -1734,9 +1613,13 @@ mod tests {
                         async fn it_should_authenticate_a_peer_with_the_key() {
                             let tracker = private_tracker();
 
-                            let peer_key = tracker.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                            let peer_key = tracker
+                                .authentication
+                                .generate_auth_key(Some(Duration::from_secs(100)))
+                                .await
+                                .unwrap();
 
-                            let result = tracker.authenticate(&peer_key.key()).await;
+                            let result = tracker.authentication.authenticate(&peer_key.key()).await;
 
                             assert!(result.is_ok());
                         }
@@ -1748,11 +1631,12 @@ mod tests {
                             let past_timestamp = Duration::ZERO;
 
                             let peer_key = tracker
+                                .authentication
                                 .add_auth_key(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(), Some(past_timestamp))
                                 .await
                                 .unwrap();
 
-                            assert!(tracker.authenticate(&peer_key.key()).await.is_ok());
+                            assert!(tracker.authentication.authenticate(&peer_key.key()).await.is_ok());
                         }
                     }
 
@@ -1771,6 +1655,7 @@ mod tests {
                             let tracker = private_tracker();
 
                             let peer_key = tracker
+                                .authentication
                                 .add_peer_key(AddKeyRequest {
                                     opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                                     opt_seconds_valid: Some(100),
@@ -1789,6 +1674,7 @@ mod tests {
                             let tracker = private_tracker();
 
                             let peer_key = tracker
+                                .authentication
                                 .add_peer_key(AddKeyRequest {
                                     opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                                     opt_seconds_valid: Some(100),
@@ -1796,7 +1682,7 @@ mod tests {
                                 .await
                                 .unwrap();
 
-                            let result = tracker.authenticate(&peer_key.key()).await;
+                            let result = tracker.authentication.authenticate(&peer_key.key()).await;
 
                             assert!(result.is_ok());
                         }
@@ -1810,6 +1696,7 @@ mod tests {
                             });
 
                             let peer_key = tracker
+                                .authentication
                                 .add_peer_key(AddKeyRequest {
                                     opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                                     opt_seconds_valid: Some(0),
@@ -1817,7 +1704,7 @@ mod tests {
                                 .await
                                 .unwrap();
 
-                            assert!(tracker.authenticate(&peer_key.key()).await.is_ok());
+                            assert!(tracker.authentication.authenticate(&peer_key.key()).await.is_ok());
                         }
                     }
                 }
@@ -1831,7 +1718,7 @@ mod tests {
                         async fn it_should_generate_the_key() {
                             let tracker = private_tracker();
 
-                            let peer_key = tracker.generate_permanent_auth_key().await.unwrap();
+                            let peer_key = tracker.authentication.generate_permanent_auth_key().await.unwrap();
 
                             assert_eq!(peer_key.valid_until, None);
                         }
@@ -1840,9 +1727,9 @@ mod tests {
                         async fn it_should_authenticate_a_peer_with_the_key() {
                             let tracker = private_tracker();
 
-                            let peer_key = tracker.generate_permanent_auth_key().await.unwrap();
+                            let peer_key = tracker.authentication.generate_permanent_auth_key().await.unwrap();
 
-                            let result = tracker.authenticate(&peer_key.key()).await;
+                            let result = tracker.authentication.authenticate(&peer_key.key()).await;
 
                             assert!(result.is_ok());
                         }
@@ -1857,6 +1744,7 @@ mod tests {
                             let tracker = private_tracker();
 
                             let peer_key = tracker
+                                .authentication
                                 .add_peer_key(AddKeyRequest {
                                     opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                                     opt_seconds_valid: None,
@@ -1872,6 +1760,7 @@ mod tests {
                             let tracker = private_tracker();
 
                             let peer_key = tracker
+                                .authentication
                                 .add_peer_key(AddKeyRequest {
                                     opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                                     opt_seconds_valid: None,
@@ -1879,7 +1768,7 @@ mod tests {
                                 .await
                                 .unwrap();
 
-                            let result = tracker.authenticate(&peer_key.key()).await;
+                            let result = tracker.authentication.authenticate(&peer_key.key()).await;
 
                             assert!(result.is_ok());
                         }

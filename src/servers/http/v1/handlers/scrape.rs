@@ -84,7 +84,7 @@ async fn handle_scrape(
     // Authentication
     let return_real_scrape_data = if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authenticate(&key).await {
+            Some(key) => match tracker.authentication.authenticate(&key).await {
                 Ok(()) => true,
                 Err(_error) => false,
             },
