@@ -60,8 +60,6 @@ impl Facade {
     /// # Errors
     ///
     /// Will return an error if the the authentication key cannot be verified.
-    ///
-    /// # Context: Authentication
     pub async fn authenticate(&self, key: &Key) -> Result<(), Error> {
         if self.is_private() {
             self.verify_auth_key(key).await
@@ -76,8 +74,6 @@ impl Facade {
     }
 
     /// It verifies an authentication key.
-    ///
-    /// # Context: Authentication
     ///
     /// # Errors
     ///
@@ -180,8 +176,6 @@ impl Facade {
     ///
     /// Authentication keys are used by HTTP trackers.
     ///
-    /// # Context: Authentication
-    ///
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the database.
@@ -192,8 +186,6 @@ impl Facade {
     /// It generates a new expiring authentication key.
     ///
     /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
     ///
     /// # Errors
     ///
@@ -217,8 +209,6 @@ impl Facade {
     ///
     /// Authentication keys are used by HTTP trackers.
     ///
-    /// # Context: Authentication
-    ///
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the
@@ -234,8 +224,6 @@ impl Facade {
     /// It adds a pre-generated authentication key.
     ///
     /// Authentication keys are used by HTTP trackers.
-    ///
-    /// # Context: Authentication
     ///
     /// # Errors
     ///
@@ -266,8 +254,6 @@ impl Facade {
 
     /// It removes an authentication key.
     ///
-    /// # Context: Authentication    
-    ///
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to remove the `key` to the database.
@@ -280,8 +266,6 @@ impl Facade {
     }
 
     /// It removes an authentication key from memory.
-    ///
-    /// # Context: Authentication    
     pub async fn remove_in_memory_auth_key(&self, key: &Key) {
         self.in_memory_key_repository.remove(key).await;
     }
@@ -290,8 +274,6 @@ impl Facade {
     /// In case you need to restart the `Tracker` you can load the keys from the database
     /// into memory with this function. Keys are automatically stored in the database when they
     /// are generated.
-    ///
-    /// # Context: Authentication
     ///
     /// # Errors
     ///
