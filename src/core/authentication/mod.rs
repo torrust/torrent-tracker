@@ -2,6 +2,7 @@ use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
+use key::repository::in_memory::InMemoryKeyRepository;
 use key::repository::persisted::DatabaseKeyRepository;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::Core;
@@ -36,11 +37,11 @@ pub struct Facade {
     /// The tracker configuration.
     config: Core,
 
-    /// Tracker users' keys. Only for private trackers.
-    keys: tokio::sync::RwLock<std::collections::HashMap<Key, PeerKey>>,
-
     /// The database repository for the authentication keys.
     db_key_repository: DatabaseKeyRepository,
+
+    /// In-memory implementation of the authentication key repository.
+    in_memory_key_repository: InMemoryKeyRepository,
 }
 
 impl Facade {
@@ -48,8 +49,8 @@ impl Facade {
     pub fn new(config: &Core, database: &Arc<Box<dyn Database>>) -> Self {
         Self {
             config: config.clone(),
-            keys: tokio::sync::RwLock::new(std::collections::HashMap::new()),
             db_key_repository: DatabaseKeyRepository::new(database),
+            in_memory_key_repository: InMemoryKeyRepository::default(),
         }
     }
 
@@ -82,7 +83,7 @@ impl Facade {
     ///
     /// Will return a `key::Error` if unable to get any `auth_key`.
     pub async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
-        match self.keys.read().await.get(key) {
+        match self.in_memory_key_repository.get(key).await {
             None => Err(Error::UnableToReadKey {
                 location: Location::caller(),
                 key: Box::new(key.clone()),
@@ -90,12 +91,12 @@ impl Facade {
             Some(key) => match self.config.private_mode {
                 Some(private_mode) => {
                     if private_mode.check_keys_expiration {
-                        return key::verify_key_expiration(key);
+                        return key::verify_key_expiration(&key);
                     }
 
                     Ok(())
                 }
-                None => key::verify_key_expiration(key),
+                None => key::verify_key_expiration(&key),
             },
         }
     }
@@ -203,12 +204,13 @@ impl Facade {
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
     pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<PeerKey, databases::error::Error> {
-        let auth_key = key::generate_key(lifetime);
+        let peer_key = key::generate_key(lifetime);
 
-        self.db_key_repository.add(&auth_key)?;
+        self.db_key_repository.add(&peer_key)?;
 
-        self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
-        Ok(auth_key)
+        self.in_memory_key_repository.insert(&peer_key).await;
+
+        Ok(peer_key)
     }
 
     /// It adds a pre-generated permanent authentication key.
@@ -250,15 +252,16 @@ impl Facade {
         key: Key,
         valid_until: Option<DurationSinceUnixEpoch>,
     ) -> Result<PeerKey, databases::error::Error> {
-        let auth_key = PeerKey { key, valid_until };
+        let peer_key = PeerKey { key, valid_until };
 
         // code-review: should we return a friendly error instead of the DB
         // constrain error when the key already exist? For now, it's returning
         // the specif error for each DB driver when a UNIQUE constrain fails.
-        self.db_key_repository.add(&auth_key)?;
+        self.db_key_repository.add(&peer_key)?;
 
-        self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
-        Ok(auth_key)
+        self.in_memory_key_repository.insert(&peer_key).await;
+
+        Ok(peer_key)
     }
 
     /// It removes an authentication key.
@@ -280,7 +283,7 @@ impl Facade {
     ///
     /// # Context: Authentication    
     pub async fn remove_in_memory_auth_key(&self, key: &Key) {
-        self.keys.write().await.remove(key);
+        self.in_memory_key_repository.remove(key).await;
     }
 
     /// The `Tracker` stores the authentication keys in memory and in the database.
@@ -296,12 +299,10 @@ impl Facade {
     pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
         let keys_from_database = self.db_key_repository.load_keys()?;
 
-        let mut keys = self.keys.write().await;
-
-        keys.clear();
+        self.in_memory_key_repository.clear().await;
 
         for key in keys_from_database {
-            keys.insert(key.key.clone(), key);
+            self.in_memory_key_repository.insert(&key).await;
         }
 
         Ok(())
