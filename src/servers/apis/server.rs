@@ -343,51 +343,21 @@ impl Launcher {
 mod tests {
     use std::sync::Arc;
 
-    use tokio::sync::RwLock;
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
-    use crate::bootstrap::app::initialize_global_services;
+    use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::make_rust_tls;
-    use crate::core::authentication::handler::KeysHandler;
-    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
-    use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
-    use crate::core::authentication::service;
-    use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
-    use crate::core::whitelist;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
-    use crate::servers::udp::server::banning::BanService;
-    use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
     #[tokio::test]
     async fn it_should_be_able_to_start_and_stop() {
         let cfg = Arc::new(ephemeral_public());
         let config = &cfg.http_api.clone().unwrap();
 
-        let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-        let (stats_event_sender, stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-        let stats_repository = Arc::new(stats_repository);
-
         initialize_global_services(&cfg);
 
-        let database = initialize_database(&cfg);
-        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
-            &cfg.core,
-            &in_memory_whitelist.clone(),
-        ));
-        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-        let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
-        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-        let _authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
-        let keys_handler = Arc::new(KeysHandler::new(
-            &db_key_repository.clone(),
-            &in_memory_key_repository.clone(),
-        ));
-
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let app_container = initialize_app_container(&cfg);
 
         let bind_to = config.bind_address;
 
@@ -403,12 +373,12 @@ mod tests {
 
         let started = stopped
             .start(
-                tracker,
-                keys_handler,
-                whitelist_manager,
-                stats_event_sender,
-                stats_repository,
-                ban_service,
+                app_container.tracker,
+                app_container.keys_handler,
+                app_container.whitelist_manager,
+                app_container.stats_event_sender,
+                app_container.stats_repository,
+                app_container.ban_service,
                 register.give_form(),
                 access_tokens,
             )
