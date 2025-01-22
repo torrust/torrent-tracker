@@ -31,7 +31,7 @@ torrust-tracker-configuration = { version = "3.0.0-develop", path = "../configur
 torrust-tracker-located-error = { version = "3.0.0-develop", path = "../located-error" }
 torrust-tracker-primitives = { version = "3.0.0-develop", path = "../primitives" }
 tracing = "0"
-zerocopy = "0.7"
+zerocopy = "0.8"
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
