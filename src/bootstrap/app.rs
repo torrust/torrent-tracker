@@ -103,7 +103,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
-    let authentication = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
+    let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
     let tracker = Arc::new(initialize_tracker(
         configuration,

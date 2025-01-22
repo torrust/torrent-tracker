@@ -17,30 +17,16 @@ pub type Key = key::Key;
 pub type Error = key::Error;
 
 pub struct Facade {
-    /// The authentication service.
-    authentication_service: Arc<service::AuthenticationService>,
-
     /// The keys handler.
     keys_handler: Arc<handler::KeysHandler>,
 }
 
 impl Facade {
     #[must_use]
-    pub fn new(authentication_service: &Arc<service::AuthenticationService>, keys_handler: &Arc<handler::KeysHandler>) -> Self {
+    pub fn new(keys_handler: &Arc<handler::KeysHandler>) -> Self {
         Self {
-            authentication_service: authentication_service.clone(),
             keys_handler: keys_handler.clone(),
         }
-    }
-
-    /// It authenticates the peer `key` against the `Tracker` authentication
-    /// key list.
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if the the authentication key cannot be verified.
-    pub async fn authenticate(&self, key: &Key) -> Result<(), Error> {
-        self.authentication_service.authenticate(key).await
     }
 
     /// Adds new peer keys to the tracker.
@@ -149,26 +135,30 @@ mod tests {
         use crate::core::authentication::handler::KeysHandler;
         use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
         use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
+        use crate::core::authentication::service::AuthenticationService;
         use crate::core::authentication::{self, service};
         use crate::core::services::initialize_database;
 
-        fn instantiate_authentication_facade() -> authentication::Facade {
+        fn instantiate_keys_manager_and_authentication() -> (authentication::Facade, Arc<AuthenticationService>) {
             let config = configuration::ephemeral_private();
 
-            instantiate_authentication_facade_with_configuration(&config)
+            instantiate_keys_manager_and_authentication_with_configuration(&config)
         }
 
-        fn instantiate_authentication_facade_with_checking_keys_expiration_disabled() -> authentication::Facade {
+        fn instantiate_keys_manager_and_authentication_with_checking_keys_expiration_disabled(
+        ) -> (authentication::Facade, Arc<AuthenticationService>) {
             let mut config = configuration::ephemeral_private();
 
             config.core.private_mode = Some(PrivateMode {
                 check_keys_expiration: false,
             });
 
-            instantiate_authentication_facade_with_configuration(&config)
+            instantiate_keys_manager_and_authentication_with_configuration(&config)
         }
 
-        fn instantiate_authentication_facade_with_configuration(config: &Configuration) -> authentication::Facade {
+        fn instantiate_keys_manager_and_authentication_with_configuration(
+            config: &Configuration,
+        ) -> (authentication::Facade, Arc<AuthenticationService>) {
             let database = initialize_database(config);
 
             let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
@@ -180,52 +170,40 @@ mod tests {
                 &in_memory_key_repository.clone(),
             ));
 
-            authentication::Facade::new(&authentication_service, &keys_handler)
+            let facade = authentication::Facade::new(&keys_handler);
+
+            (facade, authentication_service)
         }
 
         #[tokio::test]
         async fn it_should_remove_an_authentication_key() {
-            let authentication = instantiate_authentication_facade();
+            let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-            let expiring_key = authentication
-                .generate_auth_key(Some(Duration::from_secs(100)))
-                .await
-                .unwrap();
+            let expiring_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
 
-            let result = authentication.remove_auth_key(&expiring_key.key()).await;
+            let result = keys_manager.remove_auth_key(&expiring_key.key()).await;
 
             assert!(result.is_ok());
 
             // The key should no longer be valid
-            assert!(authentication
-                .authentication_service
-                .authenticate(&expiring_key.key())
-                .await
-                .is_err());
+            assert!(authentication_service.authenticate(&expiring_key.key()).await.is_err());
         }
 
         #[tokio::test]
         async fn it_should_load_authentication_keys_from_the_database() {
-            let authentication = instantiate_authentication_facade();
+            let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-            let expiring_key = authentication
-                .generate_auth_key(Some(Duration::from_secs(100)))
-                .await
-                .unwrap();
+            let expiring_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
 
             // Remove the newly generated key in memory
-            authentication.remove_in_memory_auth_key(&expiring_key.key()).await;
+            keys_manager.remove_in_memory_auth_key(&expiring_key.key()).await;
 
-            let result = authentication.load_keys_from_database().await;
+            let result = keys_manager.load_keys_from_database().await;
 
             assert!(result.is_ok());
 
             // The key should no longer be valid
-            assert!(authentication
-                .authentication_service
-                .authenticate(&expiring_key.key())
-                .await
-                .is_ok());
+            assert!(authentication_service.authenticate(&expiring_key.key()).await.is_ok());
         }
 
         mod with_expiring_and {
@@ -234,51 +212,51 @@ mod tests {
                 use std::time::Duration;
 
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
-                    instantiate_authentication_facade, instantiate_authentication_facade_with_checking_keys_expiration_disabled,
+                    instantiate_keys_manager_and_authentication,
+                    instantiate_keys_manager_and_authentication_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::Key;
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication_facade();
+                    let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = authentication
-                        .generate_auth_key(Some(Duration::from_secs(100)))
-                        .await
-                        .unwrap();
+                    let peer_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
 
-                    let result = authentication.authenticate(&peer_key.key()).await;
+                    let result = authentication_service.authenticate(&peer_key.key()).await;
 
                     assert!(result.is_ok());
                 }
 
                 #[tokio::test]
                 async fn it_should_accept_an_expired_key_when_checking_expiration_is_disabled_in_configuration() {
-                    let authentication = instantiate_authentication_facade_with_checking_keys_expiration_disabled();
+                    let (keys_manager, authentication_service) =
+                        instantiate_keys_manager_and_authentication_with_checking_keys_expiration_disabled();
 
                     let past_timestamp = Duration::ZERO;
 
-                    let peer_key = authentication
+                    let peer_key = keys_manager
                         .add_auth_key(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(), Some(past_timestamp))
                         .await
                         .unwrap();
 
-                    assert!(authentication.authenticate(&peer_key.key()).await.is_ok());
+                    assert!(authentication_service.authenticate(&peer_key.key()).await.is_ok());
                 }
             }
 
             mod pre_generated_keys {
 
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
-                    instantiate_authentication_facade, instantiate_authentication_facade_with_checking_keys_expiration_disabled,
+                    instantiate_keys_manager_and_authentication,
+                    instantiate_keys_manager_and_authentication_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::{AddKeyRequest, Key};
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication_facade();
+                    let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = authentication
+                    let peer_key = keys_manager
                         .add_peer_key(AddKeyRequest {
                             opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                             opt_seconds_valid: Some(100),
@@ -286,16 +264,17 @@ mod tests {
                         .await
                         .unwrap();
 
-                    let result = authentication.authenticate(&peer_key.key()).await;
+                    let result = authentication_service.authenticate(&peer_key.key()).await;
 
                     assert!(result.is_ok());
                 }
 
                 #[tokio::test]
                 async fn it_should_accept_an_expired_key_when_checking_expiration_is_disabled_in_configuration() {
-                    let authentication = instantiate_authentication_facade_with_checking_keys_expiration_disabled();
+                    let (keys_manager, authentication_service) =
+                        instantiate_keys_manager_and_authentication_with_checking_keys_expiration_disabled();
 
-                    let peer_key = authentication
+                    let peer_key = keys_manager
                         .add_peer_key(AddKeyRequest {
                             opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                             opt_seconds_valid: Some(0),
@@ -303,7 +282,7 @@ mod tests {
                         .await
                         .unwrap();
 
-                    assert!(authentication.authenticate(&peer_key.key()).await.is_ok());
+                    assert!(authentication_service.authenticate(&peer_key.key()).await.is_ok());
                 }
             }
         }
@@ -311,29 +290,29 @@ mod tests {
         mod with_permanent_and {
 
             mod randomly_generated_keys {
-                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication_facade;
+                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_keys_manager_and_authentication;
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication_facade();
+                    let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = authentication.generate_permanent_auth_key().await.unwrap();
+                    let peer_key = keys_manager.generate_permanent_auth_key().await.unwrap();
 
-                    let result = authentication.authenticate(&peer_key.key()).await;
+                    let result = authentication_service.authenticate(&peer_key.key()).await;
 
                     assert!(result.is_ok());
                 }
             }
 
             mod pre_generated_keys {
-                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication_facade;
+                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_keys_manager_and_authentication;
                 use crate::core::authentication::{AddKeyRequest, Key};
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication_facade();
+                    let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = authentication
+                    let peer_key = keys_manager
                         .add_peer_key(AddKeyRequest {
                             opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                             opt_seconds_valid: None,
@@ -341,7 +320,7 @@ mod tests {
                         .await
                         .unwrap();
 
-                    let result = authentication.authenticate(&peer_key.key()).await;
+                    let result = authentication_service.authenticate(&peer_key.key()).await;
 
                     assert!(result.is_ok());
                 }

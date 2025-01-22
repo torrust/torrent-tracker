@@ -94,12 +94,12 @@ mod tests {
         let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
         let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
         let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-        let authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
+        let _authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
         let keys_handler = Arc::new(KeysHandler::new(
             &db_key_repository.clone(),
             &in_memory_key_repository.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
+        let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
         let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 
@@ -147,12 +147,12 @@ mod tests {
         ));
         let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
         let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-        let authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
+        let _authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
         let keys_handler = Arc::new(KeysHandler::new(
             &db_key_repository.clone(),
             &in_memory_key_repository.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
+        let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
         let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
 

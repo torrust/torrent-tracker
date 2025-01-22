@@ -37,7 +37,7 @@ pub fn initialize_tracker_dependencies(
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
-    let authentication_facade = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
+    let authentication_facade = Arc::new(authentication::Facade::new(&keys_handler));
 
     (
         database,
