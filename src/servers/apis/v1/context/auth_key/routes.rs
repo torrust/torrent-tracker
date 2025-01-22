@@ -12,10 +12,10 @@ use axum::routing::{get, post};
 use axum::Router;
 
 use super::handlers::{add_auth_key_handler, delete_auth_key_handler, generate_auth_key_handler, reload_keys_handler};
-use crate::core::Tracker;
+use crate::core::authentication::handler::KeysHandler;
 
 /// It adds the routes to the router for the [`auth_key`](crate::servers::apis::v1::context::auth_key) API context.
-pub fn add(prefix: &str, router: Router, tracker: Arc<Tracker>) -> Router {
+pub fn add(prefix: &str, router: Router, keys_handler: Arc<KeysHandler>) -> Router {
     // Keys
     router
         .route(
@@ -29,14 +29,14 @@ pub fn add(prefix: &str, router: Router, tracker: Arc<Tracker>) -> Router {
             // Use POST /keys
             &format!("{prefix}/key/{{seconds_valid_or_key}}"),
             post(generate_auth_key_handler)
-                .with_state(tracker.clone())
+                .with_state(keys_handler.clone())
                 .delete(delete_auth_key_handler)
-                .with_state(tracker.clone()),
+                .with_state(keys_handler.clone()),
         )
         // Keys command
         .route(
             &format!("{prefix}/keys/reload"),
-            get(reload_keys_handler).with_state(tracker.clone()),
+            get(reload_keys_handler).with_state(keys_handler.clone()),
         )
-        .route(&format!("{prefix}/keys"), post(add_auth_key_handler).with_state(tracker))
+        .route(&format!("{prefix}/keys"), post(add_auth_key_handler).with_state(keys_handler))
 }

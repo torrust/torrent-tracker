@@ -14,10 +14,10 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
+use super::whitelist;
 use super::whitelist::manager::WhiteListManager;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::repository::persisted::DatabaseWhitelist;
-use super::{authentication, whitelist};
 use crate::core::Tracker;
 
 /// It returns a new tracker building its dependencies.
@@ -30,9 +30,8 @@ pub fn initialize_tracker(
     config: &Configuration,
     database: &Arc<Box<dyn Database>>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
-    authentication: &Arc<authentication::Facade>,
 ) -> Tracker {
-    match Tracker::new(&Arc::new(config).core, database, whitelist_authorization, authentication) {
+    match Tracker::new(&Arc::new(config).core, database, whitelist_authorization) {
         Ok(tracker) => tracker,
         Err(error) => {
             panic!("{}", error)

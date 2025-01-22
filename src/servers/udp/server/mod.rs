@@ -64,9 +64,13 @@ mod tests {
     use super::spawner::Spawner;
     use super::Server;
     use crate::bootstrap::app::initialize_global_services;
+    use crate::core::authentication::handler::KeysHandler;
+    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+    use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
+    use crate::core::authentication::service;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{authentication, whitelist};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -88,8 +92,15 @@ mod tests {
             &in_memory_whitelist.clone(),
         ));
         let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
+        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+        let _authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
+        let _keys_handler = Arc::new(KeysHandler::new(
+            &db_key_repository.clone(),
+            &in_memory_key_repository.clone(),
+        ));
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let udp_trackers = cfg.udp_trackers.clone().expect("missing UDP trackers configuration");
         let config = &udp_trackers[0];
@@ -133,8 +144,15 @@ mod tests {
             &cfg.core,
             &in_memory_whitelist.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
+        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+        let _authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
+        let _keys_handler = Arc::new(KeysHandler::new(
+            &db_key_repository.clone(),
+            &in_memory_key_repository.clone(),
+        ));
+
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let config = &cfg.udp_trackers.as_ref().unwrap().first().unwrap();
         let bind_to = config.bind_address;

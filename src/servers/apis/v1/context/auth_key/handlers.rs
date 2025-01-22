@@ -12,8 +12,8 @@ use super::responses::{
     auth_key_response, failed_to_delete_key_response, failed_to_generate_key_response, failed_to_reload_keys_response,
     invalid_auth_key_duration_response, invalid_auth_key_response,
 };
-use crate::core::authentication::{AddKeyRequest, Key};
-use crate::core::Tracker;
+use crate::core::authentication::handler::{AddKeyRequest, KeysHandler};
+use crate::core::authentication::Key;
 use crate::servers::apis::v1::context::auth_key::resources::AuthKey;
 use crate::servers::apis::v1::responses::{invalid_auth_key_param_response, ok_response};
 
@@ -31,11 +31,10 @@ use crate::servers::apis::v1::responses::{invalid_auth_key_param_response, ok_re
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#generate-a-new-authentication-key)
 /// for more information about this endpoint.
 pub async fn add_auth_key_handler(
-    State(tracker): State<Arc<Tracker>>,
+    State(keys_handler): State<Arc<KeysHandler>>,
     extract::Json(add_key_form): extract::Json<AddKeyForm>,
 ) -> Response {
-    match tracker
-        .authentication
+    match keys_handler
         .add_peer_key(AddKeyRequest {
             opt_key: add_key_form.opt_key.clone(),
             opt_seconds_valid: add_key_form.opt_seconds_valid,
@@ -66,13 +65,12 @@ pub async fn add_auth_key_handler(
 /// for more information about this endpoint.
 ///
 /// This endpoint has been deprecated. Use [`add_auth_key_handler`].
-pub async fn generate_auth_key_handler(State(tracker): State<Arc<Tracker>>, Path(seconds_valid_or_key): Path<u64>) -> Response {
+pub async fn generate_auth_key_handler(
+    State(keys_handler): State<Arc<KeysHandler>>,
+    Path(seconds_valid_or_key): Path<u64>,
+) -> Response {
     let seconds_valid = seconds_valid_or_key;
-    match tracker
-        .authentication
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
-        .await
-    {
+    match keys_handler.generate_auth_key(Some(Duration::from_secs(seconds_valid))).await {
         Ok(auth_key) => auth_key_response(&AuthKey::from(auth_key)),
         Err(e) => failed_to_generate_key_response(e),
     }
@@ -108,12 +106,12 @@ pub struct KeyParam(String);
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#delete-an-authentication-key)
 /// for more information about this endpoint.
 pub async fn delete_auth_key_handler(
-    State(tracker): State<Arc<Tracker>>,
+    State(keys_handler): State<Arc<KeysHandler>>,
     Path(seconds_valid_or_key): Path<KeyParam>,
 ) -> Response {
     match Key::from_str(&seconds_valid_or_key.0) {
         Err(_) => invalid_auth_key_param_response(&seconds_valid_or_key.0),
-        Ok(key) => match tracker.authentication.remove_auth_key(&key).await {
+        Ok(key) => match keys_handler.remove_auth_key(&key).await {
             Ok(()) => ok_response(),
             Err(e) => failed_to_delete_key_response(e),
         },
@@ -132,8 +130,8 @@ pub async fn delete_auth_key_handler(
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#reload-authentication-keys)
 /// for more information about this endpoint.
-pub async fn reload_keys_handler(State(tracker): State<Arc<Tracker>>) -> Response {
-    match tracker.authentication.load_keys_from_database().await {
+pub async fn reload_keys_handler(State(keys_handler): State<Arc<KeysHandler>>) -> Response {
+    match keys_handler.load_keys_from_database().await {
         Ok(()) => ok_response(),
         Err(e) => failed_to_reload_keys_response(e),
     }

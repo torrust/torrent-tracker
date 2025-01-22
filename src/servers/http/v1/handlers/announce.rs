@@ -21,6 +21,7 @@ use torrust_tracker_clock::clock::Time;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, PeersWanted, Tracker};
@@ -38,6 +39,7 @@ use crate::CurrentClock;
 pub async fn handle_without_key(
     State(state): State<(
         Arc<Tracker>,
+        Arc<AuthenticationService>,
         Arc<whitelist::authorization::Authorization>,
         Arc<Option<Box<dyn Sender>>>,
     )>,
@@ -46,7 +48,16 @@ pub async fn handle_without_key(
 ) -> Response {
     tracing::debug!("http announce request: {:#?}", announce_request);
 
-    handle(&state.0, &state.1, &state.2, &announce_request, &client_ip_sources, None).await
+    handle(
+        &state.0,
+        &state.1,
+        &state.2,
+        &state.3,
+        &announce_request,
+        &client_ip_sources,
+        None,
+    )
+    .await
 }
 
 /// It handles the `announce` request when the HTTP tracker requires
@@ -56,6 +67,7 @@ pub async fn handle_without_key(
 pub async fn handle_with_key(
     State(state): State<(
         Arc<Tracker>,
+        Arc<AuthenticationService>,
         Arc<whitelist::authorization::Authorization>,
         Arc<Option<Box<dyn Sender>>>,
     )>,
@@ -65,7 +77,16 @@ pub async fn handle_with_key(
 ) -> Response {
     tracing::debug!("http announce request: {:#?}", announce_request);
 
-    handle(&state.0, &state.1, &state.2, &announce_request, &client_ip_sources, Some(key)).await
+    handle(
+        &state.0,
+        &state.1,
+        &state.2,
+        &state.3,
+        &announce_request,
+        &client_ip_sources,
+        Some(key),
+    )
+    .await
 }
 
 /// It handles the `announce` request.
@@ -74,6 +95,7 @@ pub async fn handle_with_key(
 /// `unauthenticated` modes.
 async fn handle(
     tracker: &Arc<Tracker>,
+    authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     announce_request: &Announce,
@@ -82,6 +104,7 @@ async fn handle(
 ) -> Response {
     let announce_data = match handle_announce(
         tracker,
+        authentication_service,
         whitelist_authorization,
         opt_stats_event_sender,
         announce_request,
@@ -104,6 +127,7 @@ async fn handle(
 
 async fn handle_announce(
     tracker: &Arc<Tracker>,
+    authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     announce_request: &Announce,
@@ -113,7 +137,7 @@ async fn handle_announce(
     // Authentication
     if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authentication.authenticate(&key).await {
+            Some(key) => match authentication_service.authenticate(&key).await {
                 Ok(()) => (),
                 Err(error) => return Err(responses::error::Error::from(error)),
             },
@@ -220,6 +244,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::authentication::service::AuthenticationService;
     use crate::core::services::{initialize_tracker, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::{whitelist, Tracker};
@@ -228,6 +253,7 @@ mod tests {
         Arc<Tracker>,
         Arc<Option<Box<dyn Sender>>>,
         Arc<whitelist::authorization::Authorization>,
+        Arc<AuthenticationService>,
     );
 
     fn private_tracker() -> TrackerAndDeps {
@@ -248,18 +274,14 @@ mod tests {
 
     /// Initialize tracker's dependencies and tracker.
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
+            initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = Arc::new(initialize_tracker(
-            config,
-            &database,
-            &whitelist_authorization,
-            &authentication,
-        ));
+        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
 
-        (tracker, stats_event_sender, whitelist_authorization)
+        (tracker, stats_event_sender, whitelist_authorization, authentication_service)
     }
 
     fn sample_announce_request() -> Announce {
@@ -302,7 +324,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_missing() {
-            let (tracker, stats_event_sender, whitelist_authorization) = private_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization, authentication_service) = private_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -311,6 +333,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &authentication_service,
                 &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
@@ -328,7 +351,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_invalid() {
-            let (tracker, stats_event_sender, whitelist_authorization) = private_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization, authentication_service) = private_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -339,6 +362,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &authentication_service,
                 &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
@@ -362,7 +386,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_announced_torrent_is_not_whitelisted() {
-            let (tracker, stats_event_sender, whitelist_authorization) = whitelisted_tracker();
+            let (tracker, stats_event_sender, whitelist_authorization, authentication_service) = whitelisted_tracker();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -371,6 +395,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &authentication_service,
                 &whitelist_authorization,
                 &stats_event_sender,
                 &announce_request,
@@ -402,7 +427,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (tracker, stats_event_sender, whitelist_authorization) = tracker_on_reverse_proxy();
+            let (tracker, stats_event_sender, whitelist_authorization, authentication_service) = tracker_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -414,6 +439,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &authentication_service,
                 &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),
@@ -442,7 +468,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (tracker, stats_event_sender, whitelist_authorization) = tracker_not_on_reverse_proxy();
+            let (tracker, stats_event_sender, whitelist_authorization, authentication_service) = tracker_not_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
@@ -454,6 +480,7 @@ mod tests {
 
             let response = handle_announce(
                 &tracker,
+                &authentication_service,
                 &whitelist_authorization,
                 &stats_event_sender,
                 &sample_announce_request(),

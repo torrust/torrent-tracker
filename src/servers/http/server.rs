@@ -11,6 +11,7 @@ use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
@@ -42,10 +43,19 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    #[instrument(skip(self, tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt))]
+    #[instrument(skip(
+        self,
+        tracker,
+        authentication_service,
+        whitelist_authorization,
+        stats_event_sender,
+        tx_start,
+        rx_halt
+    ))]
     fn start(
         &self,
         tracker: Arc<Tracker>,
+        authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         tx_start: Sender<Started>,
@@ -67,7 +77,13 @@ impl Launcher {
 
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
-        let app = router(tracker, whitelist_authorization, stats_event_sender, address);
+        let app = router(
+            tracker,
+            authentication_service,
+            whitelist_authorization,
+            stats_event_sender,
+            address,
+        );
 
         let running = Box::pin(async {
             match tls {
@@ -163,6 +179,7 @@ impl HttpServer<Stopped> {
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         form: ServiceRegistrationForm,
@@ -173,7 +190,14 @@ impl HttpServer<Stopped> {
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
-            let server = launcher.start(tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt);
+            let server = launcher.start(
+                tracker,
+                authentication_service,
+                whitelist_authorization,
+                stats_event_sender,
+                tx_start,
+                rx_halt,
+            );
 
             server.await;
 
@@ -246,9 +270,13 @@ mod tests {
 
     use crate::bootstrap::app::initialize_global_services;
     use crate::bootstrap::jobs::make_rust_tls;
+    use crate::core::authentication::handler::KeysHandler;
+    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+    use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
+    use crate::core::authentication::service;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{authentication, whitelist};
     use crate::servers::http::server::{HttpServer, Launcher};
     use crate::servers::registar::Registar;
 
@@ -268,9 +296,15 @@ mod tests {
             &in_memory_whitelist.clone(),
         ));
         let _whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-        let authentication = Arc::new(authentication::Facade::new(&cfg.core, &database.clone()));
+        let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
+        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+        let authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
+        let _keys_handler = Arc::new(KeysHandler::new(
+            &db_key_repository.clone(),
+            &in_memory_key_repository.clone(),
+        ));
 
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let http_trackers = cfg.http_trackers.clone().expect("missing HTTP trackers configuration");
         let config = &http_trackers[0];
@@ -285,7 +319,13 @@ mod tests {
 
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
         let started = stopped
-            .start(tracker, whitelist_authorization, stats_event_sender, register.give_form())
+            .start(
+                tracker,
+                authentication_service,
+                whitelist_authorization,
+                stats_event_sender,
+                register.give_form(),
+            )
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

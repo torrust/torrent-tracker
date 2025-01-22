@@ -22,6 +22,7 @@ use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, Tracker};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
@@ -32,9 +33,16 @@ use crate::servers::logging::Latency;
 /// > **NOTICE**: it's added a layer to get the client IP from the connection
 /// > info. The tracker could use the connection info to get the client IP.
 #[allow(clippy::needless_pass_by_value)]
-#[instrument(skip(tracker, whitelist_authorization, stats_event_sender, server_socket_addr))]
+#[instrument(skip(
+    tracker,
+    authentication_service,
+    whitelist_authorization,
+    stats_event_sender,
+    server_socket_addr
+))]
 pub fn router(
     tracker: Arc<Tracker>,
+    authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     server_socket_addr: SocketAddr,
@@ -47,6 +55,7 @@ pub fn router(
             "/announce",
             get(announce::handle_without_key).with_state((
                 tracker.clone(),
+                authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
             )),
@@ -55,6 +64,7 @@ pub fn router(
             "/announce/{key}",
             get(announce::handle_with_key).with_state((
                 tracker.clone(),
+                authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
             )),
@@ -62,11 +72,19 @@ pub fn router(
         // Scrape request
         .route(
             "/scrape",
-            get(scrape::handle_without_key).with_state((tracker.clone(), stats_event_sender.clone())),
+            get(scrape::handle_without_key).with_state((
+                tracker.clone(),
+                authentication_service.clone(),
+                stats_event_sender.clone(),
+            )),
         )
         .route(
             "/scrape/{key}",
-            get(scrape::handle_with_key).with_state((tracker.clone(), stats_event_sender.clone())),
+            get(scrape::handle_with_key).with_state((
+                tracker.clone(),
+                authentication_service.clone(),
+                stats_event_sender.clone(),
+            )),
         )
         // Add extension to get the client IP from the connection info
         .layer(SecureClientIpSource::ConnectInfo.into_extension())

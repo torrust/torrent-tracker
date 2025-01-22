@@ -30,6 +30,7 @@ use tracing::{instrument, Level, Span};
 use super::v1;
 use super::v1::context::health_check::handlers::health_check_handler;
 use super::v1::middlewares::auth::State;
+use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
 use crate::core::whitelist::manager::WhiteListManager;
@@ -39,9 +40,11 @@ use crate::servers::logging::Latency;
 use crate::servers::udp::server::banning::BanService;
 
 /// Add all API routes to the router.
+#[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
     tracker,
+    keys_handler,
     whitelist_manager,
     ban_service,
     stats_event_sender,
@@ -50,6 +53,7 @@ use crate::servers::udp::server::banning::BanService;
 ))]
 pub fn router(
     tracker: Arc<Tracker>,
+    keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -65,6 +69,7 @@ pub fn router(
         api_url_prefix,
         router,
         tracker.clone(),
+        &keys_handler.clone(),
         &whitelist_manager.clone(),
         ban_service.clone(),
         stats_event_sender.clone(),
