@@ -5,6 +5,7 @@ use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
+use torrust_tracker_lib::core::authentication::handler::KeysHandler;
 use torrust_tracker_lib::core::authentication::service::AuthenticationService;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
@@ -17,6 +18,7 @@ use torrust_tracker_primitives::peer;
 pub struct Environment<S> {
     pub config: Arc<HttpTracker>,
     pub tracker: Arc<Tracker>,
+    pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
@@ -56,6 +58,7 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker: app_container.tracker.clone(),
+            keys_handler: app_container.keys_handler.clone(),
             authentication_service: app_container.authentication_service.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             stats_repository: app_container.stats_repository.clone(),
@@ -71,6 +74,7 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
@@ -101,6 +105,7 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,
             whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,

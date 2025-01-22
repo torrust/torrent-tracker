@@ -490,9 +490,6 @@ pub struct Tracker {
 
     /// The in-memory torrents repository.
     torrents: Arc<Torrents>,
-
-    /// The service to authenticate peers.
-    pub authentication: Arc<authentication::Facade>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -547,14 +544,12 @@ impl Tracker {
         config: &Core,
         database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
-        authentication: &Arc<authentication::Facade>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
             torrents: Arc::default(),
-            authentication: authentication.clone(),
         })
     }
 
@@ -816,21 +811,21 @@ mod tests {
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
+            initialize_tracker(&config, &database, &whitelist_authorization)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
 
-            let (database, in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            let (database, in_memory_whitelist, whitelist_authorization, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization, &authentication);
+            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
 
             (tracker, whitelist_authorization, whitelist_manager)
         }
@@ -839,10 +834,10 @@ mod tests {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
+            initialize_tracker(&config, &database, &whitelist_authorization)
         }
 
         fn sample_info_hash() -> InfoHash {

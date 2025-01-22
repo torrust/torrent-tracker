@@ -52,8 +52,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     // Load peer keys
     if app_container.tracker.is_private() {
         app_container
-            .tracker
-            .authentication
+            .keys_handler
             .load_keys_from_database()
             .await
             .expect("Could not retrieve keys from database.");
@@ -120,6 +119,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
         if let Some(job) = tracker_apis::start_job(
             http_api_config,
             app_container.tracker.clone(),
+            app_container.keys_handler.clone(),
             app_container.whitelist_manager.clone(),
             app_container.ban_service.clone(),
             app_container.stats_event_sender.clone(),

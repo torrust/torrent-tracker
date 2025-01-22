@@ -30,6 +30,7 @@ use torrust_tracker_configuration::{AccessTokens, HttpApi};
 use tracing::instrument;
 
 use super::make_rust_tls;
+use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
 use crate::core::whitelist::manager::WhiteListManager;
@@ -60,10 +61,20 @@ pub struct ApiServerJobStarted();
 ///
 ///
 #[allow(clippy::too_many_arguments)]
-#[instrument(skip(config, tracker, whitelist_manager, ban_service, stats_event_sender, stats_repository, form))]
+#[instrument(skip(
+    config,
+    tracker,
+    keys_handler,
+    whitelist_manager,
+    ban_service,
+    stats_event_sender,
+    stats_repository,
+    form
+))]
 pub async fn start_job(
     config: &HttpApi,
     tracker: Arc<core::Tracker>,
+    keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -85,6 +96,7 @@ pub async fn start_job(
                 bind_to,
                 tls,
                 tracker.clone(),
+                keys_handler.clone(),
                 whitelist_manager.clone(),
                 ban_service.clone(),
                 stats_event_sender.clone(),
@@ -103,6 +115,7 @@ pub async fn start_job(
     socket,
     tls,
     tracker,
+    keys_handler,
     whitelist_manager,
     ban_service,
     stats_event_sender,
@@ -114,6 +127,7 @@ async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -124,6 +138,7 @@ async fn start_v1(
     let server = ApiServer::new(Launcher::new(socket, tls))
         .start(
             tracker,
+            keys_handler,
             whitelist_manager,
             stats_event_sender,
             stats_repository,
@@ -154,8 +169,8 @@ mod tests {
     use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
     use crate::core::authentication::service;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{authentication, whitelist};
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -187,15 +202,15 @@ mod tests {
             &db_key_repository.clone(),
             &in_memory_key_repository.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let version = Version::V1;
 
         start_job(
             config,
             tracker,
+            keys_handler,
             whitelist_manager,
             ban_service,
             stats_event_sender,

@@ -158,8 +158,7 @@ async fn should_allow_deleting_an_auth_key() {
 
     let seconds_valid = 60;
     let auth_key = env
-        .tracker
-        .authentication
+        .keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -293,8 +292,7 @@ async fn should_fail_when_the_auth_key_cannot_be_deleted() {
 
     let seconds_valid = 60;
     let auth_key = env
-        .tracker
-        .authentication
+        .keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -327,8 +325,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
 
     // Generate new auth key
     let auth_key = env
-        .tracker
-        .authentication
+        .keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -348,8 +345,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
 
     // Generate new auth key
     let auth_key = env
-        .tracker
-        .authentication
+        .keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -377,8 +373,7 @@ async fn should_allow_reloading_keys() {
     let env = Started::new(&configuration::ephemeral().into()).await;
 
     let seconds_valid = 60;
-    env.tracker
-        .authentication
+    env.keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -403,8 +398,7 @@ async fn should_fail_when_keys_cannot_be_reloaded() {
     let request_id = Uuid::new_v4();
     let seconds_valid = 60;
 
-    env.tracker
-        .authentication
+    env.keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
@@ -432,8 +426,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
     let env = Started::new(&configuration::ephemeral().into()).await;
 
     let seconds_valid = 60;
-    env.tracker
-        .authentication
+    env.keys_handler
         .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();

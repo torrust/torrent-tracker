@@ -1397,8 +1397,7 @@ mod configured_as_private {
             let env = Started::new(&configuration::ephemeral_private().into()).await;
 
             let expiring_key = env
-                .tracker
-                .authentication
+                .keys_handler
                 .generate_auth_key(Some(Duration::from_secs(60)))
                 .await
                 .unwrap();
@@ -1547,8 +1546,7 @@ mod configured_as_private {
             );
 
             let expiring_key = env
-                .tracker
-                .authentication
+                .keys_handler
                 .generate_auth_key(Some(Duration::from_secs(60)))
                 .await
                 .unwrap();

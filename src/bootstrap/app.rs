@@ -27,8 +27,8 @@ use crate::core::authentication::key::repository::in_memory::InMemoryKeyReposito
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
 use crate::core::authentication::service;
 use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+use crate::core::whitelist;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-use crate::core::{authentication, whitelist};
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
@@ -103,24 +103,18 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
-    let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
-    let tracker = Arc::new(initialize_tracker(
-        configuration,
-        &database,
-        &whitelist_authorization,
-        &authentication,
-    ));
+    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_authorization));
 
     AppContainer {
         tracker,
+        keys_handler,
         authentication_service,
         whitelist_authorization,
         ban_service,
         stats_event_sender,
         stats_repository,
         whitelist_manager,
-        authentication,
     }
 }
 

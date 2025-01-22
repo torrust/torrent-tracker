@@ -8,6 +8,7 @@ use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::{Configuration, HttpApi};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
+use torrust_tracker_lib::core::authentication::handler::KeysHandler;
 use torrust_tracker_lib::core::authentication::service::AuthenticationService;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
@@ -24,6 +25,7 @@ where
 {
     pub config: Arc<HttpApi>,
     pub tracker: Arc<Tracker>,
+    pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
@@ -60,6 +62,7 @@ impl Environment<Stopped> {
         Self {
             config,
             tracker: app_container.tracker.clone(),
+            keys_handler: app_container.keys_handler.clone(),
             authentication_service: app_container.authentication_service.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             stats_repository: app_container.stats_repository.clone(),
@@ -76,6 +79,7 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             tracker: self.tracker.clone(),
+            keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
             stats_repository: self.stats_repository.clone(),
@@ -86,6 +90,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.keys_handler,
                     self.whitelist_manager,
                     self.stats_event_sender,
                     self.stats_repository,
@@ -108,6 +113,7 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             tracker: self.tracker,
+            keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,
             stats_event_sender: self.stats_event_sender,
             stats_repository: self.stats_repository,

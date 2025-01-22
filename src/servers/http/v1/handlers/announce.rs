@@ -274,17 +274,12 @@ mod tests {
 
     /// Initialize tracker's dependencies and tracker.
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication, authentication_service) =
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
             initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = Arc::new(initialize_tracker(
-            config,
-            &database,
-            &whitelist_authorization,
-            &authentication,
-        ));
+        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
 
         (tracker, stats_event_sender, whitelist_authorization, authentication_service)
     }

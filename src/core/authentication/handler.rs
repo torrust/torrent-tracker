@@ -303,7 +303,8 @@ mod tests {
                 use torrust_tracker_clock::clock::Time;
 
                 use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
-                use crate::core::authentication::{AddKeyRequest, Key};
+                use crate::core::authentication::handler::AddKeyRequest;
+                use crate::core::authentication::Key;
                 use crate::CurrentClock;
 
                 #[tokio::test]
@@ -344,7 +345,8 @@ mod tests {
             mod pre_generated_keys {
 
                 use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
-                use crate::core::authentication::{AddKeyRequest, Key};
+                use crate::core::authentication::handler::AddKeyRequest;
+                use crate::core::authentication::Key;
 
                 #[tokio::test]
                 async fn it_should_add_a_pre_generated_key() {

@@ -115,8 +115,8 @@ mod tests {
     use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
     use crate::core::authentication::service;
     use crate::core::services::{initialize_database, initialize_tracker, statistics};
+    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{authentication, whitelist};
     use crate::servers::http::Version;
     use crate::servers::registar::Registar;
 
@@ -140,13 +140,12 @@ mod tests {
         let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
         let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
         let authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
-        let keys_handler = Arc::new(KeysHandler::new(
+        let _keys_handler = Arc::new(KeysHandler::new(
             &db_key_repository.clone(),
             &in_memory_key_repository.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let version = Version::V1;
 

@@ -39,6 +39,7 @@ use tracing::{instrument, Level};
 
 use super::routes::router;
 use crate::bootstrap::jobs::Started;
+use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::repository::Repository;
 use crate::core::whitelist::manager::WhiteListManager;
 use crate::core::{statistics, Tracker};
@@ -127,10 +128,11 @@ impl ApiServer<Stopped> {
     ///
     /// It would panic if the bound socket address cannot be sent back to this starter.
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(self, tracker, whitelist_manager, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, keys_handler, whitelist_manager, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        keys_handler: Arc<KeysHandler>,
         whitelist_manager: Arc<WhiteListManager>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         stats_repository: Arc<Repository>,
@@ -149,6 +151,7 @@ impl ApiServer<Stopped> {
             let _task = launcher
                 .start(
                     tracker,
+                    keys_handler,
                     whitelist_manager,
                     ban_service,
                     stats_event_sender,
@@ -259,6 +262,7 @@ impl Launcher {
     #[instrument(skip(
         self,
         tracker,
+        keys_handler,
         whitelist_manager,
         ban_service,
         stats_event_sender,
@@ -270,6 +274,7 @@ impl Launcher {
     pub fn start(
         &self,
         tracker: Arc<Tracker>,
+        keys_handler: Arc<KeysHandler>,
         whitelist_manager: Arc<WhiteListManager>,
         ban_service: Arc<RwLock<BanService>>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
@@ -283,6 +288,7 @@ impl Launcher {
 
         let router = router(
             tracker,
+            keys_handler,
             whitelist_manager,
             ban_service,
             stats_event_sender,
@@ -347,8 +353,8 @@ mod tests {
     use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
     use crate::core::authentication::service;
     use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+    use crate::core::whitelist;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{authentication, whitelist};
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
     use crate::servers::udp::server::banning::BanService;
@@ -380,9 +386,8 @@ mod tests {
             &db_key_repository.clone(),
             &in_memory_key_repository.clone(),
         ));
-        let authentication = Arc::new(authentication::Facade::new(&keys_handler));
 
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization, &authentication));
+        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
 
         let bind_to = config.bind_address;
 
@@ -399,6 +404,7 @@ mod tests {
         let started = stopped
             .start(
                 tracker,
+                keys_handler,
                 whitelist_manager,
                 stats_event_sender,
                 stats_repository,

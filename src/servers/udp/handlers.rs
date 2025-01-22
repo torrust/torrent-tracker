@@ -516,18 +516,13 @@ mod tests {
     }
 
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
-        let (database, in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+        let (database, in_memory_whitelist, whitelist_authorization, _authentication_service) =
             initialize_tracker_dependencies(config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-        let tracker = Arc::new(initialize_tracker(
-            config,
-            &database,
-            &whitelist_authorization,
-            &authentication,
-        ));
+        let tracker = Arc::new(initialize_tracker(config, &database, &whitelist_authorization));
 
         (
             tracker,
@@ -635,10 +630,10 @@ mod tests {
     fn test_tracker_factory() -> (Arc<Tracker>, Arc<whitelist::authorization::Authorization>) {
         let config = tracker_configuration();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+        let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
             initialize_tracker_dependencies(&config);
 
-        let tracker = Arc::new(Tracker::new(&config.core, &database, &whitelist_authorization, &authentication).unwrap());
+        let tracker = Arc::new(Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
 
         (tracker, whitelist_authorization)
     }
@@ -1383,7 +1378,7 @@ mod tests {
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
-                    let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+                    let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
                         initialize_tracker_dependencies(&config);
 
                     let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
@@ -1395,8 +1390,7 @@ mod tests {
                     let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                         Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                    let tracker =
-                        Arc::new(core::Tracker::new(&config.core, &database, &whitelist_authorization, &authentication).unwrap());
+                    let tracker = Arc::new(core::Tracker::new(&config.core, &database, &whitelist_authorization).unwrap());
 
                     let loopback_ipv4 = Ipv4Addr::new(127, 0, 0, 1);
                     let loopback_ipv6 = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
