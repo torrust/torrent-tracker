@@ -142,7 +142,7 @@ mod tests {
         async fn should_return_none_if_the_tracker_does_not_have_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = initialize_tracker(&config, &database, &whitelist_authorization, &authentication);
@@ -162,7 +162,7 @@ mod tests {
         async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(
@@ -213,7 +213,7 @@ mod tests {
         async fn should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(
@@ -232,7 +232,7 @@ mod tests {
         async fn should_return_a_summarized_info_for_all_torrents() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(
@@ -264,7 +264,7 @@ mod tests {
         async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(
@@ -294,7 +294,7 @@ mod tests {
         async fn should_allow_using_pagination_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(
@@ -333,7 +333,7 @@ mod tests {
         async fn should_return_torrents_ordered_by_info_hash() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let tracker = Arc::new(initialize_tracker(

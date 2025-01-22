@@ -15,6 +15,7 @@ use bittorrent_http_protocol::v1::services::peer_ip_resolver::{self, ClientIpSou
 use hyper::StatusCode;
 use torrust_tracker_primitives::core::ScrapeData;
 
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::Tracker;
@@ -28,13 +29,13 @@ use crate::servers::http::v1::services;
 #[allow(clippy::unused_async)]
 #[allow(clippy::type_complexity)]
 pub async fn handle_without_key(
-    State(state): State<(Arc<Tracker>, Arc<Option<Box<dyn Sender>>>)>,
+    State(state): State<(Arc<Tracker>, Arc<AuthenticationService>, Arc<Option<Box<dyn Sender>>>)>,
     ExtractRequest(scrape_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
 ) -> Response {
     tracing::debug!("http scrape request: {:#?}", &scrape_request);
 
-    handle(&state.0, &state.1, &scrape_request, &client_ip_sources, None).await
+    handle(&state.0, &state.1, &state.2, &scrape_request, &client_ip_sources, None).await
 }
 
 /// It handles the `scrape` request when the HTTP tracker is configured
@@ -44,24 +45,34 @@ pub async fn handle_without_key(
 #[allow(clippy::unused_async)]
 #[allow(clippy::type_complexity)]
 pub async fn handle_with_key(
-    State(state): State<(Arc<Tracker>, Arc<Option<Box<dyn Sender>>>)>,
+    State(state): State<(Arc<Tracker>, Arc<AuthenticationService>, Arc<Option<Box<dyn Sender>>>)>,
     ExtractRequest(scrape_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
     ExtractKey(key): ExtractKey,
 ) -> Response {
     tracing::debug!("http scrape request: {:#?}", &scrape_request);
 
-    handle(&state.0, &state.1, &scrape_request, &client_ip_sources, Some(key)).await
+    handle(&state.0, &state.1, &state.2, &scrape_request, &client_ip_sources, Some(key)).await
 }
 
 async fn handle(
     tracker: &Arc<Tracker>,
+    authentication_service: &Arc<AuthenticationService>,
     stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     scrape_request: &Scrape,
     client_ip_sources: &ClientIpSources,
     maybe_key: Option<Key>,
 ) -> Response {
-    let scrape_data = match handle_scrape(tracker, stats_event_sender, scrape_request, client_ip_sources, maybe_key).await {
+    let scrape_data = match handle_scrape(
+        tracker,
+        authentication_service,
+        stats_event_sender,
+        scrape_request,
+        client_ip_sources,
+        maybe_key,
+    )
+    .await
+    {
         Ok(scrape_data) => scrape_data,
         Err(error) => return (StatusCode::OK, error.write()).into_response(),
     };
@@ -76,6 +87,7 @@ async fn handle(
 
 async fn handle_scrape(
     tracker: &Arc<Tracker>,
+    authentication_service: &Arc<AuthenticationService>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     scrape_request: &Scrape,
     client_ip_sources: &ClientIpSources,
@@ -84,7 +96,7 @@ async fn handle_scrape(
     // Authentication
     let return_real_scrape_data = if tracker.requires_authentication() {
         match maybe_key {
-            Some(key) => match tracker.authentication.authenticate(&key).await {
+            Some(key) => match authentication_service.authenticate(&key).await {
                 Ok(()) => true,
                 Err(_error) => false,
             },
@@ -119,6 +131,7 @@ fn build_response(scrape_data: ScrapeData) -> Response {
 mod tests {
     use std::net::IpAddr;
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use bittorrent_http_protocol::v1::requests::scrape::Scrape;
     use bittorrent_http_protocol::v1::responses;
@@ -127,54 +140,83 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::authentication::service::AuthenticationService;
     use crate::core::services::{initialize_tracker, statistics};
     use crate::core::Tracker;
 
-    fn private_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
+    fn private_tracker() -> (
+        Tracker,
+        Option<Box<dyn crate::core::statistics::event::sender::Sender>>,
+        Arc<AuthenticationService>,
+    ) {
         let config = configuration::ephemeral_private();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, authentication_service) =
+            initialize_tracker_dependencies(&config);
+
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
+            authentication_service,
         )
     }
 
-    fn whitelisted_tracker() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
+    fn whitelisted_tracker() -> (
+        Tracker,
+        Option<Box<dyn crate::core::statistics::event::sender::Sender>>,
+        Arc<AuthenticationService>,
+    ) {
         let config = configuration::ephemeral_listed();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, authentication_service) =
+            initialize_tracker_dependencies(&config);
+
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
+            authentication_service,
         )
     }
 
-    fn tracker_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
+    fn tracker_on_reverse_proxy() -> (
+        Tracker,
+        Option<Box<dyn crate::core::statistics::event::sender::Sender>>,
+        Arc<AuthenticationService>,
+    ) {
         let config = configuration::ephemeral_with_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, authentication_service) =
+            initialize_tracker_dependencies(&config);
+
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
+            authentication_service,
         )
     }
 
-    fn tracker_not_on_reverse_proxy() -> (Tracker, Option<Box<dyn crate::core::statistics::event::sender::Sender>>) {
+    fn tracker_not_on_reverse_proxy() -> (
+        Tracker,
+        Option<Box<dyn crate::core::statistics::event::sender::Sender>>,
+        Arc<AuthenticationService>,
+    ) {
         let config = configuration::ephemeral_without_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, authentication_service) =
+            initialize_tracker_dependencies(&config);
+
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication),
             stats_event_sender,
+            authentication_service,
         )
     }
 
@@ -210,7 +252,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_authentication_key_is_missing() {
-            let (tracker, stats_event_sender) = private_tracker();
+            let (tracker, stats_event_sender, authentication_service) = private_tracker();
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -219,6 +261,7 @@ mod tests {
 
             let scrape_data = handle_scrape(
                 &tracker,
+                &authentication_service,
                 &stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
@@ -234,7 +277,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_authentication_key_is_invalid() {
-            let (tracker, stats_event_sender) = private_tracker();
+            let (tracker, stats_event_sender, authentication_service) = private_tracker();
             let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -244,6 +287,7 @@ mod tests {
 
             let scrape_data = handle_scrape(
                 &tracker,
+                &authentication_service,
                 &stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
@@ -269,7 +313,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_torrent_is_not_whitelisted() {
-            let (tracker, stats_event_sender) = whitelisted_tracker();
+            let (tracker, stats_event_sender, authentication_service) = whitelisted_tracker();
             let tracker: Arc<crate::core::Tracker> = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -277,6 +321,7 @@ mod tests {
 
             let scrape_data = handle_scrape(
                 &tracker,
+                &authentication_service,
                 &stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
@@ -302,7 +347,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (tracker, stats_event_sender) = tracker_on_reverse_proxy();
+            let (tracker, stats_event_sender, authentication_service) = tracker_on_reverse_proxy();
             let tracker: Arc<crate::core::Tracker> = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -313,6 +358,7 @@ mod tests {
 
             let response = handle_scrape(
                 &tracker,
+                &authentication_service,
                 &stats_event_sender,
                 &sample_scrape_request(),
                 &client_ip_sources,
@@ -339,7 +385,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (tracker, stats_event_sender) = tracker_not_on_reverse_proxy();
+            let (tracker, stats_event_sender, authentication_service) = tracker_not_on_reverse_proxy();
             let tracker: Arc<crate::core::Tracker> = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
@@ -350,6 +396,7 @@ mod tests {
 
             let response = handle_scrape(
                 &tracker,
+                &authentication_service,
                 &stats_event_sender,
                 &sample_scrape_request(),
                 &client_ip_sources,

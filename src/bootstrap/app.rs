@@ -114,6 +114,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
 
     AppContainer {
         tracker,
+        authentication_service,
         whitelist_authorization,
         ban_service,
         stats_event_sender,

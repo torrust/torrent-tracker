@@ -132,7 +132,8 @@ mod tests {
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let config = tracker_configuration();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            initialize_tracker_dependencies(&config);
         let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_repository = Arc::new(stats_repository);
 

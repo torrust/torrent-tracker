@@ -816,7 +816,7 @@ mod tests {
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
@@ -825,7 +825,7 @@ mod tests {
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
 
-            let (database, in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
@@ -839,7 +839,7 @@ mod tests {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
-            let (database, _in_memory_whitelist, whitelist_authorization, authentication) =
+            let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
                 initialize_tracker_dependencies(&config);
 
             initialize_tracker(&config, &database, &whitelist_authorization, &authentication)

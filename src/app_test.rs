@@ -6,7 +6,7 @@ use torrust_tracker_configuration::Configuration;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
-use crate::core::authentication::service;
+use crate::core::authentication::service::{self, AuthenticationService};
 use crate::core::databases::Database;
 use crate::core::services::initialize_database;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
@@ -22,6 +22,7 @@ pub fn initialize_tracker_dependencies(
     Arc<InMemoryWhitelist>,
     Arc<whitelist::authorization::Authorization>,
     Arc<authentication::Facade>,
+    Arc<AuthenticationService>,
 ) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
@@ -36,7 +37,13 @@ pub fn initialize_tracker_dependencies(
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
-    let authentication = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
+    let authentication_facade = Arc::new(authentication::Facade::new(&authentication_service, &keys_handler));
 
-    (database, in_memory_whitelist, whitelist_authorization, authentication)
+    (
+        database,
+        in_memory_whitelist,
+        whitelist_authorization,
+        authentication_facade,
+        authentication_service,
+    )
 }

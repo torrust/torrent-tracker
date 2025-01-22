@@ -11,6 +11,7 @@ use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
@@ -42,10 +43,19 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    #[instrument(skip(self, tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt))]
+    #[instrument(skip(
+        self,
+        tracker,
+        authentication_service,
+        whitelist_authorization,
+        stats_event_sender,
+        tx_start,
+        rx_halt
+    ))]
     fn start(
         &self,
         tracker: Arc<Tracker>,
+        authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         tx_start: Sender<Started>,
@@ -67,7 +77,13 @@ impl Launcher {
 
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
-        let app = router(tracker, whitelist_authorization, stats_event_sender, address);
+        let app = router(
+            tracker,
+            authentication_service,
+            whitelist_authorization,
+            stats_event_sender,
+            address,
+        );
 
         let running = Box::pin(async {
             match tls {
@@ -163,6 +179,7 @@ impl HttpServer<Stopped> {
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         form: ServiceRegistrationForm,
@@ -173,7 +190,14 @@ impl HttpServer<Stopped> {
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
-            let server = launcher.start(tracker, whitelist_authorization, stats_event_sender, tx_start, rx_halt);
+            let server = launcher.start(
+                tracker,
+                authentication_service,
+                whitelist_authorization,
+                stats_event_sender,
+                tx_start,
+                rx_halt,
+            );
 
             server.await;
 
@@ -296,7 +320,13 @@ mod tests {
 
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
         let started = stopped
-            .start(tracker, whitelist_authorization, stats_event_sender, register.give_form())
+            .start(
+                tracker,
+                authentication_service,
+                whitelist_authorization,
+                stats_event_sender,
+                register.give_form(),
+            )
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

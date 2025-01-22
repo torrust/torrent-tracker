@@ -19,6 +19,7 @@ use torrust_tracker_configuration::HttpTracker;
 use tracing::instrument;
 
 use super::make_rust_tls;
+use crate::core::authentication::service::AuthenticationService;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{self, statistics, whitelist};
 use crate::servers::http::server::{HttpServer, Launcher};
@@ -34,10 +35,11 @@ use crate::servers::registar::ServiceRegistrationForm;
 ///
 /// It would panic if the `config::HttpTracker` struct would contain inappropriate values.
 ///
-#[instrument(skip(config, tracker, whitelist_authorization, stats_event_sender, form))]
+#[instrument(skip(config, tracker, authentication_service, whitelist_authorization, stats_event_sender, form))]
 pub async fn start_job(
     config: &HttpTracker,
     tracker: Arc<core::Tracker>,
+    authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     form: ServiceRegistrationForm,
@@ -55,6 +57,7 @@ pub async fn start_job(
                 socket,
                 tls,
                 tracker.clone(),
+                authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
                 form,
@@ -70,12 +73,19 @@ async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
     form: ServiceRegistrationForm,
 ) -> JoinHandle<()> {
     let server = HttpServer::new(Launcher::new(socket, tls))
-        .start(tracker, whitelist_authorization, stats_event_sender, form)
+        .start(
+            tracker,
+            authentication_service,
+            whitelist_authorization,
+            stats_event_sender,
+            form,
+        )
         .await
         .expect("it should be able to start to the http tracker");
 
@@ -143,6 +153,7 @@ mod tests {
         start_job(
             config,
             tracker,
+            authentication_service,
             whitelist_authorization,
             stats_event_sender,
             Registar::default().give_form(),

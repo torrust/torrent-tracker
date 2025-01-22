@@ -87,7 +87,8 @@ mod tests {
     fn public_tracker() -> Tracker {
         let config = configuration::ephemeral_public();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            initialize_tracker_dependencies(&config);
 
         initialize_tracker(&config, &database, &whitelist_authorization, &authentication)
     }
@@ -115,7 +116,8 @@ mod tests {
     fn test_tracker_factory() -> Tracker {
         let config = configuration::ephemeral();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication) = initialize_tracker_dependencies(&config);
+        let (database, _in_memory_whitelist, whitelist_authorization, authentication, _authentication_service) =
+            initialize_tracker_dependencies(&config);
 
         Tracker::new(&config.core, &database, &whitelist_authorization, &authentication).unwrap()
     }
