@@ -7,7 +7,7 @@ use super::key::repository::in_memory::InMemoryKeyRepository;
 use super::{key, Error, Key};
 
 #[derive(Debug)]
-pub struct Service {
+pub struct AuthenticationService {
     /// The tracker configuration.
     config: Core,
 
@@ -15,7 +15,7 @@ pub struct Service {
     in_memory_key_repository: Arc<InMemoryKeyRepository>,
 }
 
-impl Service {
+impl AuthenticationService {
     #[must_use]
     pub fn new(config: &Core, in_memory_key_repository: &Arc<InMemoryKeyRepository>) -> Self {
         Self {
@@ -81,14 +81,14 @@ mod tests {
 
         use crate::core::authentication;
         use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
-        use crate::core::authentication::service::Service;
+        use crate::core::authentication::service::AuthenticationService;
 
-        fn instantiate_authentication() -> Service {
+        fn instantiate_authentication() -> AuthenticationService {
             let config = configuration::ephemeral_private();
 
             let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
 
-            Service::new(&config.core, &in_memory_key_repository.clone())
+            AuthenticationService::new(&config.core, &in_memory_key_repository.clone())
         }
 
         #[tokio::test]

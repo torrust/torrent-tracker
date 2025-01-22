@@ -95,7 +95,10 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
     let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
     let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-    let authentication_service = Arc::new(service::Service::new(&configuration.core, &in_memory_key_repository));
+    let authentication_service = Arc::new(service::AuthenticationService::new(
+        &configuration.core,
+        &in_memory_key_repository,
+    ));
     let keys_handler = Arc::new(KeysHandler::new(
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),

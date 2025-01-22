@@ -18,7 +18,7 @@ pub type Error = key::Error;
 
 pub struct Facade {
     /// The authentication service.
-    authentication_service: Arc<service::Service>,
+    authentication_service: Arc<service::AuthenticationService>,
 
     /// The keys handler.
     keys_handler: Arc<handler::KeysHandler>,
@@ -26,7 +26,7 @@ pub struct Facade {
 
 impl Facade {
     #[must_use]
-    pub fn new(authentication_service: &Arc<service::Service>, keys_handler: &Arc<handler::KeysHandler>) -> Self {
+    pub fn new(authentication_service: &Arc<service::AuthenticationService>, keys_handler: &Arc<handler::KeysHandler>) -> Self {
         Self {
             authentication_service: authentication_service.clone(),
             keys_handler: keys_handler.clone(),
@@ -174,7 +174,7 @@ mod tests {
             let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
             let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
 
-            let authentication_service = Arc::new(service::Service::new(&config.core, &in_memory_key_repository));
+            let authentication_service = Arc::new(service::AuthenticationService::new(&config.core, &in_memory_key_repository));
             let keys_handler = Arc::new(KeysHandler::new(
                 &db_key_repository.clone(),
                 &in_memory_key_repository.clone(),

@@ -31,7 +31,7 @@ pub fn initialize_tracker_dependencies(
     ));
     let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
     let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-    let authentication_service = Arc::new(service::Service::new(&config.core, &in_memory_key_repository));
+    let authentication_service = Arc::new(service::AuthenticationService::new(&config.core, &in_memory_key_repository));
     let keys_handler = Arc::new(KeysHandler::new(
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
