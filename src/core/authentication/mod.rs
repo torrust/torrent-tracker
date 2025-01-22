@@ -145,7 +145,6 @@ mod tests {
 
     mod the_tracker_configured_as_private {
 
-        use std::str::FromStr;
         use std::time::Duration;
 
         use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
@@ -173,30 +172,6 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn it_should_fail_authenticating_a_peer_when_it_uses_an_unregistered_key() {
-            let authentication = instantiate_authentication();
-
-            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
-
-            let result = authentication.authenticate(&unregistered_key).await;
-
-            assert!(result.is_err());
-        }
-
-        #[tokio::test]
-        async fn it_should_fail_verifying_an_unregistered_authentication_key() {
-            let authentication = instantiate_authentication();
-
-            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
-
-            assert!(authentication
-                .authentication_service
-                .verify_auth_key(&unregistered_key)
-                .await
-                .is_err());
-        }
-
-        #[tokio::test]
         async fn it_should_remove_an_authentication_key() {
             let authentication = instantiate_authentication();
 
@@ -208,9 +183,11 @@ mod tests {
             let result = authentication.remove_auth_key(&expiring_key.key()).await;
 
             assert!(result.is_ok());
+
+            // The key should no longer be valid
             assert!(authentication
                 .authentication_service
-                .verify_auth_key(&expiring_key.key())
+                .authenticate(&expiring_key.key())
                 .await
                 .is_err());
         }
@@ -230,9 +207,11 @@ mod tests {
             let result = authentication.load_keys_from_database().await;
 
             assert!(result.is_ok());
+
+            // The key should no longer be valid
             assert!(authentication
                 .authentication_service
-                .verify_auth_key(&expiring_key.key())
+                .authenticate(&expiring_key.key())
                 .await
                 .is_ok());
         }

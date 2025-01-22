@@ -49,7 +49,7 @@ impl Service {
     /// # Errors
     ///
     /// Will return a `key::Error` if unable to get any `auth_key`.
-    pub async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
+    async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
         match self.in_memory_key_repository.get(key).await {
             None => Err(Error::UnableToReadKey {
                 location: Location::caller(),
@@ -65,6 +65,41 @@ impl Service {
                 }
                 None => key::verify_key_expiration(&key),
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    mod the_tracker_configured_as_private {
+
+        use std::str::FromStr;
+        use std::sync::Arc;
+
+        use torrust_tracker_test_helpers::configuration;
+
+        use crate::core::authentication;
+        use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+        use crate::core::authentication::service::Service;
+
+        fn instantiate_authentication() -> Service {
+            let config = configuration::ephemeral_private();
+
+            let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+            Service::new(&config.core, &in_memory_key_repository.clone())
+        }
+
+        #[tokio::test]
+        async fn it_should_not_authenticate_an_unregistered_key() {
+            let authentication = instantiate_authentication();
+
+            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+            let result = authentication.authenticate(&unregistered_key).await;
+
+            assert!(result.is_err());
         }
     }
 }
