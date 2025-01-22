@@ -108,15 +108,8 @@ mod tests {
 
     use torrust_tracker_test_helpers::configuration::ephemeral_public;
 
-    use crate::bootstrap::app::initialize_global_services;
+    use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::http_tracker::start_job;
-    use crate::core::authentication::handler::KeysHandler;
-    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
-    use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
-    use crate::core::authentication::service;
-    use crate::core::services::{initialize_database, initialize_tracker, statistics};
-    use crate::core::whitelist;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::servers::http::Version;
     use crate::servers::registar::Registar;
 
@@ -126,35 +119,18 @@ mod tests {
         let http_tracker = cfg.http_trackers.clone().expect("missing HTTP tracker configuration");
         let config = &http_tracker[0];
 
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(cfg.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-
         initialize_global_services(&cfg);
 
-        let database = initialize_database(&cfg);
-        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
-            &cfg.core,
-            &in_memory_whitelist.clone(),
-        ));
-        let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
-        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-        let authentication_service = Arc::new(service::AuthenticationService::new(&cfg.core, &in_memory_key_repository));
-        let _keys_handler = Arc::new(KeysHandler::new(
-            &db_key_repository.clone(),
-            &in_memory_key_repository.clone(),
-        ));
-
-        let tracker = Arc::new(initialize_tracker(&cfg, &database, &whitelist_authorization));
+        let app_container = initialize_app_container(&cfg);
 
         let version = Version::V1;
 
         start_job(
             config,
-            tracker,
-            authentication_service,
-            whitelist_authorization,
-            stats_event_sender,
+            app_container.tracker,
+            app_container.authentication_service,
+            app_container.whitelist_authorization,
+            app_container.stats_event_sender,
             Registar::default().give_form(),
             version,
         )
