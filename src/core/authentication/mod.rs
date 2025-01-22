@@ -7,7 +7,7 @@ use key::repository::persisted::DatabaseKeyRepository;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-use super::databases::{self, Database};
+use super::databases::{self};
 use super::error::PeerKeyError;
 use crate::CurrentClock;
 
@@ -29,12 +29,13 @@ pub struct Facade {
 
 impl Facade {
     #[must_use]
-    pub fn new(config: &Core, database: &Arc<Box<dyn Database>>) -> Self {
-        let db_key_repository = Arc::new(DatabaseKeyRepository::new(database));
-        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
-
+    pub fn new(
+        config: &Core,
+        db_key_repository: &Arc<DatabaseKeyRepository>,
+        in_memory_key_repository: &Arc<InMemoryKeyRepository>,
+    ) -> Self {
         Self {
-            authentication_service: service::Service::new(config, &in_memory_key_repository),
+            authentication_service: service::Service::new(config, in_memory_key_repository),
             keys_handler: KeysHandler::new(&db_key_repository.clone(), &in_memory_key_repository.clone()),
         }
     }
@@ -145,20 +146,22 @@ mod tests {
 
     mod the_tracker_configured_as_private {
 
+        use std::sync::Arc;
         use std::time::Duration;
 
         use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
+        use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::authentication;
+        use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+        use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
         use crate::core::services::initialize_database;
 
         fn instantiate_authentication_facade() -> authentication::Facade {
             let config = configuration::ephemeral_private();
 
-            let database = initialize_database(&config);
-
-            authentication::Facade::new(&config.core, &database.clone())
+            instantiate_authentication_facade_with_configuration(&config)
         }
 
         fn instantiate_authentication_facade_with_checking_keys_expiration_disabled() -> authentication::Facade {
@@ -168,9 +171,16 @@ mod tests {
                 check_keys_expiration: false,
             });
 
-            let database = initialize_database(&config);
-            
-            authentication::Facade::new(&config.core, &database.clone())
+            instantiate_authentication_facade_with_configuration(&config)
+        }
+
+        fn instantiate_authentication_facade_with_configuration(config: &Configuration) -> authentication::Facade {
+            let database = initialize_database(config);
+
+            let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
+            let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+            authentication::Facade::new(&config.core, &db_key_repository.clone(), &in_memory_key_repository.clone())
         }
 
         #[tokio::test]
