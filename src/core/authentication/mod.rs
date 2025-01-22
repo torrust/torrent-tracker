@@ -221,28 +221,10 @@ mod tests {
             mod randomly_generated_keys {
                 use std::time::Duration;
 
-                use torrust_tracker_clock::clock::Time;
-
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
                     instantiate_authentication, instantiate_authentication_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::Key;
-                use crate::CurrentClock;
-
-                #[tokio::test]
-                async fn it_should_generate_the_key() {
-                    let authentication = instantiate_authentication();
-
-                    let peer_key = authentication
-                        .generate_auth_key(Some(Duration::from_secs(100)))
-                        .await
-                        .unwrap();
-
-                    assert_eq!(
-                        peer_key.valid_until,
-                        Some(CurrentClock::now_add(&Duration::from_secs(100)).unwrap())
-                    );
-                }
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
@@ -274,33 +256,11 @@ mod tests {
             }
 
             mod pre_generated_keys {
-                use std::time::Duration;
-
-                use torrust_tracker_clock::clock::Time;
 
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
                     instantiate_authentication, instantiate_authentication_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::{AddKeyRequest, Key};
-                use crate::CurrentClock;
-
-                #[tokio::test]
-                async fn it_should_add_a_pre_generated_key() {
-                    let authentication = instantiate_authentication();
-
-                    let peer_key = authentication
-                        .add_peer_key(AddKeyRequest {
-                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
-                            opt_seconds_valid: Some(100),
-                        })
-                        .await
-                        .unwrap();
-
-                    assert_eq!(
-                        peer_key.valid_until,
-                        Some(CurrentClock::now_add(&Duration::from_secs(100)).unwrap())
-                    );
-                }
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
@@ -342,15 +302,6 @@ mod tests {
                 use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication;
 
                 #[tokio::test]
-                async fn it_should_generate_the_key() {
-                    let authentication = instantiate_authentication();
-
-                    let peer_key = authentication.generate_permanent_auth_key().await.unwrap();
-
-                    assert_eq!(peer_key.valid_until, None);
-                }
-
-                #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
                     let authentication = instantiate_authentication();
 
@@ -365,21 +316,6 @@ mod tests {
             mod pre_generated_keys {
                 use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication;
                 use crate::core::authentication::{AddKeyRequest, Key};
-
-                #[tokio::test]
-                async fn it_should_add_a_pre_generated_key() {
-                    let authentication = instantiate_authentication();
-
-                    let peer_key = authentication
-                        .add_peer_key(AddKeyRequest {
-                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
-                            opt_seconds_valid: None,
-                        })
-                        .await
-                        .unwrap();
-
-                    assert_eq!(peer_key.valid_until, None);
-                }
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {

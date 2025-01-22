@@ -231,3 +231,136 @@ impl KeysHandler {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    mod the_keys_handler_when_tracker_is_configured_as_private {
+
+        use std::sync::Arc;
+
+        use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
+        use torrust_tracker_configuration::Configuration;
+        use torrust_tracker_test_helpers::configuration;
+
+        use crate::core::authentication::handler::KeysHandler;
+        use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+        use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
+        use crate::core::services::initialize_database;
+
+        fn instantiate_keys_handler() -> KeysHandler {
+            let config = configuration::ephemeral_private();
+
+            instantiate_keys_handler_with_configuration(&config)
+        }
+
+        #[allow(dead_code)]
+        fn instantiate_keys_handler_with_checking_keys_expiration_disabled() -> KeysHandler {
+            let mut config = configuration::ephemeral_private();
+
+            config.core.private_mode = Some(PrivateMode {
+                check_keys_expiration: false,
+            });
+
+            instantiate_keys_handler_with_configuration(&config)
+        }
+
+        fn instantiate_keys_handler_with_configuration(config: &Configuration) -> KeysHandler {
+            let database = initialize_database(config);
+
+            let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
+            let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+            KeysHandler::new(&db_key_repository, &in_memory_key_repository)
+        }
+
+        mod with_expiring_and {
+
+            mod randomly_generated_keys {
+                use std::time::Duration;
+
+                use torrust_tracker_clock::clock::Time;
+
+                use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
+                use crate::CurrentClock;
+
+                #[tokio::test]
+                async fn it_should_generate_the_key() {
+                    let keys_handler = instantiate_keys_handler();
+
+                    let peer_key = keys_handler.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+
+                    assert_eq!(
+                        peer_key.valid_until,
+                        Some(CurrentClock::now_add(&Duration::from_secs(100)).unwrap())
+                    );
+                }
+            }
+
+            mod pre_generated_keys {
+                use std::time::Duration;
+
+                use torrust_tracker_clock::clock::Time;
+
+                use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
+                use crate::core::authentication::{AddKeyRequest, Key};
+                use crate::CurrentClock;
+
+                #[tokio::test]
+                async fn it_should_add_a_pre_generated_key() {
+                    let keys_handler = instantiate_keys_handler();
+
+                    let peer_key = keys_handler
+                        .add_peer_key(AddKeyRequest {
+                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
+                            opt_seconds_valid: Some(100),
+                        })
+                        .await
+                        .unwrap();
+
+                    assert_eq!(
+                        peer_key.valid_until,
+                        Some(CurrentClock::now_add(&Duration::from_secs(100)).unwrap())
+                    );
+                }
+            }
+        }
+
+        mod with_permanent_and {
+
+            mod randomly_generated_keys {
+                use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
+
+                #[tokio::test]
+                async fn it_should_generate_the_key() {
+                    let keys_handler = instantiate_keys_handler();
+
+                    let peer_key = keys_handler.generate_permanent_auth_key().await.unwrap();
+
+                    assert_eq!(peer_key.valid_until, None);
+                }
+            }
+
+            mod pre_generated_keys {
+
+                use crate::core::authentication::handler::tests::the_keys_handler_when_tracker_is_configured_as_private::instantiate_keys_handler;
+                use crate::core::authentication::{AddKeyRequest, Key};
+
+                #[tokio::test]
+                async fn it_should_add_a_pre_generated_key() {
+                    let keys_handler = instantiate_keys_handler();
+
+                    let peer_key = keys_handler
+                        .add_peer_key(AddKeyRequest {
+                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
+                            opt_seconds_valid: None,
+                        })
+                        .await
+                        .unwrap();
+
+                    assert_eq!(peer_key.valid_until, None);
+                }
+            }
+        }
+    }
+}
