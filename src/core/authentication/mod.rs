@@ -1,10 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use handler::{AddKeyRequest, KeysHandler};
-use key::repository::in_memory::InMemoryKeyRepository;
-use key::repository::persisted::DatabaseKeyRepository;
-use torrust_tracker_configuration::Core;
+use handler::AddKeyRequest;
 use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
 use super::databases::{self};
@@ -21,22 +18,18 @@ pub type Error = key::Error;
 
 pub struct Facade {
     /// The authentication service.
-    authentication_service: service::Service,
+    authentication_service: Arc<service::Service>,
 
     /// The keys handler.
-    keys_handler: handler::KeysHandler,
+    keys_handler: Arc<handler::KeysHandler>,
 }
 
 impl Facade {
     #[must_use]
-    pub fn new(
-        config: &Core,
-        db_key_repository: &Arc<DatabaseKeyRepository>,
-        in_memory_key_repository: &Arc<InMemoryKeyRepository>,
-    ) -> Self {
+    pub fn new(authentication_service: &Arc<service::Service>, keys_handler: &Arc<handler::KeysHandler>) -> Self {
         Self {
-            authentication_service: service::Service::new(config, in_memory_key_repository),
-            keys_handler: KeysHandler::new(&db_key_repository.clone(), &in_memory_key_repository.clone()),
+            authentication_service: authentication_service.clone(),
+            keys_handler: keys_handler.clone(),
         }
     }
 
@@ -153,9 +146,10 @@ mod tests {
         use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::authentication;
+        use crate::core::authentication::handler::KeysHandler;
         use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
         use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
+        use crate::core::authentication::{self, service};
         use crate::core::services::initialize_database;
 
         fn instantiate_authentication_facade() -> authentication::Facade {
@@ -180,7 +174,13 @@ mod tests {
             let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
             let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
 
-            authentication::Facade::new(&config.core, &db_key_repository.clone(), &in_memory_key_repository.clone())
+            let authentication_service = Arc::new(service::Service::new(&config.core, &in_memory_key_repository));
+            let keys_handler = Arc::new(KeysHandler::new(
+                &db_key_repository.clone(),
+                &in_memory_key_repository.clone(),
+            ));
+
+            authentication::Facade::new(&authentication_service, &keys_handler)
         }
 
         #[tokio::test]
