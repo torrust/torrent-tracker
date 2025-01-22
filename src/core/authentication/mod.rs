@@ -153,14 +153,15 @@ mod tests {
         use crate::core::authentication;
         use crate::core::services::initialize_database;
 
-        fn instantiate_authentication() -> authentication::Facade {
+        fn instantiate_authentication_facade() -> authentication::Facade {
             let config = configuration::ephemeral_private();
 
             let database = initialize_database(&config);
+
             authentication::Facade::new(&config.core, &database.clone())
         }
 
-        fn instantiate_authentication_with_checking_keys_expiration_disabled() -> authentication::Facade {
+        fn instantiate_authentication_facade_with_checking_keys_expiration_disabled() -> authentication::Facade {
             let mut config = configuration::ephemeral_private();
 
             config.core.private_mode = Some(PrivateMode {
@@ -168,12 +169,13 @@ mod tests {
             });
 
             let database = initialize_database(&config);
+            
             authentication::Facade::new(&config.core, &database.clone())
         }
 
         #[tokio::test]
         async fn it_should_remove_an_authentication_key() {
-            let authentication = instantiate_authentication();
+            let authentication = instantiate_authentication_facade();
 
             let expiring_key = authentication
                 .generate_auth_key(Some(Duration::from_secs(100)))
@@ -194,7 +196,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_load_authentication_keys_from_the_database() {
-            let authentication = instantiate_authentication();
+            let authentication = instantiate_authentication_facade();
 
             let expiring_key = authentication
                 .generate_auth_key(Some(Duration::from_secs(100)))
@@ -222,13 +224,13 @@ mod tests {
                 use std::time::Duration;
 
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
-                    instantiate_authentication, instantiate_authentication_with_checking_keys_expiration_disabled,
+                    instantiate_authentication_facade, instantiate_authentication_facade_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::Key;
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication();
+                    let authentication = instantiate_authentication_facade();
 
                     let peer_key = authentication
                         .generate_auth_key(Some(Duration::from_secs(100)))
@@ -242,7 +244,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_accept_an_expired_key_when_checking_expiration_is_disabled_in_configuration() {
-                    let authentication = instantiate_authentication_with_checking_keys_expiration_disabled();
+                    let authentication = instantiate_authentication_facade_with_checking_keys_expiration_disabled();
 
                     let past_timestamp = Duration::ZERO;
 
@@ -258,13 +260,13 @@ mod tests {
             mod pre_generated_keys {
 
                 use crate::core::authentication::tests::the_tracker_configured_as_private::{
-                    instantiate_authentication, instantiate_authentication_with_checking_keys_expiration_disabled,
+                    instantiate_authentication_facade, instantiate_authentication_facade_with_checking_keys_expiration_disabled,
                 };
                 use crate::core::authentication::{AddKeyRequest, Key};
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication();
+                    let authentication = instantiate_authentication_facade();
 
                     let peer_key = authentication
                         .add_peer_key(AddKeyRequest {
@@ -281,7 +283,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_accept_an_expired_key_when_checking_expiration_is_disabled_in_configuration() {
-                    let authentication = instantiate_authentication_with_checking_keys_expiration_disabled();
+                    let authentication = instantiate_authentication_facade_with_checking_keys_expiration_disabled();
 
                     let peer_key = authentication
                         .add_peer_key(AddKeyRequest {
@@ -299,11 +301,11 @@ mod tests {
         mod with_permanent_and {
 
             mod randomly_generated_keys {
-                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication;
+                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication_facade;
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication();
+                    let authentication = instantiate_authentication_facade();
 
                     let peer_key = authentication.generate_permanent_auth_key().await.unwrap();
 
@@ -314,12 +316,12 @@ mod tests {
             }
 
             mod pre_generated_keys {
-                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication;
+                use crate::core::authentication::tests::the_tracker_configured_as_private::instantiate_authentication_facade;
                 use crate::core::authentication::{AddKeyRequest, Key};
 
                 #[tokio::test]
                 async fn it_should_authenticate_a_peer_with_the_key() {
-                    let authentication = instantiate_authentication();
+                    let authentication = instantiate_authentication_facade();
 
                     let peer_key = authentication
                         .add_peer_key(AddKeyRequest {
