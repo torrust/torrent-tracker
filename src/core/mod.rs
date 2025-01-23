@@ -455,6 +455,7 @@ use std::time::Duration;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use torrent::repository::in_memory::InMemoryTorrentRepository;
+use torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
@@ -487,6 +488,9 @@ pub struct Tracker {
 
     /// The in-memory torrents repository.
     torrents: Arc<InMemoryTorrentRepository>,
+
+    /// The persistent torrents repository.
+    db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -547,6 +551,7 @@ impl Tracker {
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
             torrents: Arc::new(InMemoryTorrentRepository::default()),
+            db_torrent_repository: Arc::new(DatabasePersistentTorrentRepository::new(database)),
         })
     }
 
@@ -665,7 +670,7 @@ impl Tracker {
     ///
     /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
     pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
-        let persistent_torrents = self.database.load_persistent_torrents()?;
+        let persistent_torrents = self.db_torrent_repository.load_all()?;
 
         self.torrents.import_persistent(&persistent_torrents);
 
@@ -723,7 +728,7 @@ impl Tracker {
             let completed = swarm_metadata.downloaded;
             let info_hash = *info_hash;
 
-            drop(self.database.save_persistent_torrent(&info_hash, completed));
+            drop(self.db_torrent_repository.save(&info_hash, completed));
         }
     }
 
@@ -759,7 +764,7 @@ impl Tracker {
     ///
     /// Will return `Err` if unable to drop tables.
     pub fn drop_database_tables(&self) -> Result<(), databases::error::Error> {
-        // todo: this is only used for testing. WE have to pass the database
+        // todo: this is only used for testing. We have to pass the database
         // reference directly to the tests instead of via the tracker.
         self.database.drop_database_tables()
     }
