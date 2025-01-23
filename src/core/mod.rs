@@ -449,22 +449,19 @@ pub mod whitelist;
 
 pub mod peer_tests;
 
-use std::cmp::max;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::peer;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
-use torrust_tracker_torrent_repository::entry::EntrySync;
-use torrust_tracker_torrent_repository::repository::Repository;
 
-use self::torrent::Torrents;
 use crate::core::databases::Database;
 use crate::CurrentClock;
 
@@ -489,7 +486,7 @@ pub struct Tracker {
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
-    torrents: Arc<Torrents>,
+    torrents: Arc<InMemoryTorrentRepository>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -549,7 +546,7 @@ impl Tracker {
             config: config.clone(),
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
-            torrents: Arc::default(),
+            torrents: Arc::new(InMemoryTorrentRepository::default()),
         })
     }
 
@@ -656,10 +653,7 @@ impl Tracker {
 
     /// It returns the data for a `scrape` response.
     fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
-        match self.torrents.get(info_hash) {
-            Some(torrent_entry) => torrent_entry.get_swarm_metadata(),
-            None => SwarmMetadata::default(),
-        }
+        self.torrents.get_swarm_metadata(info_hash)
     }
 
     /// It loads the torrents from database into memory. It only loads the torrent entry list with the number of seeders for each torrent.
@@ -684,10 +678,7 @@ impl Tracker {
     ///
     /// It filters out the client making the request.
     fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
-        match self.torrents.get(info_hash) {
-            None => vec![],
-            Some(entry) => entry.get_peers_for_client(&peer.peer_addr, Some(max(limit, TORRENT_PEERS_LIMIT))),
-        }
+        self.torrents.get_peers_for(info_hash, peer, limit)
     }
 
     /// # Context: Tracker
@@ -695,10 +686,7 @@ impl Tracker {
     /// Get torrent peers for a given torrent.
     #[must_use]
     pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
-        match self.torrents.get(info_hash) {
-            None => vec![],
-            Some(entry) => entry.get_peers(Some(TORRENT_PEERS_LIMIT)),
-        }
+        self.torrents.get_torrent_peers(info_hash)
     }
 
     /// It updates the torrent entry in memory, it also stores in the database
@@ -708,14 +696,14 @@ impl Tracker {
     /// # Context: Tracker
     #[must_use]
     pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
-        let swarm_metadata_before = match self.torrents.get_swarm_metadata(info_hash) {
+        let swarm_metadata_before = match self.torrents.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
 
         self.torrents.upsert_peer(info_hash, peer);
 
-        let swarm_metadata_after = match self.torrents.get_swarm_metadata(info_hash) {
+        let swarm_metadata_after = match self.torrents.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
@@ -748,7 +736,7 @@ impl Tracker {
     /// Panics if unable to get the torrent metrics.
     #[must_use]
     pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
-        self.torrents.get_metrics()
+        self.torrents.get_torrents_metrics()
     }
 
     /// Remove inactive peers and (optionally) peerless torrents.
@@ -1492,7 +1480,6 @@ mod tests {
 
             use aquatic_udp_protocol::AnnounceEvent;
             use torrust_tracker_torrent_repository::entry::EntrySync;
-            use torrust_tracker_torrent_repository::repository::Repository;
 
             use crate::core::tests::the_tracker::{sample_info_hash, sample_peer, tracker_persisting_torrents_in_database};
 
@@ -1513,7 +1500,7 @@ mod tests {
                 assert_eq!(swarm_stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
-                tracker.torrents.remove(&info_hash);
+                let _unused = tracker.torrents.remove(&info_hash);
 
                 tracker.load_torrents_from_database().unwrap();
 

@@ -10,7 +10,6 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 use torrust_tracker_primitives::peer;
 use torrust_tracker_torrent_repository::entry::EntrySync;
-use torrust_tracker_torrent_repository::repository::Repository;
 
 use crate::core::Tracker;
 
