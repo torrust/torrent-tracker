@@ -132,12 +132,25 @@ mod tests {
     async fn the_statistics_service_should_return_the_tracker_metrics() {
         let config = tracker_configuration();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            _database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            _authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            _torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
+
         let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_repository = Arc::new(stats_repository);
 
-        let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+        let tracker = Arc::new(initialize_tracker(
+            &config,
+            &whitelist_authorization,
+            &in_memory_torrent_repository,
+            &db_torrent_repository,
+        ));
 
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 

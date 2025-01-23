@@ -10,7 +10,6 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::pagination::Pagination;
 use torrust_tracker_primitives::peer;
 use torrust_tracker_torrent_repository::entry::EntrySync;
-use torrust_tracker_torrent_repository::repository::Repository;
 
 use crate::core::Tracker;
 
@@ -46,7 +45,7 @@ pub struct BasicInfo {
 
 /// It returns all the information the tracker has about one torrent in a [Info] struct.
 pub async fn get_torrent_info(tracker: Arc<Tracker>, info_hash: &InfoHash) -> Option<Info> {
-    let torrent_entry_option = tracker.torrents.get(info_hash);
+    let torrent_entry_option = tracker.in_memory_torrent_repository.get(info_hash);
 
     let torrent_entry = torrent_entry_option?;
 
@@ -69,7 +68,7 @@ pub async fn get_torrent_info(tracker: Arc<Tracker>, info_hash: &InfoHash) -> Op
 pub async fn get_torrents_page(tracker: Arc<Tracker>, pagination: Option<&Pagination>) -> Vec<BasicInfo> {
     let mut basic_infos: Vec<BasicInfo> = vec![];
 
-    for (info_hash, torrent_entry) in tracker.torrents.get_paginated(pagination) {
+    for (info_hash, torrent_entry) in tracker.in_memory_torrent_repository.get_paginated(pagination) {
         let stats = torrent_entry.get_swarm_metadata();
 
         basic_infos.push(BasicInfo {
@@ -88,7 +87,11 @@ pub async fn get_torrents(tracker: Arc<Tracker>, info_hashes: &[InfoHash]) -> Ve
     let mut basic_infos: Vec<BasicInfo> = vec![];
 
     for info_hash in info_hashes {
-        if let Some(stats) = tracker.torrents.get(info_hash).map(|t| t.get_swarm_metadata()) {
+        if let Some(stats) = tracker
+            .in_memory_torrent_repository
+            .get(info_hash)
+            .map(|t| t.get_swarm_metadata())
+        {
             basic_infos.push(BasicInfo {
                 info_hash: *info_hash,
                 seeders: u64::from(stats.complete),
@@ -104,9 +107,34 @@ pub async fn get_torrents(tracker: Arc<Tracker>, info_hashes: &[InfoHash]) -> Ve
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
+    use torrust_tracker_configuration::Configuration;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
+
+    use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::services::initialize_tracker;
+    use crate::core::Tracker;
+
+    fn initialize_tracker_and_deps(config: &Configuration) -> Arc<Tracker> {
+        let (
+            _database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            _authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            _torrents_manager,
+        ) = initialize_tracker_dependencies(config);
+
+        Arc::new(initialize_tracker(
+            config,
+            &whitelist_authorization,
+            &in_memory_torrent_repository,
+            &db_torrent_repository,
+        ))
+    }
 
     fn sample_peer() -> peer::Peer {
         peer::Peer {
@@ -131,7 +159,7 @@ mod tests {
 
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::services::initialize_tracker;
-        use crate::core::services::torrent::tests::sample_peer;
+        use crate::core::services::torrent::tests::{initialize_tracker_and_deps, sample_peer};
         use crate::core::services::torrent::{get_torrent_info, Info};
 
         pub fn tracker_configuration() -> Configuration {
@@ -142,10 +170,22 @@ mod tests {
         async fn should_return_none_if_the_tracker_does_not_have_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+            let tracker = initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            );
 
             let tracker = Arc::new(tracker);
 
@@ -162,10 +202,7 @@ mod tests {
         async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -189,15 +226,12 @@ mod tests {
     mod searching_for_torrents {
 
         use std::str::FromStr;
-        use std::sync::Arc;
 
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::app_test::initialize_tracker_dependencies;
-        use crate::core::services::initialize_tracker;
-        use crate::core::services::torrent::tests::sample_peer;
+        use crate::core::services::torrent::tests::{initialize_tracker_and_deps, sample_peer};
         use crate::core::services::torrent::{get_torrents_page, BasicInfo, Pagination};
 
         pub fn tracker_configuration() -> Configuration {
@@ -208,10 +242,7 @@ mod tests {
         async fn should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let torrents = get_torrents_page(tracker.clone(), Some(&Pagination::default())).await;
 
@@ -222,10 +253,7 @@ mod tests {
         async fn should_return_a_summarized_info_for_all_torrents() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -249,10 +277,7 @@ mod tests {
         async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -274,10 +299,7 @@ mod tests {
         async fn should_allow_using_pagination_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -308,10 +330,7 @@ mod tests {
         async fn should_return_torrents_ordered_by_info_hash() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
-
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();

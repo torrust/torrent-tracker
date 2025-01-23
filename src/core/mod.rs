@@ -449,24 +449,17 @@ pub mod whitelist;
 
 pub mod peer_tests;
 
-use std::cmp::max;
 use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use torrust_tracker_clock::clock::Time;
+use torrent::repository::in_memory::InMemoryTorrentRepository;
+use torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::peer;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
-use torrust_tracker_torrent_repository::entry::EntrySync;
-use torrust_tracker_torrent_repository::repository::Repository;
-
-use self::torrent::Torrents;
-use crate::core::databases::Database;
-use crate::CurrentClock;
 
 /// The domain layer tracker service.
 ///
@@ -481,15 +474,14 @@ pub struct Tracker {
     /// The tracker configuration.
     config: Core,
 
-    /// A database driver implementation: [`Sqlite3`](crate::core::databases::sqlite)
-    /// or [`MySQL`](crate::core::databases::mysql)
-    database: Arc<Box<dyn Database>>,
-
     /// The service to check is a torrent is whitelisted.
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
-    torrents: Arc<Torrents>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+
+    /// The persistent torrents repository.
+    db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -542,14 +534,15 @@ impl Tracker {
     /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
     pub fn new(
         config: &Core,
-        database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+        in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
+        db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
-            database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
-            torrents: Arc::default(),
+            in_memory_torrent_repository: in_memory_torrent_repository.clone(),
+            db_torrent_repository: db_torrent_repository.clone(),
         })
     }
 
@@ -654,53 +647,6 @@ impl Tracker {
         scrape_data
     }
 
-    /// It returns the data for a `scrape` response.
-    fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
-        match self.torrents.get(info_hash) {
-            Some(torrent_entry) => torrent_entry.get_swarm_metadata(),
-            None => SwarmMetadata::default(),
-        }
-    }
-
-    /// It loads the torrents from database into memory. It only loads the torrent entry list with the number of seeders for each torrent.
-    /// Peers data is not persisted.
-    ///
-    /// # Context: Tracker
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
-    pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
-        let persistent_torrents = self.database.load_persistent_torrents()?;
-
-        self.torrents.import_persistent(&persistent_torrents);
-
-        Ok(())
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent and client.
-    ///
-    /// It filters out the client making the request.
-    fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
-        match self.torrents.get(info_hash) {
-            None => vec![],
-            Some(entry) => entry.get_peers_for_client(&peer.peer_addr, Some(max(limit, TORRENT_PEERS_LIMIT))),
-        }
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent.
-    #[must_use]
-    pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
-        match self.torrents.get(info_hash) {
-            None => vec![],
-            Some(entry) => entry.get_peers(Some(TORRENT_PEERS_LIMIT)),
-        }
-    }
-
     /// It updates the torrent entry in memory, it also stores in the database
     /// the torrent info data which is persistent, and finally return the data
     /// needed for a `announce` request response.
@@ -708,14 +654,14 @@ impl Tracker {
     /// # Context: Tracker
     #[must_use]
     pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
-        let swarm_metadata_before = match self.torrents.get_swarm_metadata(info_hash) {
+        let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
 
-        self.torrents.upsert_peer(info_hash, peer);
+        self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
 
-        let swarm_metadata_after = match self.torrents.get_swarm_metadata(info_hash) {
+        let swarm_metadata_after = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
@@ -735,8 +681,30 @@ impl Tracker {
             let completed = swarm_metadata.downloaded;
             let info_hash = *info_hash;
 
-            drop(self.database.save_persistent_torrent(&info_hash, completed));
+            drop(self.db_torrent_repository.save(&info_hash, completed));
         }
+    }
+
+    /// It returns the data for a `scrape` response.
+    fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
+        self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
+    }
+
+    /// # Context: Tracker
+    ///
+    /// Get torrent peers for a given torrent and client.
+    ///
+    /// It filters out the client making the request.
+    fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
+        self.in_memory_torrent_repository.get_peers_for(info_hash, peer, limit)
+    }
+
+    /// # Context: Tracker
+    ///
+    /// Get torrent peers for a given torrent.
+    #[must_use]
+    pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
+        self.in_memory_torrent_repository.get_torrent_peers(info_hash)
     }
 
     /// It calculates and returns the general `Tracker`
@@ -748,32 +716,7 @@ impl Tracker {
     /// Panics if unable to get the torrent metrics.
     #[must_use]
     pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
-        self.torrents.get_metrics()
-    }
-
-    /// Remove inactive peers and (optionally) peerless torrents.
-    ///
-    /// # Context: Tracker
-    pub fn cleanup_torrents(&self) {
-        let current_cutoff = CurrentClock::now_sub(&Duration::from_secs(u64::from(self.config.tracker_policy.max_peer_timeout)))
-            .unwrap_or_default();
-
-        self.torrents.remove_inactive_peers(current_cutoff);
-
-        if self.config.tracker_policy.remove_peerless_torrents {
-            self.torrents.remove_peerless_torrents(&self.config.tracker_policy);
-        }
-    }
-
-    /// It drops the database tables.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if unable to drop tables.
-    pub fn drop_database_tables(&self) -> Result<(), databases::error::Error> {
-        // todo: this is only used for testing. WE have to pass the database
-        // reference directly to the tests instead of via the tracker.
-        self.database.drop_database_tables()
+        self.in_memory_torrent_repository.get_torrents_metrics()
     }
 }
 
@@ -805,39 +748,78 @@ mod tests {
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
         use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
+        use crate::core::torrent::manager::TorrentsManager;
         use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{whitelist, TorrentsMetrics, Tracker};
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            )
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
 
-            let (database, in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+            let tracker = initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            );
 
             (tracker, whitelist_authorization, whitelist_manager)
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> Tracker {
+        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            let tracker = initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            );
+
+            (tracker, torrents_manager)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -1492,13 +1474,12 @@ mod tests {
 
             use aquatic_udp_protocol::AnnounceEvent;
             use torrust_tracker_torrent_repository::entry::EntrySync;
-            use torrust_tracker_torrent_repository::repository::Repository;
 
             use crate::core::tests::the_tracker::{sample_info_hash, sample_peer, tracker_persisting_torrents_in_database};
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let tracker = tracker_persisting_torrents_in_database();
+                let (tracker, torrents_manager) = tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();
 
@@ -1513,11 +1494,14 @@ mod tests {
                 assert_eq!(swarm_stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
-                tracker.torrents.remove(&info_hash);
+                let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
 
-                tracker.load_torrents_from_database().unwrap();
+                torrents_manager.load_torrents_from_database().unwrap();
 
-                let torrent_entry = tracker.torrents.get(&info_hash).expect("it should be able to get entry");
+                let torrent_entry = tracker
+                    .in_memory_torrent_repository
+                    .get(&info_hash)
+                    .expect("it should be able to get entry");
 
                 // It persists the number of completed peers.
                 assert_eq!(torrent_entry.get_swarm_metadata().downloaded, 1);

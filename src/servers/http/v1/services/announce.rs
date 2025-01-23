@@ -73,12 +73,24 @@ mod tests {
     fn public_tracker() -> (Tracker, Arc<Option<Box<dyn Sender>>>) {
         let config = configuration::ephemeral_public();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            _database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            _authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            _torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+        let tracker = initialize_tracker(
+            &config,
+            &whitelist_authorization,
+            &in_memory_torrent_repository,
+            &db_torrent_repository,
+        );
 
         (tracker, stats_event_sender)
     }
@@ -132,10 +144,23 @@ mod tests {
         fn test_tracker_factory() -> Tracker {
             let config = configuration::ephemeral();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            Tracker::new(&config.core, &database, &whitelist_authorization).unwrap()
+            Tracker::new(
+                &config.core,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            )
+            .unwrap()
         }
 
         #[tokio::test]

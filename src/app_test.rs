@@ -9,6 +9,9 @@ use crate::core::authentication::key::repository::persisted::DatabaseKeyReposito
 use crate::core::authentication::service::{self, AuthenticationService};
 use crate::core::databases::Database;
 use crate::core::services::initialize_database;
+use crate::core::torrent::manager::TorrentsManager;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use crate::core::whitelist;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
@@ -22,6 +25,9 @@ pub fn initialize_tracker_dependencies(
     Arc<InMemoryWhitelist>,
     Arc<whitelist::authorization::Authorization>,
     Arc<AuthenticationService>,
+    Arc<InMemoryTorrentRepository>,
+    Arc<DatabasePersistentTorrentRepository>,
+    Arc<TorrentsManager>,
 ) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
@@ -36,6 +42,21 @@ pub fn initialize_tracker_dependencies(
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
+    let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+    let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
+    let torrents_manager = Arc::new(TorrentsManager::new(
+        &config.core,
+        &in_memory_torrent_repository,
+        &db_torrent_repository,
+    ));
 
-    (database, in_memory_whitelist, whitelist_authorization, authentication_service)
+    (
+        database,
+        in_memory_whitelist,
+        whitelist_authorization,
+        authentication_service,
+        in_memory_torrent_repository,
+        db_torrent_repository,
+        torrents_manager,
+    )
 }

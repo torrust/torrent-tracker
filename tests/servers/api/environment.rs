@@ -10,6 +10,7 @@ use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_g
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::core::authentication::handler::KeysHandler;
 use torrust_tracker_lib::core::authentication::service::AuthenticationService;
+use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
@@ -24,6 +25,7 @@ where
     S: std::fmt::Debug + std::fmt::Display,
 {
     pub config: Arc<HttpApi>,
+    pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
@@ -61,6 +63,7 @@ impl Environment<Stopped> {
 
         Self {
             config,
+            database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
             keys_handler: app_container.keys_handler.clone(),
             authentication_service: app_container.authentication_service.clone(),
@@ -78,6 +81,7 @@ impl Environment<Stopped> {
 
         Environment {
             config: self.config,
+            database: self.database.clone(),
             tracker: self.tracker.clone(),
             keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
@@ -112,6 +116,7 @@ impl Environment<Running> {
     pub async fn stop(self) -> Environment<Stopped> {
         Environment {
             config: self.config,
+            database: self.database,
             tracker: self.tracker,
             keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,
