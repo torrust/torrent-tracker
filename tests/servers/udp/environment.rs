@@ -5,6 +5,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
+use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::{whitelist, Tracker};
@@ -20,6 +21,7 @@ where
     S: std::fmt::Debug + std::fmt::Display,
 {
     pub config: Arc<UdpTracker>,
+    pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -57,6 +59,7 @@ impl Environment<Stopped> {
 
         Self {
             config,
+            database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
@@ -72,6 +75,7 @@ impl Environment<Stopped> {
         let cookie_lifetime = self.config.cookie_lifetime;
         Environment {
             config: self.config,
+            database: self.database.clone(),
             tracker: self.tracker.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
@@ -109,6 +113,7 @@ impl Environment<Running> {
 
         Environment {
             config: self.config,
+            database: self.database,
             tracker: self.tracker,
             whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,

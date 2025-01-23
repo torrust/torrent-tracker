@@ -124,6 +124,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     ));
 
     AppContainer {
+        database,
         tracker,
         keys_handler,
         authentication_service,
