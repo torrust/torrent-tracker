@@ -666,18 +666,6 @@ impl Tracker {
         self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
     }
 
-    /// It loads the torrents from database into memory. It only loads the torrent entry list with the number of seeders for each torrent.
-    /// Peers data is not persisted.
-    ///
-    /// # Context: Tracker
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
-    pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
-        self.torrents_manager.load_torrents_from_database()
-    }
-
     /// # Context: Tracker
     ///
     /// Get torrent peers for a given torrent and client.
@@ -1543,7 +1531,7 @@ mod tests {
                 // Remove the newly updated torrent from memory
                 let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
 
-                tracker.load_torrents_from_database().unwrap();
+                tracker.torrents_manager.load_torrents_from_database().unwrap();
 
                 let torrent_entry = tracker
                     .in_memory_torrent_repository
