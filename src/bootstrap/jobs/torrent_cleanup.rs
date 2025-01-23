@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 use torrust_tracker_configuration::Core;
 use tracing::instrument;
 
-use crate::core;
+use crate::core::torrent::manager::TorrentsManager;
 
 /// It starts a jobs for cleaning up the torrent data in the tracker.
 ///
@@ -25,9 +25,9 @@ use crate::core;
 ///
 /// Refer to [`torrust-tracker-configuration documentation`](https://docs.rs/torrust-tracker-configuration) for more info about that option.
 #[must_use]
-#[instrument(skip(config, tracker))]
-pub fn start_job(config: &Core, tracker: &Arc<core::Tracker>) -> JoinHandle<()> {
-    let weak_tracker = std::sync::Arc::downgrade(tracker);
+#[instrument(skip(config, torrents_manager))]
+pub fn start_job(config: &Core, torrents_manager: &Arc<TorrentsManager>) -> JoinHandle<()> {
+    let weak_torrents_manager = std::sync::Arc::downgrade(torrents_manager);
     let interval = config.inactive_peer_cleanup_interval;
 
     tokio::spawn(async move {
@@ -42,10 +42,10 @@ pub fn start_job(config: &Core, tracker: &Arc<core::Tracker>) -> JoinHandle<()> 
                     break;
                 }
                 _ = interval.tick() => {
-                    if let Some(tracker) = weak_tracker.upgrade() {
+                    if let Some(torrents_manager) = weak_torrents_manager.upgrade() {
                         let start_time = Utc::now().time();
                         tracing::info!("Cleaning up torrents..");
-                        tracker.cleanup_torrents();
+                        torrents_manager.cleanup_torrents();
                         tracing::info!("Cleaned up torrents in: {}ms", (Utc::now().time() - start_time).num_milliseconds());
                     } else {
                         break;

@@ -158,7 +158,7 @@ mod tests {
             authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -169,7 +169,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             ),
             stats_event_sender,
             authentication_service,
@@ -190,7 +189,7 @@ mod tests {
             authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -201,7 +200,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             ),
             stats_event_sender,
             authentication_service,
@@ -222,7 +220,7 @@ mod tests {
             authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -233,7 +231,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             ),
             stats_event_sender,
             authentication_service,
@@ -254,7 +251,7 @@ mod tests {
             authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -265,7 +262,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             ),
             stats_event_sender,
             authentication_service,

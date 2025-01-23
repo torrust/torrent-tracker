@@ -14,7 +14,6 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
-use super::torrent::manager::TorrentsManager;
 use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use super::whitelist;
@@ -34,14 +33,12 @@ pub fn initialize_tracker(
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
     db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
-    torrents_manager: &Arc<TorrentsManager>,
 ) -> Tracker {
     match Tracker::new(
         &Arc::new(config).core,
         whitelist_authorization,
         in_memory_torrent_repository,
         db_torrent_repository,
-        torrents_manager,
     ) {
         Ok(tracker) => tracker,
         Err(error) => {

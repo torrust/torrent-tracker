@@ -453,7 +453,6 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use torrent::manager::TorrentsManager;
 use torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
@@ -483,9 +482,6 @@ pub struct Tracker {
 
     /// The persistent torrents repository.
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
-
-    /// The service to run torrents tasks.
-    torrents_manager: Arc<TorrentsManager>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -541,14 +537,12 @@ impl Tracker {
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
         in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
         db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
-        torrents_manager: &Arc<TorrentsManager>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
             in_memory_torrent_repository: in_memory_torrent_repository.clone(),
             db_torrent_repository: db_torrent_repository.clone(),
-            torrents_manager: torrents_manager.clone(),
         })
     }
 
@@ -724,13 +718,6 @@ impl Tracker {
     pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
         self.in_memory_torrent_repository.get_torrents_metrics()
     }
-
-    /// Remove inactive peers and (optionally) peerless torrents.
-    ///
-    /// # Context: Tracker
-    pub fn cleanup_torrents(&self) {
-        self.torrents_manager.cleanup_torrents();
-    }
 }
 
 #[must_use]
@@ -761,6 +748,7 @@ mod tests {
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::peer::Peer;
         use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
+        use crate::core::torrent::manager::TorrentsManager;
         use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{whitelist, TorrentsMetrics, Tracker};
 
@@ -774,7 +762,7 @@ mod tests {
                 _authentication_service,
                 in_memory_torrent_repository,
                 db_torrent_repository,
-                torrents_manager,
+                _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
             initialize_tracker(
@@ -782,7 +770,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             )
         }
 
@@ -796,7 +783,7 @@ mod tests {
                 _authentication_service,
                 in_memory_torrent_repository,
                 db_torrent_repository,
-                torrents_manager,
+                _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
@@ -806,13 +793,12 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             );
 
             (tracker, whitelist_authorization, whitelist_manager)
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> Tracker {
+        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
@@ -826,13 +812,14 @@ mod tests {
                 torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(
+            let tracker = initialize_tracker(
                 &config,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
-            )
+            );
+
+            (tracker, torrents_manager)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -1492,7 +1479,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let tracker = tracker_persisting_torrents_in_database();
+                let (tracker, torrents_manager) = tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();
 
@@ -1509,7 +1496,7 @@ mod tests {
                 // Remove the newly updated torrent from memory
                 let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
 
-                tracker.torrents_manager.load_torrents_from_database().unwrap();
+                torrents_manager.load_torrents_from_database().unwrap();
 
                 let torrent_entry = tracker
                     .in_memory_torrent_repository

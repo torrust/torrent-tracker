@@ -139,7 +139,7 @@ mod tests {
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -150,7 +150,6 @@ mod tests {
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
-            &torrents_manager,
         ));
 
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));

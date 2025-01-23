@@ -125,7 +125,7 @@ mod tests {
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(config);
 
         Arc::new(initialize_tracker(
@@ -133,7 +133,6 @@ mod tests {
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
-            &torrents_manager,
         ))
     }
 
@@ -178,7 +177,7 @@ mod tests {
                 _authentication_service,
                 in_memory_torrent_repository,
                 db_torrent_repository,
-                torrents_manager,
+                _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
             let tracker = initialize_tracker(
@@ -186,7 +185,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             );
 
             let tracker = Arc::new(tracker);

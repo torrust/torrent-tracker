@@ -119,7 +119,6 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &whitelist_authorization,
         &in_memory_torrent_repository,
         &db_torrent_repository,
-        &torrents_manager,
     ));
 
     AppContainer {
@@ -132,6 +131,9 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         stats_event_sender,
         stats_repository,
         whitelist_manager,
+        in_memory_torrent_repository,
+        db_torrent_repository,
+        torrents_manager,
     }
 }
 

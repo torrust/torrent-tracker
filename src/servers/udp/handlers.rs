@@ -523,7 +523,7 @@ mod tests {
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -535,7 +535,6 @@ mod tests {
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
-            &torrents_manager,
         ));
 
         (
@@ -651,7 +650,7 @@ mod tests {
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
-            torrents_manager,
+            _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let tracker = Arc::new(
@@ -660,7 +659,6 @@ mod tests {
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-                &torrents_manager,
             )
             .unwrap(),
         );
@@ -1415,7 +1413,7 @@ mod tests {
                         _authentication_service,
                         in_memory_torrent_repository,
                         db_torrent_repository,
-                        torrents_manager,
+                        _torrents_manager,
                     ) = initialize_tracker_dependencies(&config);
 
                     let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
@@ -1433,7 +1431,6 @@ mod tests {
                             &whitelist_authorization,
                             &in_memory_torrent_repository,
                             &db_torrent_repository,
-                            &torrents_manager,
                         )
                         .unwrap(),
                     );
