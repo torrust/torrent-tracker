@@ -27,6 +27,9 @@ use crate::core::authentication::key::repository::in_memory::InMemoryKeyReposito
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
 use crate::core::authentication::service;
 use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+use crate::core::torrent::manager::TorrentsManager;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use crate::core::whitelist;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 use crate::servers::udp::server::banning::BanService;
@@ -103,8 +106,22 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &db_key_repository.clone(),
         &in_memory_key_repository.clone(),
     ));
+    let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+    let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
+    let torrents_manager = Arc::new(TorrentsManager::new(
+        &configuration.core,
+        &in_memory_torrent_repository,
+        &db_torrent_repository,
+    ));
 
-    let tracker = Arc::new(initialize_tracker(configuration, &database, &whitelist_authorization));
+    let tracker = Arc::new(initialize_tracker(
+        configuration,
+        &database,
+        &whitelist_authorization,
+        &in_memory_torrent_repository,
+        &db_torrent_repository,
+        &torrents_manager,
+    ));
 
     AppContainer {
         tracker,

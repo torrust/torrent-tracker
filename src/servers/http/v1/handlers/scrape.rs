@@ -151,13 +151,27 @@ mod tests {
     ) {
         let config = configuration::ephemeral_private();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ),
             stats_event_sender,
             authentication_service,
         )
@@ -170,13 +184,27 @@ mod tests {
     ) {
         let config = configuration::ephemeral_listed();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ),
             stats_event_sender,
             authentication_service,
         )
@@ -189,13 +217,27 @@ mod tests {
     ) {
         let config = configuration::ephemeral_with_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ),
             stats_event_sender,
             authentication_service,
         )
@@ -208,13 +250,27 @@ mod tests {
     ) {
         let config = configuration::ephemeral_without_reverse_proxy();
 
-        let (database, _in_memory_whitelist, whitelist_authorization, authentication_service) =
-            initialize_tracker_dependencies(&config);
+        let (
+            database,
+            _in_memory_whitelist,
+            whitelist_authorization,
+            authentication_service,
+            in_memory_torrent_repository,
+            db_torrent_repository,
+            torrents_manager,
+        ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
 
         (
-            initialize_tracker(&config, &database, &whitelist_authorization),
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ),
             stats_event_sender,
             authentication_service,
         )

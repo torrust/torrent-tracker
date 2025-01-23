@@ -546,21 +546,17 @@ impl Tracker {
         config: &Core,
         database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+        in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
+        db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
+        torrents_manager: &Arc<TorrentsManager>,
     ) -> Result<Tracker, databases::error::Error> {
-        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
-        let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(database));
-
         Ok(Tracker {
             config: config.clone(),
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
             in_memory_torrent_repository: in_memory_torrent_repository.clone(),
             db_torrent_repository: db_torrent_repository.clone(),
-            torrents_manager: Arc::new(TorrentsManager::new(
-                config,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            )),
+            torrents_manager: torrents_manager.clone(),
         })
     }
 
@@ -802,21 +798,49 @@ mod tests {
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            )
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
             let config = configuration::ephemeral_listed();
 
-            let (database, in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+            let tracker = initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            );
 
             (tracker, whitelist_authorization, whitelist_manager)
         }
@@ -825,10 +849,24 @@ mod tests {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            initialize_tracker(&config, &database, &whitelist_authorization)
+            initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            )
         }
 
         fn sample_info_hash() -> InfoHash {

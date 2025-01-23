@@ -145,10 +145,24 @@ mod tests {
         async fn should_return_none_if_the_tracker_does_not_have_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = initialize_tracker(&config, &database, &whitelist_authorization);
+            let tracker = initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            );
 
             let tracker = Arc::new(tracker);
 
@@ -165,10 +179,24 @@ mod tests {
         async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -211,10 +239,24 @@ mod tests {
         async fn should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let torrents = get_torrents_page(tracker.clone(), Some(&Pagination::default())).await;
 
@@ -225,10 +267,24 @@ mod tests {
         async fn should_return_a_summarized_info_for_all_torrents() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -252,10 +308,24 @@ mod tests {
         async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -277,10 +347,24 @@ mod tests {
         async fn should_allow_using_pagination_in_the_result() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -311,10 +395,24 @@ mod tests {
         async fn should_return_torrents_ordered_by_info_hash() {
             let config = tracker_configuration();
 
-            let (database, _in_memory_whitelist, whitelist_authorization, _authentication_service) =
-                initialize_tracker_dependencies(&config);
+            let (
+                database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(&config, &database, &whitelist_authorization));
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &database,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+                &torrents_manager,
+            ));
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
