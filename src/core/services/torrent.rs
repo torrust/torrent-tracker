@@ -45,7 +45,7 @@ pub struct BasicInfo {
 
 /// It returns all the information the tracker has about one torrent in a [Info] struct.
 pub async fn get_torrent_info(tracker: Arc<Tracker>, info_hash: &InfoHash) -> Option<Info> {
-    let torrent_entry_option = tracker.torrents.get(info_hash);
+    let torrent_entry_option = tracker.in_memory_torrent_repository.get(info_hash);
 
     let torrent_entry = torrent_entry_option?;
 
@@ -68,7 +68,7 @@ pub async fn get_torrent_info(tracker: Arc<Tracker>, info_hash: &InfoHash) -> Op
 pub async fn get_torrents_page(tracker: Arc<Tracker>, pagination: Option<&Pagination>) -> Vec<BasicInfo> {
     let mut basic_infos: Vec<BasicInfo> = vec![];
 
-    for (info_hash, torrent_entry) in tracker.torrents.get_paginated(pagination) {
+    for (info_hash, torrent_entry) in tracker.in_memory_torrent_repository.get_paginated(pagination) {
         let stats = torrent_entry.get_swarm_metadata();
 
         basic_infos.push(BasicInfo {
@@ -87,7 +87,11 @@ pub async fn get_torrents(tracker: Arc<Tracker>, info_hashes: &[InfoHash]) -> Ve
     let mut basic_infos: Vec<BasicInfo> = vec![];
 
     for info_hash in info_hashes {
-        if let Some(stats) = tracker.torrents.get(info_hash).map(|t| t.get_swarm_metadata()) {
+        if let Some(stats) = tracker
+            .in_memory_torrent_repository
+            .get(info_hash)
+            .map(|t| t.get_swarm_metadata())
+        {
             basic_infos.push(BasicInfo {
                 info_hash: *info_hash,
                 seeders: u64::from(stats.complete),

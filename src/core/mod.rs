@@ -487,7 +487,7 @@ pub struct Tracker {
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
-    torrents: Arc<InMemoryTorrentRepository>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
 
     /// The persistent torrents repository.
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
@@ -550,7 +550,7 @@ impl Tracker {
             config: config.clone(),
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
-            torrents: Arc::new(InMemoryTorrentRepository::default()),
+            in_memory_torrent_repository: Arc::new(InMemoryTorrentRepository::default()),
             db_torrent_repository: Arc::new(DatabasePersistentTorrentRepository::new(database)),
         })
     }
@@ -658,7 +658,7 @@ impl Tracker {
 
     /// It returns the data for a `scrape` response.
     fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
-        self.torrents.get_swarm_metadata(info_hash)
+        self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
     }
 
     /// It loads the torrents from database into memory. It only loads the torrent entry list with the number of seeders for each torrent.
@@ -672,7 +672,7 @@ impl Tracker {
     pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
         let persistent_torrents = self.db_torrent_repository.load_all()?;
 
-        self.torrents.import_persistent(&persistent_torrents);
+        self.in_memory_torrent_repository.import_persistent(&persistent_torrents);
 
         Ok(())
     }
@@ -683,7 +683,7 @@ impl Tracker {
     ///
     /// It filters out the client making the request.
     fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
-        self.torrents.get_peers_for(info_hash, peer, limit)
+        self.in_memory_torrent_repository.get_peers_for(info_hash, peer, limit)
     }
 
     /// # Context: Tracker
@@ -691,7 +691,7 @@ impl Tracker {
     /// Get torrent peers for a given torrent.
     #[must_use]
     pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
-        self.torrents.get_torrent_peers(info_hash)
+        self.in_memory_torrent_repository.get_torrent_peers(info_hash)
     }
 
     /// It updates the torrent entry in memory, it also stores in the database
@@ -701,14 +701,14 @@ impl Tracker {
     /// # Context: Tracker
     #[must_use]
     pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
-        let swarm_metadata_before = match self.torrents.get_opt_swarm_metadata(info_hash) {
+        let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
 
-        self.torrents.upsert_peer(info_hash, peer);
+        self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
 
-        let swarm_metadata_after = match self.torrents.get_opt_swarm_metadata(info_hash) {
+        let swarm_metadata_after = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
         };
@@ -741,7 +741,7 @@ impl Tracker {
     /// Panics if unable to get the torrent metrics.
     #[must_use]
     pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
-        self.torrents.get_torrents_metrics()
+        self.in_memory_torrent_repository.get_torrents_metrics()
     }
 
     /// Remove inactive peers and (optionally) peerless torrents.
@@ -751,10 +751,11 @@ impl Tracker {
         let current_cutoff = CurrentClock::now_sub(&Duration::from_secs(u64::from(self.config.tracker_policy.max_peer_timeout)))
             .unwrap_or_default();
 
-        self.torrents.remove_inactive_peers(current_cutoff);
+        self.in_memory_torrent_repository.remove_inactive_peers(current_cutoff);
 
         if self.config.tracker_policy.remove_peerless_torrents {
-            self.torrents.remove_peerless_torrents(&self.config.tracker_policy);
+            self.in_memory_torrent_repository
+                .remove_peerless_torrents(&self.config.tracker_policy);
         }
     }
 
@@ -1505,11 +1506,14 @@ mod tests {
                 assert_eq!(swarm_stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
-                let _unused = tracker.torrents.remove(&info_hash);
+                let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
 
                 tracker.load_torrents_from_database().unwrap();
 
-                let torrent_entry = tracker.torrents.get(&info_hash).expect("it should be able to get entry");
+                let torrent_entry = tracker
+                    .in_memory_torrent_repository
+                    .get(&info_hash)
+                    .expect("it should be able to get entry");
 
                 // It persists the number of completed peers.
                 assert_eq!(torrent_entry.get_swarm_metadata().downloaded, 1);
