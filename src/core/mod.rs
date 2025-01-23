@@ -653,28 +653,6 @@ impl Tracker {
         scrape_data
     }
 
-    /// It returns the data for a `scrape` response.
-    fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
-        self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent and client.
-    ///
-    /// It filters out the client making the request.
-    fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
-        self.in_memory_torrent_repository.get_peers_for(info_hash, peer, limit)
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent.
-    #[must_use]
-    pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
-        self.in_memory_torrent_repository.get_torrent_peers(info_hash)
-    }
-
     /// It updates the torrent entry in memory, it also stores in the database
     /// the torrent info data which is persistent, and finally return the data
     /// needed for a `announce` request response.
@@ -711,6 +689,28 @@ impl Tracker {
 
             drop(self.db_torrent_repository.save(&info_hash, completed));
         }
+    }
+
+    /// It returns the data for a `scrape` response.
+    fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
+        self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
+    }
+
+    /// # Context: Tracker
+    ///
+    /// Get torrent peers for a given torrent and client.
+    ///
+    /// It filters out the client making the request.
+    fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
+        self.in_memory_torrent_repository.get_peers_for(info_hash, peer, limit)
+    }
+
+    /// # Context: Tracker
+    ///
+    /// Get torrent peers for a given torrent.
+    #[must_use]
+    pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
+        self.in_memory_torrent_repository.get_torrent_peers(info_hash)
     }
 
     /// It calculates and returns the general `Tracker`
