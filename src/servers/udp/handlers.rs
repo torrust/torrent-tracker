@@ -525,6 +525,7 @@ mod tests {
             db_torrent_repository,
             torrents_manager,
         ) = initialize_tracker_dependencies(config);
+        
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
