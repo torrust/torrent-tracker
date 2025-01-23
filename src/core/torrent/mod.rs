@@ -25,6 +25,7 @@
 //! - The number of peers that have NOT completed downloading the torrent and are still active, that means they are actively participating in the network.
 //!   Peer that don not have a full copy of the torrent data are called "leechers".
 //!
+pub mod manager;
 pub mod repository;
 
 use torrust_tracker_torrent_repository::TorrentsSkipMapMutexStd;

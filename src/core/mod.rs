@@ -451,12 +451,11 @@ pub mod peer_tests;
 
 use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use torrent::manager::TorrentsManager;
 use torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::peer;
@@ -464,7 +463,6 @@ use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
 use crate::core::databases::Database;
-use crate::CurrentClock;
 
 /// The domain layer tracker service.
 ///
@@ -491,6 +489,9 @@ pub struct Tracker {
 
     /// The persistent torrents repository.
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
+
+    /// The service to run torrents tasks.
+    torrents_manager: Arc<TorrentsManager>,
 }
 
 /// How many peers the peer announcing wants in the announce response.
@@ -546,12 +547,20 @@ impl Tracker {
         database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     ) -> Result<Tracker, databases::error::Error> {
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(database));
+
         Ok(Tracker {
             config: config.clone(),
             database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
-            in_memory_torrent_repository: Arc::new(InMemoryTorrentRepository::default()),
-            db_torrent_repository: Arc::new(DatabasePersistentTorrentRepository::new(database)),
+            in_memory_torrent_repository: in_memory_torrent_repository.clone(),
+            db_torrent_repository: db_torrent_repository.clone(),
+            torrents_manager: Arc::new(TorrentsManager::new(
+                config,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            )),
         })
     }
 
@@ -670,11 +679,7 @@ impl Tracker {
     ///
     /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
     pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
-        let persistent_torrents = self.db_torrent_repository.load_all()?;
-
-        self.in_memory_torrent_repository.import_persistent(&persistent_torrents);
-
-        Ok(())
+        self.torrents_manager.load_torrents_from_database()
     }
 
     /// # Context: Tracker
@@ -748,15 +753,7 @@ impl Tracker {
     ///
     /// # Context: Tracker
     pub fn cleanup_torrents(&self) {
-        let current_cutoff = CurrentClock::now_sub(&Duration::from_secs(u64::from(self.config.tracker_policy.max_peer_timeout)))
-            .unwrap_or_default();
-
-        self.in_memory_torrent_repository.remove_inactive_peers(current_cutoff);
-
-        if self.config.tracker_policy.remove_peerless_torrents {
-            self.in_memory_torrent_repository
-                .remove_peerless_torrents(&self.config.tracker_policy);
-        }
+        self.torrents_manager.cleanup_torrents();
     }
 
     /// It drops the database tables.
