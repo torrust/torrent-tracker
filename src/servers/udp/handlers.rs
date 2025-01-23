@@ -525,14 +525,13 @@ mod tests {
             db_torrent_repository,
             torrents_manager,
         ) = initialize_tracker_dependencies(config);
-        
+
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
         let tracker = Arc::new(initialize_tracker(
             config,
-            &database,
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
@@ -646,7 +645,7 @@ mod tests {
         let config = tracker_configuration();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             _authentication_service,
@@ -658,7 +657,6 @@ mod tests {
         let tracker = Arc::new(
             Tracker::new(
                 &config.core,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -1411,7 +1409,7 @@ mod tests {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
                     let (
-                        database,
+                        _database,
                         _in_memory_whitelist,
                         whitelist_authorization,
                         _authentication_service,
@@ -1432,7 +1430,6 @@ mod tests {
                     let tracker = Arc::new(
                         core::Tracker::new(
                             &config.core,
-                            &database,
                             &whitelist_authorization,
                             &in_memory_torrent_repository,
                             &db_torrent_repository,

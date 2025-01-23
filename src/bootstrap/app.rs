@@ -116,7 +116,6 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
 
     let tracker = Arc::new(initialize_tracker(
         configuration,
-        &database,
         &whitelist_authorization,
         &in_memory_torrent_repository,
         &db_torrent_repository,

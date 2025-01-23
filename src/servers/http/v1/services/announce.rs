@@ -74,7 +74,7 @@ mod tests {
         let config = configuration::ephemeral_public();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             _authentication_service,
@@ -87,7 +87,6 @@ mod tests {
 
         let tracker = initialize_tracker(
             &config,
-            &database,
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
@@ -147,7 +146,7 @@ mod tests {
             let config = configuration::ephemeral();
 
             let (
-                database,
+                _database,
                 _in_memory_whitelist,
                 whitelist_authorization,
                 _authentication_service,
@@ -158,7 +157,6 @@ mod tests {
 
             Tracker::new(
                 &config.core,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,

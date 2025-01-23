@@ -126,7 +126,7 @@ async fn should_fail_when_the_auth_key_cannot_be_generated() {
 
     let env = Started::new(&configuration::ephemeral().into()).await;
 
-    force_database_error(&env.tracker);
+    force_database_error(&env.database);
 
     let request_id = Uuid::new_v4();
 
@@ -297,7 +297,7 @@ async fn should_fail_when_the_auth_key_cannot_be_deleted() {
         .await
         .unwrap();
 
-    force_database_error(&env.tracker);
+    force_database_error(&env.database);
 
     let request_id = Uuid::new_v4();
 
@@ -403,7 +403,7 @@ async fn should_fail_when_keys_cannot_be_reloaded() {
         .await
         .unwrap();
 
-    force_database_error(&env.tracker);
+    force_database_error(&env.database);
 
     let response = Client::new(env.get_connection_info())
         .reload_keys(Some(headers_with_request_id(request_id)))
@@ -556,7 +556,7 @@ mod deprecated_generate_key_endpoint {
 
         let env = Started::new(&configuration::ephemeral().into()).await;
 
-        force_database_error(&env.tracker);
+        force_database_error(&env.database);
 
         let request_id = Uuid::new_v4();
         let seconds_valid = 60;

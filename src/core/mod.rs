@@ -462,8 +462,6 @@ use torrust_tracker_primitives::peer;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
-use crate::core::databases::Database;
-
 /// The domain layer tracker service.
 ///
 /// Its main responsibility is to handle the `announce` and `scrape` requests.
@@ -476,10 +474,6 @@ use crate::core::databases::Database;
 pub struct Tracker {
     /// The tracker configuration.
     config: Core,
-
-    /// A database driver implementation: [`Sqlite3`](crate::core::databases::sqlite)
-    /// or [`MySQL`](crate::core::databases::mysql)
-    database: Arc<Box<dyn Database>>,
 
     /// The service to check is a torrent is whitelisted.
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -544,7 +538,6 @@ impl Tracker {
     /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
     pub fn new(
         config: &Core,
-        database: &Arc<Box<dyn Database>>,
         whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
         in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
         db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
@@ -552,7 +545,6 @@ impl Tracker {
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
-            database: database.clone(),
             whitelist_authorization: whitelist_authorization.clone(),
             in_memory_torrent_repository: in_memory_torrent_repository.clone(),
             db_torrent_repository: db_torrent_repository.clone(),
@@ -739,17 +731,6 @@ impl Tracker {
     pub fn cleanup_torrents(&self) {
         self.torrents_manager.cleanup_torrents();
     }
-
-    /// It drops the database tables.
-    ///
-    /// # Errors
-    ///
-    /// Will return `Err` if unable to drop tables.
-    pub fn drop_database_tables(&self) -> Result<(), databases::error::Error> {
-        // todo: this is only used for testing. We have to pass the database
-        // reference directly to the tests instead of via the tracker.
-        self.database.drop_database_tables()
-    }
 }
 
 #[must_use]
@@ -787,7 +768,7 @@ mod tests {
             let config = configuration::ephemeral_public();
 
             let (
-                database,
+                _database,
                 _in_memory_whitelist,
                 whitelist_authorization,
                 _authentication_service,
@@ -798,7 +779,6 @@ mod tests {
 
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -823,7 +803,6 @@ mod tests {
 
             let tracker = initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -838,7 +817,7 @@ mod tests {
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
             let (
-                database,
+                _database,
                 _in_memory_whitelist,
                 whitelist_authorization,
                 _authentication_service,
@@ -849,7 +828,6 @@ mod tests {
 
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,

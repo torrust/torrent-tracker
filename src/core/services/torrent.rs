@@ -119,7 +119,7 @@ mod tests {
 
     fn initialize_tracker_and_deps(config: &Configuration) -> Arc<Tracker> {
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             _authentication_service,
@@ -130,7 +130,6 @@ mod tests {
 
         Arc::new(initialize_tracker(
             config,
-            &database,
             &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
@@ -173,7 +172,7 @@ mod tests {
             let config = tracker_configuration();
 
             let (
-                database,
+                _database,
                 _in_memory_whitelist,
                 whitelist_authorization,
                 _authentication_service,
@@ -184,7 +183,6 @@ mod tests {
 
             let tracker = initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,

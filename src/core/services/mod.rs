@@ -31,7 +31,6 @@ use crate::core::Tracker;
 #[must_use]
 pub fn initialize_tracker(
     config: &Configuration,
-    database: &Arc<Box<dyn Database>>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
     db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
@@ -39,7 +38,6 @@ pub fn initialize_tracker(
 ) -> Tracker {
     match Tracker::new(
         &Arc::new(config).core,
-        database,
         whitelist_authorization,
         in_memory_torrent_repository,
         db_torrent_repository,

@@ -152,7 +152,7 @@ mod tests {
         let config = configuration::ephemeral_private();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             authentication_service,
@@ -166,7 +166,6 @@ mod tests {
         (
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -185,7 +184,7 @@ mod tests {
         let config = configuration::ephemeral_listed();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             authentication_service,
@@ -199,7 +198,6 @@ mod tests {
         (
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -218,7 +216,7 @@ mod tests {
         let config = configuration::ephemeral_with_reverse_proxy();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             authentication_service,
@@ -232,7 +230,6 @@ mod tests {
         (
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
@@ -251,7 +248,7 @@ mod tests {
         let config = configuration::ephemeral_without_reverse_proxy();
 
         let (
-            database,
+            _database,
             _in_memory_whitelist,
             whitelist_authorization,
             authentication_service,
@@ -265,7 +262,6 @@ mod tests {
         (
             initialize_tracker(
                 &config,
-                &database,
                 &whitelist_authorization,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
