@@ -916,7 +916,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -1001,7 +1001,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V4(remote_client_ip), client_port));
             }
@@ -1133,7 +1133,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                    let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                    let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                     let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
 
@@ -1200,7 +1200,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -1288,7 +1288,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 // When using IPv6 the tracker converts the remote client ip into a IPv4 address
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V6(remote_client_ip), client_port));
@@ -1466,7 +1466,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                    let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                    let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                     let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
 

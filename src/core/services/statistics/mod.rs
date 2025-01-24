@@ -68,7 +68,7 @@ pub async fn get_metrics(
     ban_service: Arc<RwLock<BanService>>,
     stats_repository: Arc<Repository>,
 ) -> TrackerMetrics {
-    let torrents_metrics = tracker.get_torrents_metrics();
+    let torrents_metrics = tracker.in_memory_torrent_repository.get_torrents_metrics();
     let stats = stats_repository.get_stats().await;
     let udp_banned_ips_total = ban_service.read().await.get_banned_ips_total();
 
