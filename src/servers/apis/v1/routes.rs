@@ -8,8 +8,8 @@ use super::context::{auth_key, stats, torrent, whitelist};
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::whitelist::manager::WhiteListManager;
-use crate::core::Tracker;
 use crate::servers::udp::server::banning::BanService;
 
 /// Add the routes for the v1 API.
@@ -17,7 +17,7 @@ use crate::servers::udp::server::banning::BanService;
 pub fn add(
     prefix: &str,
     router: Router,
-    tracker: Arc<Tracker>,
+    in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
     keys_handler: &Arc<KeysHandler>,
     whitelist_manager: &Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
@@ -30,12 +30,12 @@ pub fn add(
     let router = stats::routes::add(
         &v1_prefix,
         router,
-        tracker.clone(),
+        in_memory_torrent_repository.clone(),
         ban_service,
         stats_event_sender,
         stats_repository,
     );
     let router = whitelist::routes::add(&v1_prefix, router, whitelist_manager);
 
-    torrent::routes::add(&v1_prefix, router, tracker)
+    torrent::routes::add(&v1_prefix, router, in_memory_torrent_repository.clone())
 }

@@ -40,9 +40,10 @@ use tracing::{instrument, Level};
 use super::routes::router;
 use crate::bootstrap::jobs::Started;
 use crate::core::authentication::handler::KeysHandler;
+use crate::core::statistics;
 use crate::core::statistics::repository::Repository;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::whitelist::manager::WhiteListManager;
-use crate::core::{statistics, Tracker};
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::logging::STARTED_ON;
@@ -128,10 +129,10 @@ impl ApiServer<Stopped> {
     ///
     /// It would panic if the bound socket address cannot be sent back to this starter.
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(self, tracker, keys_handler, whitelist_manager, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, in_memory_torrent_repository, keys_handler, whitelist_manager, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
-        tracker: Arc<Tracker>,
+        in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
         keys_handler: Arc<KeysHandler>,
         whitelist_manager: Arc<WhiteListManager>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
@@ -150,7 +151,7 @@ impl ApiServer<Stopped> {
 
             let _task = launcher
                 .start(
-                    tracker,
+                    in_memory_torrent_repository,
                     keys_handler,
                     whitelist_manager,
                     ban_service,
@@ -261,7 +262,6 @@ impl Launcher {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         self,
-        tracker,
         keys_handler,
         whitelist_manager,
         ban_service,
@@ -273,7 +273,7 @@ impl Launcher {
     ))]
     pub fn start(
         &self,
-        tracker: Arc<Tracker>,
+        in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
         keys_handler: Arc<KeysHandler>,
         whitelist_manager: Arc<WhiteListManager>,
         ban_service: Arc<RwLock<BanService>>,
@@ -287,7 +287,7 @@ impl Launcher {
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
         let router = router(
-            tracker,
+            in_memory_torrent_repository,
             keys_handler,
             whitelist_manager,
             ban_service,
@@ -373,7 +373,7 @@ mod tests {
 
         let started = stopped
             .start(
-                app_container.tracker,
+                app_container.in_memory_torrent_repository,
                 app_container.keys_handler,
                 app_container.whitelist_manager,
                 app_container.stats_event_sender,

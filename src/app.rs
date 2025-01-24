@@ -118,7 +118,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     if let Some(http_api_config) = &config.http_api {
         if let Some(job) = tracker_apis::start_job(
             http_api_config,
-            app_container.tracker.clone(),
+            app_container.in_memory_torrent_repository.clone(),
             app_container.keys_handler.clone(),
             app_container.whitelist_manager.clone(),
             app_container.ban_service.clone(),

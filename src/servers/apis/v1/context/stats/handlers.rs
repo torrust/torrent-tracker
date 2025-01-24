@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use super::responses::{metrics_response, stats_response};
 use crate::core::services::statistics::get_metrics;
 use crate::core::statistics::repository::Repository;
-use crate::core::Tracker;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::servers::udp::server::banning::BanService;
 
 #[derive(Deserialize, Debug, Default)]
@@ -40,7 +40,7 @@ pub struct QueryParams {
 /// for more information about this endpoint.
 #[allow(clippy::type_complexity)]
 pub async fn get_stats_handler(
-    State(state): State<(Arc<Tracker>, Arc<RwLock<BanService>>, Arc<Repository>)>,
+    State(state): State<(Arc<InMemoryTorrentRepository>, Arc<RwLock<BanService>>, Arc<Repository>)>,
     params: Query<QueryParams>,
 ) -> Response {
     let metrics = get_metrics(state.0.clone(), state.1.clone(), state.2.clone()).await;

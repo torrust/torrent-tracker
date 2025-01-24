@@ -474,10 +474,10 @@ pub struct Tracker {
     config: Core,
 
     /// The service to check is a torrent is whitelisted.
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
-    pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
 
     /// The persistent torrents repository.
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
@@ -1325,24 +1325,24 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
                     let result = whitelist_manager.add_torrent_to_whitelist(&info_hash).await;
                     assert!(result.is_ok());
 
-                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
+                    let result = whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_ok());
                 }
 
                 #[tokio::test]
                 async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (tracker, _whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
-                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
+                    let result = whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_err());
                 }
             }

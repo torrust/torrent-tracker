@@ -12,20 +12,20 @@ use tokio::sync::RwLock;
 use super::handlers::get_stats_handler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
-use crate::core::Tracker;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::servers::udp::server::banning::BanService;
 
 /// It adds the routes to the router for the [`stats`](crate::servers::apis::v1::context::stats) API context.
 pub fn add(
     prefix: &str,
     router: Router,
-    tracker: Arc<Tracker>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     ban_service: Arc<RwLock<BanService>>,
     _stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,
 ) -> Router {
     router.route(
         &format!("{prefix}/stats"),
-        get(get_stats_handler).with_state((tracker, ban_service, stats_repository)),
+        get(get_stats_handler).with_state((in_memory_torrent_repository, ban_service, stats_repository)),
     )
 }
