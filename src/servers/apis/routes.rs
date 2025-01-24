@@ -33,8 +33,8 @@ use super::v1::middlewares::auth::State;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::whitelist::manager::WhiteListManager;
-use crate::core::Tracker;
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::logging::Latency;
 use crate::servers::udp::server::banning::BanService;
@@ -43,7 +43,6 @@ use crate::servers::udp::server::banning::BanService;
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
-    tracker,
     keys_handler,
     whitelist_manager,
     ban_service,
@@ -52,7 +51,7 @@ use crate::servers::udp::server::banning::BanService;
     access_tokens
 ))]
 pub fn router(
-    tracker: Arc<Tracker>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
@@ -68,7 +67,7 @@ pub fn router(
     let router = v1::routes::add(
         api_url_prefix,
         router,
-        tracker.clone(),
+        &in_memory_torrent_repository.clone(),
         &keys_handler.clone(),
         &whitelist_manager.clone(),
         ban_service.clone(),

@@ -10,6 +10,7 @@ use torrust_tracker_lib::core::authentication::service::AuthenticationService;
 use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
+use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
 use torrust_tracker_lib::core::{whitelist, Tracker};
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
@@ -20,6 +21,7 @@ pub struct Environment<S> {
     pub config: Arc<HttpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -61,6 +63,7 @@ impl Environment<Stopped> {
             config,
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
+            in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             keys_handler: app_container.keys_handler.clone(),
             authentication_service: app_container.authentication_service.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
@@ -78,6 +81,7 @@ impl Environment<Stopped> {
             config: self.config,
             database: self.database.clone(),
             tracker: self.tracker.clone(),
+            in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
@@ -110,6 +114,7 @@ impl Environment<Running> {
             config: self.config,
             database: self.database,
             tracker: self.tracker,
+            in_memory_torrent_repository: self.in_memory_torrent_repository,
             keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,
             whitelist_authorization: self.whitelist_authorization,

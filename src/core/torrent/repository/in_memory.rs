@@ -101,3 +101,29 @@ impl InMemoryTorrentRepository {
         self.torrents.import_persistent(persistent_torrents);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
+
+    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+
+    #[tokio::test]
+    async fn should_collect_torrent_metrics() {
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+
+        let torrents_metrics = in_memory_torrent_repository.get_torrents_metrics();
+
+        assert_eq!(
+            torrents_metrics,
+            TorrentsMetrics {
+                complete: 0,
+                downloaded: 0,
+                incomplete: 0,
+                torrents: 0
+            }
+        );
+    }
+}

@@ -45,7 +45,7 @@ use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
 use crate::core::statistics::metrics::Metrics;
 use crate::core::statistics::repository::Repository;
-use crate::core::Tracker;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::servers::udp::server::banning::BanService;
 
 /// All the metrics collected by the tracker.
@@ -64,11 +64,11 @@ pub struct TrackerMetrics {
 
 /// It returns all the [`TrackerMetrics`]
 pub async fn get_metrics(
-    tracker: Arc<Tracker>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     ban_service: Arc<RwLock<BanService>>,
     stats_repository: Arc<Repository>,
 ) -> TrackerMetrics {
-    let torrents_metrics = tracker.get_torrents_metrics();
+    let torrents_metrics = in_memory_torrent_repository.get_torrents_metrics();
     let stats = stats_repository.get_stats().await;
     let udp_banned_ips_total = ban_service.read().await.get_banned_ips_total();
 
@@ -145,7 +145,7 @@ mod tests {
         let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_repository = Arc::new(stats_repository);
 
-        let tracker = Arc::new(initialize_tracker(
+        let _tracker = Arc::new(initialize_tracker(
             &config,
             &whitelist_authorization,
             &in_memory_torrent_repository,
@@ -154,7 +154,12 @@ mod tests {
 
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 
-        let tracker_metrics = get_metrics(tracker.clone(), ban_service.clone(), stats_repository.clone()).await;
+        let tracker_metrics = get_metrics(
+            in_memory_torrent_repository.clone(),
+            ban_service.clone(),
+            stats_repository.clone(),
+        )
+        .await;
 
         assert_eq!(
             tracker_metrics,

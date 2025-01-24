@@ -14,7 +14,7 @@ use torrust_tracker_primitives::pagination::Pagination;
 
 use super::responses::{torrent_info_response, torrent_list_response, torrent_not_known_response};
 use crate::core::services::torrent::{get_torrent_info, get_torrents, get_torrents_page};
-use crate::core::Tracker;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::servers::apis::v1::responses::invalid_info_hash_param_response;
 use crate::servers::apis::InfoHashParam;
 
@@ -27,10 +27,13 @@ use crate::servers::apis::InfoHashParam;
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::torrent#get-a-torrent)
 /// for more information about this endpoint.
-pub async fn get_torrent_handler(State(tracker): State<Arc<Tracker>>, Path(info_hash): Path<InfoHashParam>) -> Response {
+pub async fn get_torrent_handler(
+    State(in_memory_torrent_repository): State<Arc<InMemoryTorrentRepository>>,
+    Path(info_hash): Path<InfoHashParam>,
+) -> Response {
     match InfoHash::from_str(&info_hash.0) {
         Err(_) => invalid_info_hash_param_response(&info_hash.0),
-        Ok(info_hash) => match get_torrent_info(tracker.clone(), &info_hash).await {
+        Ok(info_hash) => match get_torrent_info(in_memory_torrent_repository.clone(), &info_hash).await {
             Some(info) => torrent_info_response(info).into_response(),
             None => torrent_not_known_response(),
         },
@@ -75,13 +78,16 @@ pub struct QueryParams {
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::torrent#list-torrents)
 /// for more information about this endpoint.
-pub async fn get_torrents_handler(State(tracker): State<Arc<Tracker>>, pagination: Query<QueryParams>) -> Response {
+pub async fn get_torrents_handler(
+    State(in_memory_torrent_repository): State<Arc<InMemoryTorrentRepository>>,
+    pagination: Query<QueryParams>,
+) -> Response {
     tracing::debug!("pagination: {:?}", pagination);
 
     if pagination.0.info_hashes.is_empty() {
         torrent_list_response(
             &get_torrents_page(
-                tracker.clone(),
+                in_memory_torrent_repository.clone(),
                 Some(&Pagination::new_with_options(pagination.0.offset, pagination.0.limit)),
             )
             .await,
@@ -89,7 +95,9 @@ pub async fn get_torrents_handler(State(tracker): State<Arc<Tracker>>, paginatio
         .into_response()
     } else {
         match parse_info_hashes(pagination.0.info_hashes) {
-            Ok(info_hashes) => torrent_list_response(&get_torrents(tracker.clone(), &info_hashes).await).into_response(),
+            Ok(info_hashes) => {
+                torrent_list_response(&get_torrents(in_memory_torrent_repository.clone(), &info_hashes).await).into_response()
+            }
             Err(err) => match err {
                 QueryParamError::InvalidInfoHash { info_hash } => invalid_info_hash_param_response(&info_hash),
             },

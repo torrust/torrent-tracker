@@ -486,6 +486,7 @@ mod tests {
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::services::{initialize_tracker, initialize_whitelist_manager, statistics};
     use crate::core::statistics::event::sender::Sender;
+    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::whitelist::manager::WhiteListManager;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::core::{whitelist, Tracker};
@@ -493,6 +494,7 @@ mod tests {
 
     type TrackerAndDeps = (
         Arc<Tracker>,
+        Arc<InMemoryTorrentRepository>,
         Arc<Option<Box<dyn Sender>>>,
         Arc<InMemoryWhitelist>,
         Arc<WhiteListManager>,
@@ -539,6 +541,7 @@ mod tests {
 
         (
             tracker,
+            in_memory_torrent_repository,
             stats_event_sender,
             in_memory_whitelist,
             whitelist_manager,
@@ -887,8 +890,14 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let client_ip = Ipv4Addr::new(126, 0, 0, 1);
                 let client_port = 8080;
@@ -916,7 +925,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -928,8 +937,14 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
 
@@ -969,8 +984,14 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1001,7 +1022,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V4(remote_client_ip), client_port));
             }
@@ -1048,8 +1069,14 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv4_the_response_should_not_include_peers_using_ipv6() {
-                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    _stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 add_a_torrent_peer_using_ipv6(&tracker);
 
@@ -1104,8 +1131,14 @@ mod tests {
 
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration_if_defined() {
-                    let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                        public_tracker();
+                    let (
+                        tracker,
+                        in_memory_torrent_repository,
+                        stats_event_sender,
+                        _in_memory_whitelist,
+                        _whitelist_manager,
+                        whitelist_authorization,
+                    ) = public_tracker();
 
                     let client_ip = Ipv4Addr::new(127, 0, 0, 1);
                     let client_port = 8080;
@@ -1133,7 +1166,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                    let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                    let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                     let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
 
@@ -1170,8 +1203,14 @@ mod tests {
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1200,7 +1239,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -1212,8 +1251,14 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1256,8 +1301,14 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1288,7 +1339,7 @@ mod tests {
                 .await
                 .unwrap();
 
-                let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                 // When using IPv6 the tracker converts the remote client ip into a IPv4 address
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V6(remote_client_ip), client_port));
@@ -1338,8 +1389,14 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv6_the_response_should_not_include_peers_using_ipv4() {
-                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    _stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    whitelist_authorization,
+                ) = public_tracker();
 
                 add_a_torrent_peer_using_ipv4(&tracker);
 
@@ -1466,7 +1523,7 @@ mod tests {
                     .await
                     .unwrap();
 
-                    let peers = tracker.get_torrent_peers(&info_hash.0.into());
+                    let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
                     let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
 
@@ -1511,8 +1568,14 @@ mod tests {
 
         #[tokio::test]
         async fn should_return_no_stats_when_the_tracker_does_not_have_any_torrent() {
-            let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
-                public_tracker();
+            let (
+                tracker,
+                _in_memory_torrent_repository,
+                stats_event_sender,
+                _in_memory_whitelist,
+                _whitelist_manager,
+                _whitelist_authorization,
+            ) = public_tracker();
 
             let remote_addr = sample_ipv4_remote_addr();
 
@@ -1605,8 +1668,14 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
-                let (tracker, _stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
-                    public_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    _stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    _whitelist_authorization,
+                ) = public_tracker();
 
                 let torrent_stats = match_scrape_response(add_a_sample_seeder_and_scrape(tracker.clone()).await);
 
@@ -1631,8 +1700,14 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
-                let (tracker, stats_event_sender, in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
-                    whitelisted_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    stats_event_sender,
+                    in_memory_whitelist,
+                    _whitelist_manager,
+                    _whitelist_authorization,
+                ) = whitelisted_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
@@ -1667,8 +1742,14 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
-                let (tracker, stats_event_sender, _in_memory_whitelist, _whitelist_manager, _whitelist_authorization) =
-                    whitelisted_tracker();
+                let (
+                    tracker,
+                    _in_memory_torrent_repository,
+                    stats_event_sender,
+                    _in_memory_whitelist,
+                    _whitelist_manager,
+                    _whitelist_authorization,
+                ) = whitelisted_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);

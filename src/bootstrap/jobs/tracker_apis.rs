@@ -33,8 +33,8 @@ use super::make_rust_tls;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
+use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::whitelist::manager::WhiteListManager;
-use crate::core::{self};
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -63,7 +63,6 @@ pub struct ApiServerJobStarted();
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip(
     config,
-    tracker,
     keys_handler,
     whitelist_manager,
     ban_service,
@@ -73,7 +72,7 @@ pub struct ApiServerJobStarted();
 ))]
 pub async fn start_job(
     config: &HttpApi,
-    tracker: Arc<core::Tracker>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
@@ -95,7 +94,7 @@ pub async fn start_job(
             start_v1(
                 bind_to,
                 tls,
-                tracker.clone(),
+                in_memory_torrent_repository.clone(),
                 keys_handler.clone(),
                 whitelist_manager.clone(),
                 ban_service.clone(),
@@ -114,7 +113,6 @@ pub async fn start_job(
 #[instrument(skip(
     socket,
     tls,
-    tracker,
     keys_handler,
     whitelist_manager,
     ban_service,
@@ -126,7 +124,7 @@ pub async fn start_job(
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
-    tracker: Arc<core::Tracker>,
+    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
     whitelist_manager: Arc<WhiteListManager>,
     ban_service: Arc<RwLock<BanService>>,
@@ -137,7 +135,7 @@ async fn start_v1(
 ) -> JoinHandle<()> {
     let server = ApiServer::new(Launcher::new(socket, tls))
         .start(
-            tracker,
+            in_memory_torrent_repository,
             keys_handler,
             whitelist_manager,
             stats_event_sender,
@@ -179,7 +177,7 @@ mod tests {
 
         start_job(
             config,
-            app_container.tracker,
+            app_container.in_memory_torrent_repository,
             app_container.keys_handler,
             app_container.whitelist_manager,
             app_container.ban_service,

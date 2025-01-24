@@ -459,7 +459,6 @@ use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
 use torrust_tracker_primitives::core::{AnnounceData, ScrapeData};
 use torrust_tracker_primitives::peer;
 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
-use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
 /// The domain layer tracker service.
 ///
@@ -475,7 +474,7 @@ pub struct Tracker {
     config: Core,
 
     /// The service to check is a torrent is whitelisted.
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
 
     /// The in-memory torrents repository.
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
@@ -619,7 +618,9 @@ impl Tracker {
 
         let stats = self.upsert_peer_and_get_stats(info_hash, peer);
 
-        let peers = self.get_peers_for(info_hash, peer, peers_wanted.limit());
+        let peers = self
+            .in_memory_torrent_repository
+            .get_peers_for(info_hash, peer, peers_wanted.limit());
 
         AnnounceData {
             peers,
@@ -638,7 +639,7 @@ impl Tracker {
 
         for info_hash in info_hashes {
             let swarm_metadata = match self.whitelist_authorization.authorize(info_hash).await {
-                Ok(()) => self.get_swarm_metadata(info_hash),
+                Ok(()) => self.in_memory_torrent_repository.get_swarm_metadata(info_hash),
                 Err(_) => SwarmMetadata::zeroed(),
             };
             scrape_data.add_file(info_hash, swarm_metadata);
@@ -684,40 +685,6 @@ impl Tracker {
             drop(self.db_torrent_repository.save(&info_hash, completed));
         }
     }
-
-    /// It returns the data for a `scrape` response.
-    fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
-        self.in_memory_torrent_repository.get_swarm_metadata(info_hash)
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent and client.
-    ///
-    /// It filters out the client making the request.
-    fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
-        self.in_memory_torrent_repository.get_peers_for(info_hash, peer, limit)
-    }
-
-    /// # Context: Tracker
-    ///
-    /// Get torrent peers for a given torrent.
-    #[must_use]
-    pub fn get_torrent_peers(&self, info_hash: &InfoHash) -> Vec<Arc<peer::Peer>> {
-        self.in_memory_torrent_repository.get_torrent_peers(info_hash)
-    }
-
-    /// It calculates and returns the general `Tracker`
-    /// [`TorrentsMetrics`]
-    ///
-    /// # Context: Tracker
-    ///
-    /// # Panics
-    /// Panics if unable to get the torrent metrics.
-    #[must_use]
-    pub fn get_torrents_metrics(&self) -> TorrentsMetrics {
-        self.in_memory_torrent_repository.get_torrents_metrics()
-    }
 }
 
 #[must_use]
@@ -742,6 +709,7 @@ mod tests {
         use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
+        use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
@@ -749,8 +717,9 @@ mod tests {
         use crate::core::peer::Peer;
         use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
         use crate::core::torrent::manager::TorrentsManager;
+        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::core::whitelist::manager::WhiteListManager;
-        use crate::core::{whitelist, TorrentsMetrics, Tracker};
+        use crate::core::{whitelist, Tracker};
 
         fn public_tracker() -> Tracker {
             let config = configuration::ephemeral_public();
@@ -771,6 +740,29 @@ mod tests {
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
             )
+        }
+
+        fn public_tracker_and_in_memory_torrents_repository() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
+            let config = configuration::ephemeral_public();
+
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
+
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
+
+            (tracker, in_memory_torrent_repository)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
@@ -798,7 +790,7 @@ mod tests {
             (tracker, whitelist_authorization, whitelist_manager)
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>) {
+        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>, Arc<InMemoryTorrentRepository>) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
@@ -819,7 +811,7 @@ mod tests {
                 &db_torrent_repository,
             );
 
-            (tracker, torrents_manager)
+            (tracker, torrents_manager, in_memory_torrent_repository)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -907,32 +899,15 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_collect_torrent_metrics() {
-            let tracker = public_tracker();
-
-            let torrents_metrics = tracker.get_torrents_metrics();
-
-            assert_eq!(
-                torrents_metrics,
-                TorrentsMetrics {
-                    complete: 0,
-                    downloaded: 0,
-                    incomplete: 0,
-                    torrents: 0
-                }
-            );
-        }
-
-        #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
             let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
 
-            let peers = tracker.get_torrent_peers(&info_hash);
+            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
             assert_eq!(peers, vec![Arc::new(peer)]);
         }
@@ -957,7 +932,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
 
@@ -975,7 +950,7 @@ mod tests {
                 let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
             }
 
-            let peers = tracker.get_torrent_peers(&info_hash);
+            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
             assert_eq!(peers.len(), 74);
         }
@@ -989,7 +964,9 @@ mod tests {
 
             let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
 
-            let peers = tracker.get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
+            let peers = tracker
+                .in_memory_torrent_repository
+                .get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
 
             assert_eq!(peers, vec![]);
         }
@@ -1019,18 +996,20 @@ mod tests {
                 let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
             }
 
-            let peers = tracker.get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
+            let peers = tracker
+                .in_memory_torrent_repository
+                .get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
 
             assert_eq!(peers.len(), 74);
         }
 
         #[tokio::test]
         async fn it_should_return_the_torrent_metrics() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let _ = tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
 
-            let torrent_metrics = tracker.get_torrents_metrics();
+            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
 
             assert_eq!(
                 torrent_metrics,
@@ -1045,7 +1024,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_get_many_the_torrent_metrics() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
@@ -1054,7 +1033,7 @@ mod tests {
             let result_a = start_time.elapsed();
 
             let start_time = std::time::Instant::now();
-            let torrent_metrics = tracker.get_torrents_metrics();
+            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
             let result_b = start_time.elapsed();
 
             assert_eq!(
@@ -1346,24 +1325,24 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (tracker, _whitelist_authorization, whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, whitelist_authorization, whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
                     let result = whitelist_manager.add_torrent_to_whitelist(&info_hash).await;
                     assert!(result.is_ok());
 
-                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
+                    let result = whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_ok());
                 }
 
                 #[tokio::test]
                 async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (tracker, _whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
+                    let (_tracker, whitelist_authorization, _whitelist_manager) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
-                    let result = tracker.whitelist_authorization.authorize(&info_hash).await;
+                    let result = whitelist_authorization.authorize(&info_hash).await;
                     assert!(result.is_err());
                 }
             }
@@ -1479,7 +1458,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let (tracker, torrents_manager) = tracker_persisting_torrents_in_database();
+                let (tracker, torrents_manager, in_memory_torrent_repository) = tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();
 
@@ -1494,7 +1473,7 @@ mod tests {
                 assert_eq!(swarm_stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
-                let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
+                let _unused = in_memory_torrent_repository.remove(&info_hash);
 
                 torrents_manager.load_torrents_from_database().unwrap();
 
