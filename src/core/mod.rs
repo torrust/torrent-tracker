@@ -875,23 +875,6 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_collect_torrent_metrics() {
-            let tracker = public_tracker();
-
-            let torrents_metrics = tracker.in_memory_torrent_repository.get_torrents_metrics();
-
-            assert_eq!(
-                torrents_metrics,
-                TorrentsMetrics {
-                    complete: 0,
-                    downloaded: 0,
-                    incomplete: 0,
-                    torrents: 0
-                }
-            );
-        }
-
-        #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
             let tracker = public_tracker();
 
