@@ -717,6 +717,7 @@ mod tests {
         use crate::core::peer::Peer;
         use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
         use crate::core::torrent::manager::TorrentsManager;
+        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{whitelist, Tracker};
 
@@ -739,6 +740,29 @@ mod tests {
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
             )
+        }
+
+        fn public_tracker_and_in_memory_torrents_repository() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
+            let config = configuration::ephemeral_public();
+
+            let (
+                _database,
+                _in_memory_whitelist,
+                whitelist_authorization,
+                _authentication_service,
+                in_memory_torrent_repository,
+                db_torrent_repository,
+                _torrents_manager,
+            ) = initialize_tracker_dependencies(&config);
+
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &whitelist_authorization,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
+
+            (tracker, in_memory_torrent_repository)
         }
 
         fn whitelisted_tracker() -> (Tracker, Arc<whitelist::authorization::Authorization>, Arc<WhiteListManager>) {
@@ -766,7 +790,7 @@ mod tests {
             (tracker, whitelist_authorization, whitelist_manager)
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>) {
+        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>, Arc<InMemoryTorrentRepository>) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
@@ -787,7 +811,7 @@ mod tests {
                 &db_torrent_repository,
             );
 
-            (tracker, torrents_manager)
+            (tracker, torrents_manager, in_memory_torrent_repository)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -876,14 +900,14 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
             let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
 
-            let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash);
+            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
             assert_eq!(peers, vec![Arc::new(peer)]);
         }
@@ -908,7 +932,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
 
@@ -926,7 +950,7 @@ mod tests {
                 let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
             }
 
-            let peers = tracker.in_memory_torrent_repository.get_torrent_peers(&info_hash);
+            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
             assert_eq!(peers.len(), 74);
         }
@@ -981,11 +1005,11 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_torrent_metrics() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let _ = tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
 
-            let torrent_metrics = tracker.in_memory_torrent_repository.get_torrents_metrics();
+            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
 
             assert_eq!(
                 torrent_metrics,
@@ -1000,7 +1024,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_get_many_the_torrent_metrics() {
-            let tracker = public_tracker();
+            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
@@ -1009,7 +1033,7 @@ mod tests {
             let result_a = start_time.elapsed();
 
             let start_time = std::time::Instant::now();
-            let torrent_metrics = tracker.in_memory_torrent_repository.get_torrents_metrics();
+            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
             let result_b = start_time.elapsed();
 
             assert_eq!(
@@ -1434,7 +1458,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let (tracker, torrents_manager) = tracker_persisting_torrents_in_database();
+                let (tracker, torrents_manager, in_memory_torrent_repository) = tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();
 
@@ -1449,7 +1473,7 @@ mod tests {
                 assert_eq!(swarm_stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
-                let _unused = tracker.in_memory_torrent_repository.remove(&info_hash);
+                let _unused = in_memory_torrent_repository.remove(&info_hash);
 
                 torrents_manager.load_torrents_from_database().unwrap();
 
