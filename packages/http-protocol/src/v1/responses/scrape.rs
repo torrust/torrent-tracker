@@ -1,4 +1,4 @@
-//! `Scrape` response for the HTTP tracker [`scrape`](bittorrent_http_protocol::v1::requests::scrape::Scrape) request.
+//! `Scrape` response for the HTTP tracker [`scrape`](crate::v1::requests::scrape::Scrape) request.
 //!
 //! Data structures and logic to build the `scrape` response.
 use std::borrow::Cow;

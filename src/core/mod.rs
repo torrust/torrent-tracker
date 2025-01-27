@@ -52,7 +52,7 @@
 //! The tracker responds to the peer with the list of other peers in the swarm so that
 //! the peer can contact them to start downloading pieces of the file from them.
 //!
-//! Once you have instantiated the `Tracker` you can `announce` a new [`peer::Peer`] with:
+//! Once you have instantiated the `AnnounceHandler` you can `announce` a new [`peer::Peer`](torrust_tracker_primitives::peer::Peer) with:
 //!
 //! ```rust,no_run
 //! use std::net::SocketAddr;
@@ -81,7 +81,7 @@
 //! ```
 //!
 //! ```text
-//! let announce_data = tracker.announce(&info_hash, &mut peer, &peer_ip).await;
+//! let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip).await;
 //! ```
 //!
 //! The `Tracker` returns the list of peers for the torrent with the infohash `3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0`,
@@ -306,7 +306,7 @@
 //! `c1277613db1d28709b034a017ab2cae4be07ae10` is the torrent infohash and `completed` contains the number of peers
 //! that have a full version of the torrent data, also known as seeders.
 //!
-//! Refer to [`peer`] module for more information about peers.
+//! Refer to [`peer`](torrust_tracker_primitives::peer) for more information about peers.
 //!
 //! # Configuration
 //!

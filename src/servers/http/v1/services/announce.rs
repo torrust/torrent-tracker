@@ -2,9 +2,8 @@
 //!
 //! The service is responsible for handling the `announce` requests.
 //!
-//! It delegates the `announce` logic to the [`Tracker`](crate::core::Tracker::announce)
-//! and it returns the [`AnnounceData`] returned
-//! by the [`Tracker`].
+//! It delegates the `announce` logic to the [`AnnounceHandler`] and it returns
+//! the [`AnnounceData`].
 //!
 //! It also sends an [`statistics::event::Event`]
 //! because events are specific for the HTTP tracker.

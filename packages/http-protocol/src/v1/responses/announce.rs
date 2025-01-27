@@ -1,4 +1,4 @@
-//! `Announce` response for the HTTP tracker [`announce`](bittorrent_http_protocol::v1::requests::announce::Announce) request.
+//! `Announce` response for the HTTP tracker [`announce`](crate::v1::requests::announce::Announce) request.
 //!
 //! Data structures and logic to build the `announce` response.
 use std::io::Write;
