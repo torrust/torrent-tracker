@@ -462,11 +462,8 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-        use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
         use bittorrent_primitives::info_hash::InfoHash;
-        use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
         use torrust_tracker_primitives::peer::Peer;
-        use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
@@ -501,22 +498,6 @@ mod tests {
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
             (announce_handler, in_memory_torrent_repository, scrape_handler)
-        }
-
-        fn initialize_in_memory_torrents_repository() -> Arc<InMemoryTorrentRepository> {
-            let config = configuration::ephemeral_public();
-
-            let (
-                _database,
-                _in_memory_whitelist,
-                _whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                _db_torrent_repository,
-                _torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
-
-            in_memory_torrent_repository
         }
 
         #[allow(clippy::type_complexity)]
@@ -657,152 +638,6 @@ mod tests {
                 left: NumberOfBytes::new(1000), // Still bytes to download
                 event: AnnounceEvent::Started,
             }
-        }
-
-        #[tokio::test]
-        async fn it_should_return_the_peers_for_a_given_torrent() {
-            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
-
-            let info_hash = sample_info_hash();
-            let peer = sample_peer();
-
-            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
-
-            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
-
-            assert_eq!(peers, vec![Arc::new(peer)]);
-        }
-
-        /// It generates a peer id from a number where the number is the last
-        /// part of the peer ID. For example, for `12` it returns
-        /// `-qB00000000000000012`.
-        fn numeric_peer_id(two_digits_value: i32) -> PeerId {
-            // Format idx as a string with leading zeros, ensuring it has exactly 2 digits
-            let idx_str = format!("{two_digits_value:02}");
-
-            // Create the base part of the peer ID.
-            let base = b"-qB00000000000000000";
-
-            // Concatenate the base with idx bytes, ensuring the total length is 20 bytes.
-            let mut peer_id_bytes = [0u8; 20];
-            peer_id_bytes[..base.len()].copy_from_slice(base);
-            peer_id_bytes[base.len() - idx_str.len()..].copy_from_slice(idx_str.as_bytes());
-
-            PeerId(peer_id_bytes)
-        }
-
-        #[tokio::test]
-        async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
-
-            let info_hash = sample_info_hash();
-
-            for idx in 1..=75 {
-                let peer = Peer {
-                    peer_id: numeric_peer_id(idx),
-                    peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, idx.try_into().unwrap())), 8080),
-                    updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                    uploaded: NumberOfBytes::new(0),
-                    downloaded: NumberOfBytes::new(0),
-                    left: NumberOfBytes::new(0), // No bytes left to download
-                    event: AnnounceEvent::Completed,
-                };
-
-                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
-            }
-
-            let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
-
-            assert_eq!(peers.len(), 74);
-        }
-
-        #[tokio::test]
-        async fn it_should_return_the_peers_for_a_given_torrent_excluding_a_given_peer() {
-            let (_announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
-
-            let info_hash = sample_info_hash();
-            let peer = sample_peer();
-
-            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
-
-            let peers = in_memory_torrent_repository.get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
-
-            assert_eq!(peers, vec![]);
-        }
-
-        #[tokio::test]
-        async fn it_should_return_74_peers_at_the_most_for_a_given_torrent_when_it_filters_out_a_given_peer() {
-            let (_announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
-
-            let info_hash = sample_info_hash();
-
-            let excluded_peer = sample_peer();
-
-            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &excluded_peer);
-
-            // Add 74 peers
-            for idx in 2..=75 {
-                let peer = Peer {
-                    peer_id: numeric_peer_id(idx),
-                    peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, idx.try_into().unwrap())), 8080),
-                    updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                    uploaded: NumberOfBytes::new(0),
-                    downloaded: NumberOfBytes::new(0),
-                    left: NumberOfBytes::new(0), // No bytes left to download
-                    event: AnnounceEvent::Completed,
-                };
-
-                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
-            }
-
-            let peers = in_memory_torrent_repository.get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
-
-            assert_eq!(peers.len(), 74);
-        }
-
-        #[tokio::test]
-        async fn it_should_return_the_torrent_metrics() {
-            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
-
-            let () = in_memory_torrent_repository.upsert_peer(&sample_info_hash(), &leecher());
-
-            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
-
-            assert_eq!(
-                torrent_metrics,
-                TorrentsMetrics {
-                    complete: 0,
-                    downloaded: 0,
-                    incomplete: 1,
-                    torrents: 1,
-                }
-            );
-        }
-
-        #[tokio::test]
-        async fn it_should_get_many_the_torrent_metrics() {
-            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
-
-            let start_time = std::time::Instant::now();
-            for i in 0..1_000_000 {
-                let () = in_memory_torrent_repository.upsert_peer(&gen_seeded_infohash(&i), &leecher());
-            }
-            let result_a = start_time.elapsed();
-
-            let start_time = std::time::Instant::now();
-            let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
-            let result_b = start_time.elapsed();
-
-            assert_eq!(
-                (torrent_metrics),
-                (TorrentsMetrics {
-                    complete: 0,
-                    downloaded: 0,
-                    incomplete: 1_000_000,
-                    torrents: 1_000_000,
-                }),
-                "{result_a:?} {result_b:?}"
-            );
         }
 
         mod for_all_config_modes {
