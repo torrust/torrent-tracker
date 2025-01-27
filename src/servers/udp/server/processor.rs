@@ -15,14 +15,13 @@ use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::event::UdpResponseKind;
-use crate::core::{statistics, whitelist, Tracker};
+use crate::core::{statistics, whitelist};
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
     core_config: Arc<Core>,
-    tracker: Arc<Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -35,7 +34,6 @@ impl Processor {
     pub fn new(
         socket: Arc<BoundSocket>,
         core_config: Arc<Core>,
-        tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -45,7 +43,6 @@ impl Processor {
         Self {
             socket,
             core_config,
-            tracker,
             announce_handler,
             scrape_handler,
             whitelist_authorization,
@@ -63,7 +60,6 @@ impl Processor {
         let response = handlers::handle_packet(
             request,
             &self.core_config,
-            &self.tracker,
             &self.announce_handler,
             &self.scrape_handler,
             &self.whitelist_authorization,

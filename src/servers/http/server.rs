@@ -15,7 +15,7 @@ use crate::bootstrap::jobs::Started;
 use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::{statistics, whitelist, Tracker};
+use crate::core::{statistics, whitelist};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::STARTED_ON;
@@ -49,7 +49,6 @@ impl Launcher {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         self,
-        tracker,
         announce_handler,
         scrape_handler,
         authentication_service,
@@ -61,7 +60,6 @@ impl Launcher {
     fn start(
         &self,
         config: Arc<Core>,
-        tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
@@ -88,7 +86,6 @@ impl Launcher {
 
         let app = router(
             config,
-            tracker,
             announce_handler,
             scrape_handler,
             authentication_service,
@@ -192,7 +189,6 @@ impl HttpServer<Stopped> {
     pub async fn start(
         self,
         core_config: Arc<Core>,
-        tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
@@ -208,7 +204,6 @@ impl HttpServer<Stopped> {
         let task = tokio::spawn(async move {
             let server = launcher.start(
                 core_config,
-                tracker,
                 announce_handler,
                 scrape_handler,
                 authentication_service,
@@ -315,7 +310,6 @@ mod tests {
         let started = stopped
             .start(
                 Arc::new(cfg.core.clone()),
-                app_container.tracker,
                 app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.authentication_service,

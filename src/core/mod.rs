@@ -451,53 +451,9 @@ pub mod whitelist;
 
 pub mod peer_tests;
 
-use std::sync::Arc;
-
-use torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use torrust_tracker_configuration::Core;
-
-/// The domain layer tracker service.
-///
-/// Its main responsibility is to handle the `announce` and `scrape` requests.
-/// But it's also a container for the `Tracker` configuration, persistence,
-/// authentication and other services.
-///
-/// > **NOTICE**: the `Tracker` is not responsible for handling the network layer.
-/// > Typically, the `Tracker` is used by a higher application service that handles
-/// > the network layer.
-pub struct Tracker {
-    /// The tracker configuration.
-    _core_config: Core,
-
-    /// The in-memory torrents repository.
-    _in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-
-    /// The persistent torrents repository.
-    _db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
-}
-
-impl Tracker {
-    /// `Tracker` constructor.
-    ///
-    /// # Errors
-    ///
-    /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
-    pub fn new(
-        core_config: &Core,
-        in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
-        db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
-    ) -> Result<Tracker, databases::error::Error> {
-        Ok(Tracker {
-            _core_config: core_config.clone(),
-            _in_memory_torrent_repository: in_memory_torrent_repository.clone(),
-            _db_torrent_repository: db_torrent_repository.clone(),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    // Integration tests for the core module.
 
     mod the_tracker {
 
@@ -517,18 +473,13 @@ mod tests {
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::AnnounceHandler;
         use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
+        use crate::core::services::initialize_whitelist_manager;
         use crate::core::torrent::manager::TorrentsManager;
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::core::whitelist;
         use crate::core::whitelist::manager::WhiteListManager;
-        use crate::core::{whitelist, Tracker};
 
-        fn public_tracker() -> (
-            Arc<Tracker>,
-            Arc<AnnounceHandler>,
-            Arc<InMemoryTorrentRepository>,
-            Arc<ScrapeHandler>,
-        ) {
+        fn public_tracker() -> (Arc<AnnounceHandler>, Arc<InMemoryTorrentRepository>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
 
             let (
@@ -541,12 +492,6 @@ mod tests {
                 _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(
-                &config,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
             let announce_handler = Arc::new(AnnounceHandler::new(
                 &config.core,
                 &in_memory_torrent_repository,
@@ -555,10 +500,10 @@ mod tests {
 
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (tracker, announce_handler, in_memory_torrent_repository, scrape_handler)
+            (announce_handler, in_memory_torrent_repository, scrape_handler)
         }
 
-        fn public_tracker_and_in_memory_torrents_repository() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
+        fn initialize_in_memory_torrents_repository() -> Arc<InMemoryTorrentRepository> {
             let config = configuration::ephemeral_public();
 
             let (
@@ -567,22 +512,15 @@ mod tests {
                 _whitelist_authorization,
                 _authentication_service,
                 in_memory_torrent_repository,
-                db_torrent_repository,
+                _db_torrent_repository,
                 _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(
-                &config,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
-            (tracker, in_memory_torrent_repository)
+            in_memory_torrent_repository
         }
 
         #[allow(clippy::type_complexity)]
         fn whitelisted_tracker() -> (
-            Arc<Tracker>,
             Arc<AnnounceHandler>,
             Arc<whitelist::authorization::Authorization>,
             Arc<WhiteListManager>,
@@ -602,12 +540,6 @@ mod tests {
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = Arc::new(initialize_tracker(
-                &config,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
             let announce_handler = Arc::new(AnnounceHandler::new(
                 &config.core,
                 &in_memory_torrent_repository,
@@ -616,21 +548,11 @@ mod tests {
 
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (
-                tracker,
-                announce_handler,
-                whitelist_authorization,
-                whitelist_manager,
-                scrape_handler,
-            )
+            (announce_handler, whitelist_authorization, whitelist_manager, scrape_handler)
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> (
-            Arc<Tracker>,
-            Arc<AnnounceHandler>,
-            Arc<TorrentsManager>,
-            Arc<InMemoryTorrentRepository>,
-        ) {
+        pub fn tracker_persisting_torrents_in_database(
+        ) -> (Arc<AnnounceHandler>, Arc<TorrentsManager>, Arc<InMemoryTorrentRepository>) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
@@ -644,19 +566,13 @@ mod tests {
                 torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(initialize_tracker(
-                &config,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
             let announce_handler = Arc::new(AnnounceHandler::new(
                 &config.core,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
             ));
 
-            (tracker, announce_handler, torrents_manager, in_memory_torrent_repository)
+            (announce_handler, torrents_manager, in_memory_torrent_repository)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -745,7 +661,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
-            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
@@ -777,7 +693,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
 
@@ -802,7 +718,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent_excluding_a_given_peer() {
-            let (_tracker, _announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
+            let (_announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
@@ -816,7 +732,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent_when_it_filters_out_a_given_peer() {
-            let (_tracker, _announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
+            let (_announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
 
@@ -846,7 +762,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_torrent_metrics() {
-            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
 
             let () = in_memory_torrent_repository.upsert_peer(&sample_info_hash(), &leecher());
 
@@ -865,7 +781,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_get_many_the_torrent_metrics() {
-            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let in_memory_torrent_repository = initialize_in_memory_torrents_repository();
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
@@ -1000,7 +916,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_an_empty_peer_list_when_it_is_the_first_announced_peer() {
-                    let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                    let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut peer = sample_peer();
 
@@ -1011,7 +927,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_the_previously_announced_peers() {
-                    let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                    let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut previously_announced_peer = sample_peer_1();
                     announce_handler.announce(
@@ -1036,7 +952,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
-                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = seeder();
 
@@ -1048,7 +964,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_leecher() {
-                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = leecher();
 
@@ -1060,7 +976,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_a_previously_announced_started_peer_has_completed_downloading() {
-                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         // We have to announce with "started" event because peer does not count if peer was not previously known
                         let mut started_peer = started_peer();
@@ -1088,7 +1004,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_swarm_metadata_for_the_requested_file_if_the_tracker_has_that_torrent() {
-                    let (_tracker, announce_handler, _in_memory_torrent_repository, scrape_handler) = public_tracker();
+                    let (announce_handler, _in_memory_torrent_repository, scrape_handler) = public_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
@@ -1136,8 +1052,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (_tracker, _announce_handler, whitelist_authorization, whitelist_manager, _scrape_handler) =
-                        whitelisted_tracker();
+                    let (_announce_handler, whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1150,8 +1065,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (_tracker, _announce_handler, whitelist_authorization, _whitelist_manager, _scrape_handler) =
-                        whitelisted_tracker();
+                    let (_announce_handler, whitelist_authorization, _whitelist_manager, _scrape_handler) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1170,8 +1084,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_add_a_torrent_to_the_whitelist() {
-                    let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
-                        whitelisted_tracker();
+                    let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1182,8 +1095,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_remove_a_torrent_from_the_whitelist() {
-                    let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
-                        whitelisted_tracker();
+                    let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1199,7 +1111,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn it_should_load_the_whitelist_from_the_database() {
-                        let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
+                        let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
                             whitelisted_tracker();
 
                         let info_hash = sample_info_hash();
@@ -1244,8 +1156,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {
-                    let (_tracker, announce_handler, _whitelist_authorization, _whitelist_manager, scrape_handler) =
-                        whitelisted_tracker();
+                    let (announce_handler, _whitelist_authorization, _whitelist_manager, scrape_handler) = whitelisted_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
@@ -1279,7 +1190,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let (_tracker, announce_handler, torrents_manager, in_memory_torrent_repository) =
+                let (announce_handler, torrents_manager, in_memory_torrent_repository) =
                     tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();

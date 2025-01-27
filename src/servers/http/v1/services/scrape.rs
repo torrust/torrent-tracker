@@ -83,10 +83,8 @@ mod tests {
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
     use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::initialize_tracker;
-    use crate::core::Tracker;
 
-    fn public_tracker_and_announce_and_scrape_handlers() -> (Arc<Tracker>, Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
+    fn public_tracker_and_announce_and_scrape_handlers() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
 
         let (
@@ -99,12 +97,6 @@ mod tests {
             _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
-        let tracker = Arc::new(initialize_tracker(
-            &config,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
@@ -113,7 +105,7 @@ mod tests {
 
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-        (tracker, announce_handler, scrape_handler)
+        (announce_handler, scrape_handler)
     }
 
     fn sample_info_hashes() -> Vec<InfoHash> {
@@ -136,7 +128,7 @@ mod tests {
         }
     }
 
-    fn test_tracker_factory() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
+    fn initialize_scrape_handler() -> Arc<ScrapeHandler> {
         let config = configuration::ephemeral();
 
         let (
@@ -145,15 +137,11 @@ mod tests {
             whitelist_authorization,
             _authentication_service,
             in_memory_torrent_repository,
-            db_torrent_repository,
+            _db_torrent_repository,
             _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
-        let tracker = Arc::new(Tracker::new(&config.core, &in_memory_torrent_repository, &db_torrent_repository).unwrap());
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (tracker, scrape_handler)
+        Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository))
     }
 
     mod with_real_data {
@@ -170,8 +158,8 @@ mod tests {
         use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes, sample_peer,
-            test_tracker_factory,
+            initialize_scrape_handler, public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes,
+            sample_peer,
         };
 
         #[tokio::test]
@@ -179,7 +167,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (_tracker, announce_handler, scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
+            let (announce_handler, scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];
@@ -215,7 +203,7 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let (_tracker, scrape_handler) = test_tracker_factory();
+            let scrape_handler = initialize_scrape_handler();
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
@@ -233,7 +221,7 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let (_tracker, scrape_handler) = test_tracker_factory();
+            let scrape_handler = initialize_scrape_handler();
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 
@@ -262,7 +250,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (_tracker, announce_handler, _scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
+            let (announce_handler, _scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];

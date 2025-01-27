@@ -17,7 +17,6 @@ use torrust_tracker_primitives::peer;
 use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::{self};
-use crate::core::Tracker;
 
 /// The HTTP tracker `announce` service.
 ///
@@ -30,7 +29,6 @@ use crate::core::Tracker;
 /// > like the UDP tracker, the number of TCP connections is incremented for
 /// > each `announce` request.
 pub async fn invoke(
-    _tracker: Arc<Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     info_hash: InfoHash,
@@ -69,12 +67,11 @@ mod tests {
 
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::services::{initialize_tracker, statistics};
+    use crate::core::services::statistics;
     use crate::core::statistics::event::sender::Sender;
-    use crate::core::Tracker;
 
     #[allow(clippy::type_complexity)]
-    fn public_tracker() -> (Arc<Core>, Arc<Tracker>, Arc<AnnounceHandler>, Arc<Option<Box<dyn Sender>>>) {
+    fn public_tracker() -> (Arc<Core>, Arc<AnnounceHandler>, Arc<Option<Box<dyn Sender>>>) {
         let config = configuration::ephemeral_public();
 
         let (
@@ -89,12 +86,6 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = Arc::new(initialize_tracker(
-            &config,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
@@ -103,7 +94,7 @@ mod tests {
 
         let core_config = Arc::new(config.core.clone());
 
-        (core_config, tracker, announce_handler, stats_event_sender)
+        (core_config, announce_handler, stats_event_sender)
     }
 
     fn sample_info_hash() -> InfoHash {
@@ -149,11 +140,11 @@ mod tests {
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-        use crate::core::{statistics, Tracker};
+        use crate::core::statistics;
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
 
-        fn initialize_tracker_and_announce_handler() -> (Arc<Tracker>, Arc<AnnounceHandler>) {
+        fn initialize_announce_handler() -> Arc<AnnounceHandler> {
             let config = configuration::ephemeral();
 
             let (
@@ -166,25 +157,20 @@ mod tests {
                 _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            let tracker = Arc::new(Tracker::new(&config.core, &in_memory_torrent_repository, &db_torrent_repository).unwrap());
-
-            let announce_handler = Arc::new(AnnounceHandler::new(
+            Arc::new(AnnounceHandler::new(
                 &config.core,
                 &in_memory_torrent_repository,
                 &db_torrent_repository,
-            ));
-
-            (tracker, announce_handler)
+            ))
         }
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
-            let (core_config, tracker, announce_handler, stats_event_sender) = public_tracker();
+            let (core_config, announce_handler, stats_event_sender) = public_tracker();
 
             let mut peer = sample_peer();
 
             let announce_data = invoke(
-                tracker.clone(),
                 announce_handler.clone(),
                 stats_event_sender.clone(),
                 sample_info_hash(),
@@ -217,12 +203,11 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let (tracker, announce_handler) = initialize_tracker_and_announce_handler();
+            let announce_handler = initialize_announce_handler();
 
             let mut peer = sample_peer_using_ipv4();
 
             let _announce_data = invoke(
-                tracker,
                 announce_handler,
                 stats_event_sender,
                 sample_info_hash(),
@@ -232,13 +217,13 @@ mod tests {
             .await;
         }
 
-        fn tracker_with_an_ipv6_external_ip() -> (Arc<Tracker>, Arc<AnnounceHandler>) {
+        fn tracker_with_an_ipv6_external_ip() -> Arc<AnnounceHandler> {
             let mut configuration = configuration::ephemeral();
             configuration.core.net.external_ip = Some(IpAddr::V6(Ipv6Addr::new(
                 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969,
             )));
 
-            initialize_tracker_and_announce_handler()
+            initialize_announce_handler()
         }
 
         fn peer_with_the_ipv4_loopback_ip() -> peer::Peer {
@@ -265,10 +250,9 @@ mod tests {
 
             let mut peer = peer_with_the_ipv4_loopback_ip();
 
-            let (tracker, announce_handler) = tracker_with_an_ipv6_external_ip();
+            let announce_handler = tracker_with_an_ipv6_external_ip();
 
             let _announce_data = invoke(
-                tracker,
                 announce_handler,
                 stats_event_sender,
                 sample_info_hash(),
@@ -290,12 +274,11 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let (tracker, announce_handler) = initialize_tracker_and_announce_handler();
+            let announce_handler = initialize_announce_handler();
 
             let mut peer = sample_peer_using_ipv6();
 
             let _announce_data = invoke(
-                tracker,
                 announce_handler,
                 stats_event_sender,
                 sample_info_hash(),

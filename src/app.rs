@@ -82,7 +82,6 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
                     udp_tracker::start_job(
                         Arc::new(config.core.clone()),
                         udp_tracker_config,
-                        app_container.tracker.clone(),
                         app_container.announce_handler.clone(),
                         app_container.scrape_handler.clone(),
                         app_container.whitelist_authorization.clone(),
@@ -104,7 +103,6 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
             if let Some(job) = http_tracker::start_job(
                 http_tracker_config,
                 Arc::new(config.core.clone()),
-                app_container.tracker.clone(),
                 app_container.announce_handler.clone(),
                 app_container.scrape_handler.clone(),
                 app_container.authentication_service.clone(),

@@ -52,8 +52,7 @@
 //! is designed to be as simple as possible. It uses a single UDP port and
 //! supports only three types of requests: `Connect`, `Announce` and `Scrape`.
 //!
-//! Request are parsed from UDP packets using the [`aquatic_udp_protocol`](https://crates.io/crates/aquatic_udp_protocol)
-//! crate and then handled by the [`Tracker`](crate::core::Tracker) struct.
+//! Request are parsed from UDP packets using the [`aquatic_udp_protocol`](https://crates.io/crates/aquatic_udp_protocol).
 //! And then the response is also build using the [`aquatic_udp_protocol`](https://crates.io/crates/aquatic_udp_protocol)
 //! and converted to a UDP packet.
 //!

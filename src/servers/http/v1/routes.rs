@@ -26,7 +26,7 @@ use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{whitelist, Tracker};
+use crate::core::whitelist;
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::Latency;
 
@@ -37,7 +37,6 @@ use crate::servers::logging::Latency;
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
-    tracker,
     announce_handler,
     scrape_handler,
     authentication_service,
@@ -47,7 +46,6 @@ use crate::servers::logging::Latency;
 ))]
 pub fn router(
     core_config: Arc<Core>,
-    tracker: Arc<Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
@@ -63,7 +61,6 @@ pub fn router(
             "/announce",
             get(announce::handle_without_key).with_state((
                 core_config.clone(),
-                tracker.clone(),
                 announce_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
@@ -74,7 +71,6 @@ pub fn router(
             "/announce/{key}",
             get(announce::handle_with_key).with_state((
                 core_config.clone(),
-                tracker.clone(),
                 announce_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
@@ -86,7 +82,6 @@ pub fn router(
             "/scrape",
             get(scrape::handle_without_key).with_state((
                 core_config.clone(),
-                tracker.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),
                 stats_event_sender.clone(),
@@ -96,7 +91,6 @@ pub fn router(
             "/scrape/{key}",
             get(scrape::handle_with_key).with_state((
                 core_config.clone(),
-                tracker.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),
                 stats_event_sender.clone(),

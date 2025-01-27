@@ -28,7 +28,7 @@ use crate::core::authentication::key::repository::in_memory::InMemoryKeyReposito
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
 use crate::core::authentication::service;
 use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
+use crate::core::services::{initialize_database, initialize_whitelist_manager, statistics};
 use crate::core::torrent::manager::TorrentsManager;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -116,12 +116,6 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &db_torrent_repository,
     ));
 
-    let tracker = Arc::new(initialize_tracker(
-        configuration,
-        &in_memory_torrent_repository,
-        &db_torrent_repository,
-    ));
-
     let announce_handler = Arc::new(AnnounceHandler::new(
         &configuration.core,
         &in_memory_torrent_repository,
@@ -132,7 +126,6 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
 
     AppContainer {
         database,
-        tracker,
         announce_handler,
         scrape_handler,
         keys_handler,
