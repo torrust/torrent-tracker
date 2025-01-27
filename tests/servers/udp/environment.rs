@@ -9,6 +9,7 @@ use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
+use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_lib::core::{whitelist, Tracker};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
@@ -24,6 +25,7 @@ where
     pub config: Arc<UdpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -40,7 +42,7 @@ where
     /// Add a torrent to the tracker
     #[allow(dead_code)]
     pub fn add_torrent(&self, info_hash: &InfoHash, peer: &peer::Peer) {
-        let _ = self.tracker.upsert_peer_and_get_stats(info_hash, peer);
+        let () = self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
     }
 }
 
@@ -63,6 +65,7 @@ impl Environment<Stopped> {
             config,
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
+            in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
@@ -80,6 +83,7 @@ impl Environment<Stopped> {
             config: self.config,
             database: self.database.clone(),
             tracker: self.tracker.clone(),
+            in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             scrape_handler: self.scrape_handler.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
@@ -120,6 +124,7 @@ impl Environment<Running> {
             config: self.config,
             database: self.database,
             tracker: self.tracker,
+            in_memory_torrent_repository: self.in_memory_torrent_repository,
             scrape_handler: self.scrape_handler,
             whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,

@@ -883,6 +883,7 @@ mod tests {
             };
             use mockall::predicate::eq;
 
+            use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
             use crate::core::{self, statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1034,7 +1035,7 @@ mod tests {
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V4(remote_client_ip), client_port));
             }
 
-            fn add_a_torrent_peer_using_ipv6(tracker: &Arc<core::Tracker>) {
+            fn add_a_torrent_peer_using_ipv6(in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>) {
                 let info_hash = AquaticInfoHash([0u8; 20]);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
@@ -1047,7 +1048,7 @@ mod tests {
                     .with_peer_address(SocketAddr::new(IpAddr::V6(client_ip_v6), client_port))
                     .into();
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv6);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash.0.into(), &peer_using_ipv6);
             }
 
             async fn announce_a_new_peer_using_ipv4(
@@ -1079,14 +1080,14 @@ mod tests {
                 let (
                     tracker,
                     _scrape_handler,
-                    _in_memory_torrent_repository,
+                    in_memory_torrent_repository,
                     _stats_event_sender,
                     _in_memory_whitelist,
                     _whitelist_manager,
                     whitelist_authorization,
                 ) = public_tracker();
 
-                add_a_torrent_peer_using_ipv6(&tracker);
+                add_a_torrent_peer_using_ipv6(&in_memory_torrent_repository);
 
                 let response = announce_a_new_peer_using_ipv4(tracker.clone(), whitelist_authorization).await;
 
@@ -1201,6 +1202,7 @@ mod tests {
             };
             use mockall::predicate::eq;
 
+            use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
             use crate::core::{self, statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1357,7 +1359,7 @@ mod tests {
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V6(remote_client_ip), client_port));
             }
 
-            fn add_a_torrent_peer_using_ipv4(tracker: &Arc<core::Tracker>) {
+            fn add_a_torrent_peer_using_ipv4(in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>) {
                 let info_hash = AquaticInfoHash([0u8; 20]);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
@@ -1369,7 +1371,7 @@ mod tests {
                     .with_peer_address(SocketAddr::new(IpAddr::V4(client_ip_v4), client_port))
                     .into();
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer_using_ipv4);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash.0.into(), &peer_using_ipv4);
             }
 
             async fn announce_a_new_peer_using_ipv6(
@@ -1404,14 +1406,14 @@ mod tests {
                 let (
                     tracker,
                     _scrape_handler,
-                    _in_memory_torrent_repository,
+                    in_memory_torrent_repository,
                     _stats_event_sender,
                     _in_memory_whitelist,
                     _whitelist_manager,
                     whitelist_authorization,
                 ) = public_tracker();
 
-                add_a_torrent_peer_using_ipv4(&tracker);
+                add_a_torrent_peer_using_ipv4(&in_memory_torrent_repository);
 
                 let response = announce_a_new_peer_using_ipv6(tracker.clone(), whitelist_authorization).await;
 
@@ -1559,7 +1561,7 @@ mod tests {
         use super::{gen_remote_fingerprint, TorrentPeerBuilder};
         use crate::core::scrape_handler::ScrapeHandler;
         use crate::core::services::statistics;
-        use crate::core::{self};
+        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
         use crate::servers::udp::handlers::tests::{
@@ -1618,7 +1620,11 @@ mod tests {
             );
         }
 
-        async fn add_a_seeder(tracker: Arc<core::Tracker>, remote_addr: &SocketAddr, info_hash: &InfoHash) {
+        async fn add_a_seeder(
+            in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+            remote_addr: &SocketAddr,
+            info_hash: &InfoHash,
+        ) {
             let peer_id = PeerId([255u8; 20]);
 
             let peer = TorrentPeerBuilder::new()
@@ -1627,7 +1633,7 @@ mod tests {
                 .with_number_of_bytes_left(0)
                 .into();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash.0.into(), &peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash.0.into(), &peer);
         }
 
         fn build_scrape_request(remote_addr: &SocketAddr, info_hash: &InfoHash) -> ScrapeRequest {
@@ -1640,14 +1646,17 @@ mod tests {
             }
         }
 
-        async fn add_a_sample_seeder_and_scrape(tracker: Arc<core::Tracker>, scrape_handler: Arc<ScrapeHandler>) -> Response {
+        async fn add_a_sample_seeder_and_scrape(
+            in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+            scrape_handler: Arc<ScrapeHandler>,
+        ) -> Response {
             let (stats_event_sender, _stats_repository) = statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let remote_addr = sample_ipv4_remote_addr();
             let info_hash = InfoHash([0u8; 20]);
 
-            add_a_seeder(tracker.clone(), &remote_addr, &info_hash).await;
+            add_a_seeder(in_memory_torrent_repository.clone(), &remote_addr, &info_hash).await;
 
             let request = build_scrape_request(&remote_addr, &info_hash);
 
@@ -1678,17 +1687,18 @@ mod tests {
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
                 let (
-                    tracker,
+                    _tracker,
                     scrape_handler,
-                    _in_memory_torrent_repository,
+                    in_memory_torrent_repository,
                     _stats_event_sender,
                     _in_memory_whitelist,
                     _whitelist_manager,
                     _whitelist_authorization,
                 ) = public_tracker();
 
-                let torrent_stats =
-                    match_scrape_response(add_a_sample_seeder_and_scrape(tracker.clone(), scrape_handler.clone()).await);
+                let torrent_stats = match_scrape_response(
+                    add_a_sample_seeder_and_scrape(in_memory_torrent_repository.clone(), scrape_handler.clone()).await,
+                );
 
                 let expected_torrent_stats = vec![TorrentScrapeStatistics {
                     seeders: NumberOfPeers(1.into()),
@@ -1712,9 +1722,9 @@ mod tests {
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
                 let (
-                    tracker,
+                    _tracker,
                     scrape_handler,
-                    _in_memory_torrent_repository,
+                    in_memory_torrent_repository,
                     stats_event_sender,
                     in_memory_whitelist,
                     _whitelist_manager,
@@ -1724,7 +1734,7 @@ mod tests {
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
 
-                add_a_seeder(tracker.clone(), &remote_addr, &info_hash).await;
+                add_a_seeder(in_memory_torrent_repository.clone(), &remote_addr, &info_hash).await;
 
                 in_memory_whitelist.add(&info_hash.0.into()).await;
 
@@ -1755,9 +1765,9 @@ mod tests {
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
                 let (
-                    tracker,
+                    _tracker,
                     scrape_handler,
-                    _in_memory_torrent_repository,
+                    in_memory_torrent_repository,
                     stats_event_sender,
                     _in_memory_whitelist,
                     _whitelist_manager,
@@ -1767,7 +1777,7 @@ mod tests {
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
 
-                add_a_seeder(tracker.clone(), &remote_addr, &info_hash).await;
+                add_a_seeder(in_memory_torrent_repository.clone(), &remote_addr, &info_hash).await;
 
                 let request = build_scrape_request(&remote_addr, &info_hash);
 

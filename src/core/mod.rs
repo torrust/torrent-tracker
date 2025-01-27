@@ -693,7 +693,7 @@ mod tests {
         use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{whitelist, Tracker};
 
-        fn public_tracker() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
+        fn public_tracker() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
 
             let (
@@ -714,7 +714,7 @@ mod tests {
 
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (tracker, scrape_handler)
+            (tracker, in_memory_torrent_repository, scrape_handler)
         }
 
         fn public_tracker_and_in_memory_torrents_repository() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
@@ -871,12 +871,12 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
 
             let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
@@ -903,7 +903,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
 
@@ -918,7 +918,7 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
             }
 
             let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
@@ -928,12 +928,12 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent_excluding_a_given_peer() {
-            let (tracker, _scrape_handler) = public_tracker();
+            let (tracker, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
 
             let peers = tracker
                 .in_memory_torrent_repository
@@ -944,13 +944,13 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent_when_it_filters_out_a_given_peer() {
-            let (tracker, _scrape_handler) = public_tracker();
+            let (tracker, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
 
             let excluded_peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &excluded_peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &excluded_peer);
 
             // Add 74 peers
             for idx in 2..=75 {
@@ -964,7 +964,7 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
             }
 
             let peers = tracker
@@ -976,9 +976,9 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_torrent_metrics() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
-            let _ = tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
+            let () = in_memory_torrent_repository.upsert_peer(&sample_info_hash(), &leecher());
 
             let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
 
@@ -995,11 +995,11 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_get_many_the_torrent_metrics() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
-                let _ = tracker.upsert_peer_and_get_stats(&gen_seeded_infohash(&i), &leecher());
+                let () = in_memory_torrent_repository.upsert_peer(&gen_seeded_infohash(&i), &leecher());
             }
             let result_a = start_time.elapsed();
 
@@ -1130,7 +1130,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_an_empty_peer_list_when_it_is_the_first_announced_peer() {
-                    let (tracker, _scrape_handler) = public_tracker();
+                    let (tracker, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut peer = sample_peer();
 
@@ -1141,7 +1141,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_the_previously_announced_peers() {
-                    let (tracker, _scrape_handler) = public_tracker();
+                    let (tracker, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut previously_announced_peer = sample_peer_1();
                     tracker.announce(
@@ -1166,7 +1166,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (tracker, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = seeder();
 
@@ -1177,7 +1177,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_leecher() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (tracker, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = leecher();
 
@@ -1188,7 +1188,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_a_previously_announced_started_peer_has_completed_downloading() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (tracker, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         // We have to announce with "started" event because peer does not count if peer was not previously known
                         let mut started_peer = started_peer();
@@ -1215,7 +1215,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_swarm_metadata_for_the_requested_file_if_the_tracker_has_that_torrent() {
-                    let (tracker, scrape_handler) = public_tracker();
+                    let (tracker, _in_memory_torrent_repository, scrape_handler) = public_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
