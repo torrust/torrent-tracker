@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::core::databases::Database;
+use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::{whitelist, Tracker};
@@ -23,6 +24,7 @@ where
     pub config: Arc<UdpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
@@ -61,6 +63,7 @@ impl Environment<Stopped> {
             config,
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
+            scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             stats_repository: app_container.stats_repository.clone(),
@@ -77,6 +80,7 @@ impl Environment<Stopped> {
             config: self.config,
             database: self.database.clone(),
             tracker: self.tracker.clone(),
+            scrape_handler: self.scrape_handler.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
             stats_repository: self.stats_repository.clone(),
@@ -86,6 +90,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.scrape_handler,
                     self.whitelist_authorization,
                     self.stats_event_sender,
                     self.ban_service,
@@ -115,6 +120,7 @@ impl Environment<Running> {
             config: self.config,
             database: self.database,
             tracker: self.tracker,
+            scrape_handler: self.scrape_handler,
             whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,
             stats_repository: self.stats_repository,

@@ -20,6 +20,7 @@ use tracing::instrument;
 
 use super::make_rust_tls;
 use crate::core::authentication::service::AuthenticationService;
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{self, statistics, whitelist};
 use crate::servers::http::server::{HttpServer, Launcher};
@@ -34,11 +35,20 @@ use crate::servers::registar::ServiceRegistrationForm;
 /// # Panics
 ///
 /// It would panic if the `config::HttpTracker` struct would contain inappropriate values.
-///
-#[instrument(skip(config, tracker, authentication_service, whitelist_authorization, stats_event_sender, form))]
+#[allow(clippy::too_many_arguments)]
+#[instrument(skip(
+    config,
+    tracker,
+    scrape_handler,
+    authentication_service,
+    whitelist_authorization,
+    stats_event_sender,
+    form
+))]
 pub async fn start_job(
     config: &HttpTracker,
     tracker: Arc<core::Tracker>,
+    scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -57,6 +67,7 @@ pub async fn start_job(
                 socket,
                 tls,
                 tracker.clone(),
+                scrape_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
@@ -67,12 +78,14 @@ pub async fn start_job(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(socket, tls, tracker, whitelist_authorization, stats_event_sender, form))]
+#[instrument(skip(socket, tls, tracker, scrape_handler, whitelist_authorization, stats_event_sender, form))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
@@ -81,6 +94,7 @@ async fn start_v1(
     let server = HttpServer::new(Launcher::new(socket, tls))
         .start(
             tracker,
+            scrape_handler,
             authentication_service,
             whitelist_authorization,
             stats_event_sender,
@@ -128,6 +142,7 @@ mod tests {
         start_job(
             config,
             app_container.tracker,
+            app_container.scrape_handler,
             app_container.authentication_service,
             app_container.whitelist_authorization,
             app_container.stats_event_sender,

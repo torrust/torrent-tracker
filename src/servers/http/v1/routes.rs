@@ -23,6 +23,7 @@ use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
 use crate::core::authentication::service::AuthenticationService;
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, Tracker};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
@@ -35,6 +36,7 @@ use crate::servers::logging::Latency;
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
     tracker,
+    scrape_handler,
     authentication_service,
     whitelist_authorization,
     stats_event_sender,
@@ -42,6 +44,7 @@ use crate::servers::logging::Latency;
 ))]
 pub fn router(
     tracker: Arc<Tracker>,
+    scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -74,6 +77,7 @@ pub fn router(
             "/scrape",
             get(scrape::handle_without_key).with_state((
                 tracker.clone(),
+                scrape_handler.clone(),
                 authentication_service.clone(),
                 stats_event_sender.clone(),
             )),
@@ -82,6 +86,7 @@ pub fn router(
             "/scrape/{key}",
             get(scrape::handle_with_key).with_state((
                 tracker.clone(),
+                scrape_handler.clone(),
                 authentication_service.clone(),
                 stats_event_sender.clone(),
             )),

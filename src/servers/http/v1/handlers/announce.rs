@@ -289,7 +289,6 @@ mod tests {
 
         let tracker = Arc::new(initialize_tracker(
             config,
-            &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
