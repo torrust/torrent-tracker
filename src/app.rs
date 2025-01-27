@@ -50,7 +50,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     let registar = Registar::default();
 
     // Load peer keys
-    if app_container.tracker.is_private() {
+    if config.core.private {
         app_container
             .keys_handler
             .load_keys_from_database()
@@ -59,7 +59,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     }
 
     // Load whitelisted torrents
-    if app_container.tracker.is_listed() {
+    if config.core.listed {
         app_container
             .whitelist_manager
             .load_whitelist_from_database()
@@ -70,7 +70,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
     // Start the UDP blocks
     if let Some(udp_trackers) = &config.udp_trackers {
         for udp_tracker_config in udp_trackers {
-            if app_container.tracker.is_private() {
+            if config.core.private {
                 tracing::warn!(
                     "Could not start UDP tracker on: {} while in private mode. UDP is not safe for private trackers!",
                     udp_tracker_config.bind_address

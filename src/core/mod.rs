@@ -496,28 +496,10 @@ impl Tracker {
         })
     }
 
-    /// Returns `true` is the tracker is in public mode.
-    #[must_use]
-    pub fn is_public(&self) -> bool {
-        !self.config.private
-    }
-
-    /// Returns `true` is the tracker is in private mode.
-    #[must_use]
-    pub fn is_private(&self) -> bool {
-        self.config.private
-    }
-
-    /// Returns `true` is the tracker is in whitelisted mode.
-    #[must_use]
-    pub fn is_listed(&self) -> bool {
-        self.config.listed
-    }
-
     /// Returns `true` if the tracker requires authentication.
     #[must_use]
     pub fn requires_authentication(&self) -> bool {
-        self.is_private()
+        self.config.private
     }
 
     /// Returns `true` is the tracker is in whitelisted mode.
