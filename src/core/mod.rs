@@ -627,7 +627,7 @@ impl Tracker {
     /// the torrent info data which is persistent, and finally return the data
     /// needed for a `announce` request response.
     #[must_use]
-    pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
+    fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
         let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
             Some(swarm_metadata) => swarm_metadata,
             None => SwarmMetadata::zeroed(),
@@ -1393,7 +1393,10 @@ mod tests {
             use aquatic_udp_protocol::AnnounceEvent;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core::tests::the_tracker::{sample_info_hash, sample_peer, tracker_persisting_torrents_in_database};
+            use crate::core::tests::the_tracker::{
+                peer_ip, sample_info_hash, sample_peer, tracker_persisting_torrents_in_database,
+            };
+            use crate::core::PeersWanted;
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
@@ -1404,12 +1407,12 @@ mod tests {
                 let mut peer = sample_peer();
 
                 peer.event = AnnounceEvent::Started;
-                let swarm_stats = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
-                assert_eq!(swarm_stats.downloaded, 0);
+                let announce_data = tracker.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                assert_eq!(announce_data.stats.downloaded, 0);
 
                 peer.event = AnnounceEvent::Completed;
-                let swarm_stats = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
-                assert_eq!(swarm_stats.downloaded, 1);
+                let announce_data = tracker.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                assert_eq!(announce_data.stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
                 let _unused = in_memory_torrent_repository.remove(&info_hash);
