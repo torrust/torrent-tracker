@@ -583,8 +583,6 @@ impl Tracker {
 
     /// It handles an announce request.
     ///
-    /// # Context: Tracker
-    ///
     /// BEP 03: [The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html).
     pub fn announce(
         &self,
@@ -628,8 +626,6 @@ impl Tracker {
     /// It updates the torrent entry in memory, it also stores in the database
     /// the torrent info data which is persistent, and finally return the data
     /// needed for a `announce` request response.
-    ///
-    /// # Context: Tracker
     #[must_use]
     pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
         let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
@@ -652,8 +648,6 @@ impl Tracker {
     }
 
     /// It stores the torrents stats into the database (if persistency is enabled).
-    ///
-    /// # Context: Tracker
     fn persist_stats(&self, info_hash: &InfoHash, swarm_metadata: &SwarmMetadata) {
         if self.config.tracker_policy.persistent_torrent_completed_stat {
             let completed = swarm_metadata.downloaded;
