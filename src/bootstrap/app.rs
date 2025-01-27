@@ -22,6 +22,7 @@ use tracing::instrument;
 use super::config::initialize_configuration;
 use crate::bootstrap;
 use crate::container::AppContainer;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
@@ -121,11 +122,18 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         &db_torrent_repository,
     ));
 
+    let announce_handler = Arc::new(AnnounceHandler::new(
+        &configuration.core,
+        &in_memory_torrent_repository,
+        &db_torrent_repository,
+    ));
+
     let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
     AppContainer {
         database,
         tracker,
+        announce_handler,
         scrape_handler,
         keys_handler,
         authentication_service,

@@ -10,6 +10,7 @@ use tracing::{instrument, Level};
 
 use super::banning::BanService;
 use super::bound_socket::BoundSocket;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::event::UdpResponseKind;
@@ -20,6 +21,7 @@ use crate::servers::udp::{handlers, RawRequest};
 pub struct Processor {
     socket: Arc<BoundSocket>,
     tracker: Arc<Tracker>,
+    announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -30,6 +32,7 @@ impl Processor {
     pub fn new(
         socket: Arc<BoundSocket>,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -38,6 +41,7 @@ impl Processor {
         Self {
             socket,
             tracker,
+            announce_handler,
             scrape_handler,
             whitelist_authorization,
             opt_stats_event_sender,
@@ -54,6 +58,7 @@ impl Processor {
         let response = handlers::handle_packet(
             request,
             &self.tracker,
+            &self.announce_handler,
             &self.scrape_handler,
             &self.whitelist_authorization,
             &self.opt_stats_event_sender,

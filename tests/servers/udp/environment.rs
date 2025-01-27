@@ -5,6 +5,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
+use torrust_tracker_lib::core::announce_handler::AnnounceHandler;
 use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
@@ -26,6 +27,7 @@ where
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+    pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -66,6 +68,7 @@ impl Environment<Stopped> {
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
+            announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
@@ -84,6 +87,7 @@ impl Environment<Stopped> {
             database: self.database.clone(),
             tracker: self.tracker.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
+            announce_handler: self.announce_handler.clone(),
             scrape_handler: self.scrape_handler.clone(),
             whitelist_authorization: self.whitelist_authorization.clone(),
             stats_event_sender: self.stats_event_sender.clone(),
@@ -94,6 +98,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.announce_handler,
                     self.scrape_handler,
                     self.whitelist_authorization,
                     self.stats_event_sender,
@@ -125,6 +130,7 @@ impl Environment<Running> {
             database: self.database,
             tracker: self.tracker,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
+            announce_handler: self.announce_handler,
             scrape_handler: self.scrape_handler,
             whitelist_authorization: self.whitelist_authorization,
             stats_event_sender: self.stats_event_sender,

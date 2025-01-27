@@ -13,6 +13,7 @@ use super::banning::BanService;
 use super::spawner::Spawner;
 use super::{Server, UdpError};
 use crate::bootstrap::jobs::Started;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, Tracker};
@@ -66,10 +67,11 @@ impl Server<Stopped> {
     ///
     /// It panics if unable to receive the bound socket address from service.
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(self, tracker, scrape_handler, whitelist_authorization, opt_stats_event_sender, ban_service, form), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, tracker, announce_handler, scrape_handler, whitelist_authorization, opt_stats_event_sender, ban_service, form), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -85,6 +87,7 @@ impl Server<Stopped> {
         // May need to wrap in a task to about a tokio bug.
         let task = self.state.spawner.spawn_launcher(
             tracker,
+            announce_handler,
             scrape_handler,
             whitelist_authorization,
             opt_stats_event_sender,

@@ -13,6 +13,7 @@ use tokio::task::JoinHandle;
 use torrust_tracker_configuration::UdpTracker;
 use tracing::instrument;
 
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{self, whitelist};
@@ -32,10 +33,12 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 /// It will panic if it is unable to start the UDP service.
 /// It will panic if the task did not finish successfully.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 #[allow(clippy::async_yields_async)]
 #[instrument(skip(
     config,
     tracker,
+    announce_handler,
     scrape_handler,
     whitelist_authorization,
     stats_event_sender,
@@ -45,6 +48,7 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 pub async fn start_job(
     config: &UdpTracker,
     tracker: Arc<core::Tracker>,
+    announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -57,6 +61,7 @@ pub async fn start_job(
     let server = Server::new(Spawner::new(bind_to))
         .start(
             tracker,
+            announce_handler,
             scrape_handler,
             whitelist_authorization,
             stats_event_sender,

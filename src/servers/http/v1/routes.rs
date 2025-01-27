@@ -22,6 +22,7 @@ use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
@@ -36,6 +37,7 @@ use crate::servers::logging::Latency;
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
     tracker,
+    announce_handler,
     scrape_handler,
     authentication_service,
     whitelist_authorization,
@@ -44,6 +46,7 @@ use crate::servers::logging::Latency;
 ))]
 pub fn router(
     tracker: Arc<Tracker>,
+    announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -58,6 +61,7 @@ pub fn router(
             "/announce",
             get(announce::handle_without_key).with_state((
                 tracker.clone(),
+                announce_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
@@ -67,6 +71,7 @@ pub fn router(
             "/announce/{key}",
             get(announce::handle_with_key).with_state((
                 tracker.clone(),
+                announce_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
                 stats_event_sender.clone(),
