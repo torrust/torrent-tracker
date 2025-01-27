@@ -185,8 +185,8 @@ impl fmt::Display for Event {
 /// Depending on the value of this param, the tracker will return a different
 /// response:
 ///
-/// - [`Normal`](crate::servers::http::v1::responses::announce::Normal), i.e. a `non-compact` response.
-/// - [`Compact`](crate::servers::http::v1::responses::announce::Compact) response.
+/// - [`Normal`](crate::v1::responses::announce::Normal), i.e. a `non-compact` response.
+/// - [`Compact`](crate::v1::responses::announce::Compact) response.
 ///
 /// Refer to [BEP 23. Tracker Returns Compact Peer Lists](https://www.bittorrent.org/beps/bep_0023.html)
 #[derive(PartialEq, Debug)]

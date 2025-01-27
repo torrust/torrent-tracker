@@ -189,11 +189,11 @@ mod tests {
         async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let config = tracker_configuration();
 
-            let (tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &sample_peer());
 
             let torrent_info = get_torrent_info(in_memory_torrent_repository.clone(), &info_hash)
                 .await
@@ -242,12 +242,12 @@ mod tests {
         async fn should_return_a_summarized_info_for_all_torrents() {
             let config = tracker_configuration();
 
-            let (tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &sample_peer());
 
             let torrents = get_torrents_page(in_memory_torrent_repository.clone(), Some(&Pagination::default())).await;
 
@@ -266,15 +266,16 @@ mod tests {
         async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
             let config = tracker_configuration();
 
-            let (tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
+
             let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash1, &sample_peer());
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash2, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash2, &sample_peer());
 
             let offset = 0;
             let limit = 1;
@@ -288,15 +289,16 @@ mod tests {
         async fn should_allow_using_pagination_in_the_result() {
             let config = tracker_configuration();
 
-            let (tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
+
             let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash1, &sample_peer());
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash2, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash2, &sample_peer());
 
             let offset = 1;
             let limit = 4000;
@@ -319,15 +321,15 @@ mod tests {
         async fn should_return_torrents_ordered_by_info_hash() {
             let config = tracker_configuration();
 
-            let (tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash1, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
 
             let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash2, &sample_peer());
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash2, &sample_peer());
 
             let torrents = get_torrents_page(in_memory_torrent_repository.clone(), Some(&Pagination::default())).await;
 

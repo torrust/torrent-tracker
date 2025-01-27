@@ -19,6 +19,7 @@ use torrust_tracker_configuration::HttpTracker;
 use tracing::instrument;
 
 use super::make_rust_tls;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
@@ -39,6 +40,7 @@ use crate::servers::registar::ServiceRegistrationForm;
 #[instrument(skip(
     config,
     tracker,
+    announce_handler,
     scrape_handler,
     authentication_service,
     whitelist_authorization,
@@ -48,6 +50,7 @@ use crate::servers::registar::ServiceRegistrationForm;
 pub async fn start_job(
     config: &HttpTracker,
     tracker: Arc<core::Tracker>,
+    announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -67,6 +70,7 @@ pub async fn start_job(
                 socket,
                 tls,
                 tracker.clone(),
+                announce_handler.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),
                 whitelist_authorization.clone(),
@@ -80,11 +84,21 @@ pub async fn start_job(
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(socket, tls, tracker, scrape_handler, whitelist_authorization, stats_event_sender, form))]
+#[instrument(skip(
+    socket,
+    tls,
+    tracker,
+    announce_handler,
+    scrape_handler,
+    whitelist_authorization,
+    stats_event_sender,
+    form
+))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     tracker: Arc<core::Tracker>,
+    announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -94,6 +108,7 @@ async fn start_v1(
     let server = HttpServer::new(Launcher::new(socket, tls))
         .start(
             tracker,
+            announce_handler,
             scrape_handler,
             authentication_service,
             whitelist_authorization,
@@ -142,6 +157,7 @@ mod tests {
         start_job(
             config,
             app_container.tracker,
+            app_container.announce_handler,
             app_container.scrape_handler,
             app_container.authentication_service,
             app_container.whitelist_authorization,

@@ -39,11 +39,11 @@
 //! Please refer to the documentation of each structure for more information
 //! about each section.
 //!
-//! - [`Core configuration`](crate::v2::Configuration)
-//! - [`HTTP API configuration`](crate::v2::tracker_api::HttpApi)
-//! - [`HTTP Tracker configuration`](crate::v2::http_tracker::HttpTracker)
-//! - [`UDP Tracker configuration`](crate::v2::udp_tracker::UdpTracker)
-//! - [`Health Check API configuration`](crate::v2::health_check_api::HealthCheckApi)
+//! - [`Core configuration`](crate::v2_0_0::Configuration)
+//! - [`HTTP API configuration`](crate::v2_0_0::tracker_api::HttpApi)
+//! - [`HTTP Tracker configuration`](crate::v2_0_0::http_tracker::HttpTracker)
+//! - [`UDP Tracker configuration`](crate::v2_0_0::udp_tracker::UdpTracker)
+//! - [`Health Check API configuration`](crate::v2_0_0::health_check_api::HealthCheckApi)
 //!
 //! ## Port binding
 //!
@@ -78,7 +78,7 @@
 //!
 //! Alternatively, you could setup a reverse proxy like Nginx or Apache to
 //! handle the SSL/TLS part and forward the requests to the tracker. If you do
-//! that, you should set [`on_reverse_proxy`](crate::v2::network::Network::on_reverse_proxy)
+//! that, you should set [`on_reverse_proxy`](crate::v2_0_0::network::Network::on_reverse_proxy)
 //! to `true` in the configuration file. It's out of scope for this
 //! documentation to explain in detail how to setup a reverse proxy, but the
 //! configuration file should be something like this:

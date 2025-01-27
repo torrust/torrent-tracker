@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::databases::Database;
@@ -18,6 +19,7 @@ use crate::servers::udp::server::banning::BanService;
 pub struct AppContainer {
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,

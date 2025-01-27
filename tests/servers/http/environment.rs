@@ -5,6 +5,7 @@ use futures::executor::block_on;
 use torrust_tracker_configuration::{Configuration, HttpTracker};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
+use torrust_tracker_lib::core::announce_handler::AnnounceHandler;
 use torrust_tracker_lib::core::authentication::handler::KeysHandler;
 use torrust_tracker_lib::core::authentication::service::AuthenticationService;
 use torrust_tracker_lib::core::databases::Database;
@@ -22,6 +23,7 @@ pub struct Environment<S> {
     pub config: Arc<HttpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub keys_handler: Arc<KeysHandler>,
@@ -37,7 +39,7 @@ pub struct Environment<S> {
 impl<S> Environment<S> {
     /// Add a torrent to the tracker
     pub fn add_torrent_peer(&self, info_hash: &InfoHash, peer: &peer::Peer) {
-        let _ = self.tracker.upsert_peer_and_get_stats(info_hash, peer);
+        let () = self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
     }
 }
 
@@ -65,6 +67,7 @@ impl Environment<Stopped> {
             config,
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
+            announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             keys_handler: app_container.keys_handler.clone(),
@@ -84,6 +87,7 @@ impl Environment<Stopped> {
             config: self.config,
             database: self.database.clone(),
             tracker: self.tracker.clone(),
+            announce_handler: self.announce_handler.clone(),
             scrape_handler: self.scrape_handler.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             keys_handler: self.keys_handler.clone(),
@@ -97,6 +101,7 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.tracker,
+                    self.announce_handler,
                     self.scrape_handler,
                     self.authentication_service,
                     self.whitelist_authorization,
@@ -119,6 +124,7 @@ impl Environment<Running> {
             config: self.config,
             database: self.database,
             tracker: self.tracker,
+            announce_handler: self.announce_handler,
             scrape_handler: self.scrape_handler,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
             keys_handler: self.keys_handler,

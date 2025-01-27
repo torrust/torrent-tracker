@@ -11,6 +11,7 @@ use tokio::task::JoinHandle;
 use super::banning::BanService;
 use super::launcher::Launcher;
 use crate::bootstrap::jobs::Started;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{whitelist, Tracker};
@@ -32,6 +33,7 @@ impl Spawner {
     pub fn spawn_launcher(
         &self,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -45,6 +47,7 @@ impl Spawner {
         tokio::spawn(async move {
             Launcher::run_with_graceful_shutdown(
                 tracker,
+                announce_handler,
                 scrape_handler,
                 whitelist_authorization,
                 opt_stats_event_sender,

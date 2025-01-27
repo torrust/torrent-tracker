@@ -29,8 +29,6 @@ impl ScrapeHandler {
 
     /// It handles a scrape request.
     ///
-    /// # Context: Tracker
-    ///
     /// BEP 48: [Tracker Protocol Extension: Scrape](https://www.bittorrent.org/beps/bep_0048.html).
     pub async fn scrape(&self, info_hashes: &Vec<InfoHash>) -> ScrapeData {
         let mut scrape_data = ScrapeData::empty();

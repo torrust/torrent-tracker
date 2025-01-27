@@ -13,6 +13,7 @@ use tracing::instrument;
 use super::banning::BanService;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::{statistics, whitelist, Tracker};
@@ -44,6 +45,7 @@ impl Launcher {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         tracker,
+        announce_handler,
         scrape_handler,
         whitelist_authorization,
         opt_stats_event_sender,
@@ -54,6 +56,7 @@ impl Launcher {
     ))]
     pub async fn run_with_graceful_shutdown(
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -98,6 +101,7 @@ impl Launcher {
                 let () = Self::run_udp_server_main(
                     receiver,
                     tracker.clone(),
+                    announce_handler.clone(),
                     scrape_handler.clone(),
                     whitelist_authorization.clone(),
                     opt_stats_event_sender.clone(),
@@ -141,9 +145,11 @@ impl Launcher {
         ServiceHealthCheckJob::new(binding, info, job)
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         receiver,
         tracker,
+        announce_handler,
         scrape_handler,
         whitelist_authorization,
         opt_stats_event_sender,
@@ -152,6 +158,7 @@ impl Launcher {
     async fn run_udp_server_main(
         mut receiver: Receiver,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
@@ -224,6 +231,7 @@ impl Launcher {
                 let processor = Processor::new(
                     receiver.socket.clone(),
                     tracker.clone(),
+                    announce_handler.clone(),
                     scrape_handler.clone(),
                     whitelist_authorization.clone(),
                     opt_stats_event_sender.clone(),

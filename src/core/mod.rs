@@ -52,7 +52,7 @@
 //! The tracker responds to the peer with the list of other peers in the swarm so that
 //! the peer can contact them to start downloading pieces of the file from them.
 //!
-//! Once you have instantiated the `Tracker` you can `announce` a new [`peer::Peer`] with:
+//! Once you have instantiated the `AnnounceHandler` you can `announce` a new [`peer::Peer`](torrust_tracker_primitives::peer::Peer) with:
 //!
 //! ```rust,no_run
 //! use std::net::SocketAddr;
@@ -81,7 +81,7 @@
 //! ```
 //!
 //! ```text
-//! let announce_data = tracker.announce(&info_hash, &mut peer, &peer_ip).await;
+//! let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip).await;
 //! ```
 //!
 //! The `Tracker` returns the list of peers for the torrent with the infohash `3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0`,
@@ -306,7 +306,7 @@
 //! `c1277613db1d28709b034a017ab2cae4be07ae10` is the torrent infohash and `completed` contains the number of peers
 //! that have a full version of the torrent data, also known as seeders.
 //!
-//! Refer to [`peer`] module for more information about peers.
+//! Refer to [`peer`](torrust_tracker_primitives::peer) for more information about peers.
 //!
 //! # Configuration
 //!
@@ -439,6 +439,7 @@
 //! - Torrent metrics
 //!
 //! Refer to [`databases`] module for more information about persistence.
+pub mod announce_handler;
 pub mod authentication;
 pub mod databases;
 pub mod error;
@@ -453,13 +454,9 @@ pub mod peer_tests;
 use std::net::IpAddr;
 use std::sync::Arc;
 
-use bittorrent_primitives::info_hash::InfoHash;
 use torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use torrust_tracker_configuration::{AnnouncePolicy, Core, TORRENT_PEERS_LIMIT};
-use torrust_tracker_primitives::core::AnnounceData;
-use torrust_tracker_primitives::peer;
-use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
+use torrust_tracker_configuration::{AnnouncePolicy, Core};
 
 /// The domain layer tracker service.
 ///
@@ -475,52 +472,10 @@ pub struct Tracker {
     config: Core,
 
     /// The in-memory torrents repository.
-    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+    _in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
 
     /// The persistent torrents repository.
-    db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
-}
-
-/// How many peers the peer announcing wants in the announce response.
-#[derive(Clone, Debug, PartialEq, Default)]
-pub enum PeersWanted {
-    /// The peer wants as many peers as possible in the announce response.
-    #[default]
-    All,
-    /// The peer only wants a certain amount of peers in the announce response.
-    Only { amount: usize },
-}
-
-impl PeersWanted {
-    #[must_use]
-    pub fn only(limit: u32) -> Self {
-        let amount: usize = match limit.try_into() {
-            Ok(amount) => amount,
-            Err(_) => TORRENT_PEERS_LIMIT,
-        };
-
-        Self::Only { amount }
-    }
-
-    fn limit(&self) -> usize {
-        match self {
-            PeersWanted::All => TORRENT_PEERS_LIMIT,
-            PeersWanted::Only { amount } => *amount,
-        }
-    }
-}
-
-impl From<i32> for PeersWanted {
-    fn from(value: i32) -> Self {
-        if value > 0 {
-            match value.try_into() {
-                Ok(peers_wanted) => Self::Only { amount: peers_wanted },
-                Err(_) => Self::All,
-            }
-        } else {
-            Self::All
-        }
-    }
+    _db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
 }
 
 impl Tracker {
@@ -536,33 +491,15 @@ impl Tracker {
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
             config: config.clone(),
-            in_memory_torrent_repository: in_memory_torrent_repository.clone(),
-            db_torrent_repository: db_torrent_repository.clone(),
+            _in_memory_torrent_repository: in_memory_torrent_repository.clone(),
+            _db_torrent_repository: db_torrent_repository.clone(),
         })
-    }
-
-    /// Returns `true` is the tracker is in public mode.
-    #[must_use]
-    pub fn is_public(&self) -> bool {
-        !self.config.private
-    }
-
-    /// Returns `true` is the tracker is in private mode.
-    #[must_use]
-    pub fn is_private(&self) -> bool {
-        self.config.private
-    }
-
-    /// Returns `true` is the tracker is in whitelisted mode.
-    #[must_use]
-    pub fn is_listed(&self) -> bool {
-        self.config.listed
     }
 
     /// Returns `true` if the tracker requires authentication.
     #[must_use]
     pub fn requires_authentication(&self) -> bool {
-        self.is_private()
+        self.config.private
     }
 
     /// Returns `true` is the tracker is in whitelisted mode.
@@ -580,97 +517,6 @@ impl Tracker {
     pub fn get_maybe_external_ip(&self) -> Option<IpAddr> {
         self.config.net.external_ip
     }
-
-    /// It handles an announce request.
-    ///
-    /// # Context: Tracker
-    ///
-    /// BEP 03: [The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html).
-    pub fn announce(
-        &self,
-        info_hash: &InfoHash,
-        peer: &mut peer::Peer,
-        remote_client_ip: &IpAddr,
-        peers_wanted: &PeersWanted,
-    ) -> AnnounceData {
-        // code-review: maybe instead of mutating the peer we could just return
-        // a tuple with the new peer and the announce data: (Peer, AnnounceData).
-        // It could even be a different struct: `StoredPeer` or `PublicPeer`.
-
-        // code-review: in the `scrape` function we perform an authorization check.
-        // We check if the torrent is whitelisted. Should we also check authorization here?
-        // I think so because the `Tracker` has the responsibility for checking authentication and authorization.
-        // The `Tracker` has delegated that responsibility to the handlers
-        // (because we want to return a friendly error response) but that does not mean we should
-        // double-check authorization at this domain level too.
-        // I would propose to return a `Result<AnnounceData, Error>` here.
-        // Besides, regarding authentication the `Tracker` is also responsible for authentication but
-        // we are actually handling authentication at the handlers level. So I would extract that
-        // responsibility into another authentication service.
-
-        tracing::debug!("Before: {peer:?}");
-        peer.change_ip(&assign_ip_address_to_peer(remote_client_ip, self.config.net.external_ip));
-        tracing::debug!("After: {peer:?}");
-
-        let stats = self.upsert_peer_and_get_stats(info_hash, peer);
-
-        let peers = self
-            .in_memory_torrent_repository
-            .get_peers_for(info_hash, peer, peers_wanted.limit());
-
-        AnnounceData {
-            peers,
-            stats,
-            policy: self.get_announce_policy(),
-        }
-    }
-
-    /// It updates the torrent entry in memory, it also stores in the database
-    /// the torrent info data which is persistent, and finally return the data
-    /// needed for a `announce` request response.
-    ///
-    /// # Context: Tracker
-    #[must_use]
-    pub fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
-        let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
-            Some(swarm_metadata) => swarm_metadata,
-            None => SwarmMetadata::zeroed(),
-        };
-
-        self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
-
-        let swarm_metadata_after = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
-            Some(swarm_metadata) => swarm_metadata,
-            None => SwarmMetadata::zeroed(),
-        };
-
-        if swarm_metadata_before != swarm_metadata_after {
-            self.persist_stats(info_hash, &swarm_metadata_after);
-        }
-
-        swarm_metadata_after
-    }
-
-    /// It stores the torrents stats into the database (if persistency is enabled).
-    ///
-    /// # Context: Tracker
-    fn persist_stats(&self, info_hash: &InfoHash, swarm_metadata: &SwarmMetadata) {
-        if self.config.tracker_policy.persistent_torrent_completed_stat {
-            let completed = swarm_metadata.downloaded;
-            let info_hash = *info_hash;
-
-            drop(self.db_torrent_repository.save(&info_hash, completed));
-        }
-    }
-}
-
-#[must_use]
-fn assign_ip_address_to_peer(remote_client_ip: &IpAddr, tracker_external_ip: Option<IpAddr>) -> IpAddr {
-    if let Some(host_ip) = tracker_external_ip.filter(|_| remote_client_ip.is_loopback()) {
-        host_ip
-    } else {
-        *remote_client_ip
-    }
 }
 
 #[cfg(test)]
@@ -686,12 +532,13 @@ mod tests {
         use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
         use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
+        use torrust_tracker_primitives::peer::Peer;
         use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::app_test::initialize_tracker_dependencies;
-        use crate::core::peer::Peer;
+        use crate::core::announce_handler::AnnounceHandler;
         use crate::core::scrape_handler::ScrapeHandler;
         use crate::core::services::{initialize_tracker, initialize_whitelist_manager};
         use crate::core::torrent::manager::TorrentsManager;
@@ -699,7 +546,12 @@ mod tests {
         use crate::core::whitelist::manager::WhiteListManager;
         use crate::core::{whitelist, Tracker};
 
-        fn public_tracker() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
+        fn public_tracker() -> (
+            Arc<Tracker>,
+            Arc<AnnounceHandler>,
+            Arc<InMemoryTorrentRepository>,
+            Arc<ScrapeHandler>,
+        ) {
             let config = configuration::ephemeral_public();
 
             let (
@@ -718,9 +570,15 @@ mod tests {
                 &db_torrent_repository,
             ));
 
+            let announce_handler = Arc::new(AnnounceHandler::new(
+                &config.core,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
+
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (tracker, scrape_handler)
+            (tracker, announce_handler, in_memory_torrent_repository, scrape_handler)
         }
 
         fn public_tracker_and_in_memory_torrents_repository() -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
@@ -745,8 +603,10 @@ mod tests {
             (tracker, in_memory_torrent_repository)
         }
 
+        #[allow(clippy::type_complexity)]
         fn whitelisted_tracker() -> (
-            Tracker,
+            Arc<Tracker>,
+            Arc<AnnounceHandler>,
             Arc<whitelist::authorization::Authorization>,
             Arc<WhiteListManager>,
             Arc<ScrapeHandler>,
@@ -765,14 +625,35 @@ mod tests {
 
             let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
-            let tracker = initialize_tracker(&config, &in_memory_torrent_repository, &db_torrent_repository);
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
+
+            let announce_handler = Arc::new(AnnounceHandler::new(
+                &config.core,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
 
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (tracker, whitelist_authorization, whitelist_manager, scrape_handler)
+            (
+                tracker,
+                announce_handler,
+                whitelist_authorization,
+                whitelist_manager,
+                scrape_handler,
+            )
         }
 
-        pub fn tracker_persisting_torrents_in_database() -> (Tracker, Arc<TorrentsManager>, Arc<InMemoryTorrentRepository>) {
+        pub fn tracker_persisting_torrents_in_database() -> (
+            Arc<Tracker>,
+            Arc<AnnounceHandler>,
+            Arc<TorrentsManager>,
+            Arc<InMemoryTorrentRepository>,
+        ) {
             let mut config = configuration::ephemeral_listed();
             config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
@@ -786,9 +667,19 @@ mod tests {
                 torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            let tracker = initialize_tracker(&config, &in_memory_torrent_repository, &db_torrent_repository);
+            let tracker = Arc::new(initialize_tracker(
+                &config,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
 
-            (tracker, torrents_manager, in_memory_torrent_repository)
+            let announce_handler = Arc::new(AnnounceHandler::new(
+                &config.core,
+                &in_memory_torrent_repository,
+                &db_torrent_repository,
+            ));
+
+            (tracker, announce_handler, torrents_manager, in_memory_torrent_repository)
         }
 
         fn sample_info_hash() -> InfoHash {
@@ -877,12 +768,12 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
 
             let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
 
@@ -909,7 +800,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let info_hash = sample_info_hash();
 
@@ -924,7 +815,7 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
             }
 
             let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash);
@@ -934,29 +825,27 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_peers_for_a_given_torrent_excluding_a_given_peer() {
-            let (tracker, _scrape_handler) = public_tracker();
+            let (_tracker, _announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
             let peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
 
-            let peers = tracker
-                .in_memory_torrent_repository
-                .get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
+            let peers = in_memory_torrent_repository.get_peers_for(&info_hash, &peer, TORRENT_PEERS_LIMIT);
 
             assert_eq!(peers, vec![]);
         }
 
         #[tokio::test]
         async fn it_should_return_74_peers_at_the_most_for_a_given_torrent_when_it_filters_out_a_given_peer() {
-            let (tracker, _scrape_handler) = public_tracker();
+            let (_tracker, _announce_handler, in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
             let info_hash = sample_info_hash();
 
             let excluded_peer = sample_peer();
 
-            let _ = tracker.upsert_peer_and_get_stats(&info_hash, &excluded_peer);
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &excluded_peer);
 
             // Add 74 peers
             for idx in 2..=75 {
@@ -970,21 +859,19 @@ mod tests {
                     event: AnnounceEvent::Completed,
                 };
 
-                let _ = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
+                let () = in_memory_torrent_repository.upsert_peer(&info_hash, &peer);
             }
 
-            let peers = tracker
-                .in_memory_torrent_repository
-                .get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
+            let peers = in_memory_torrent_repository.get_peers_for(&info_hash, &excluded_peer, TORRENT_PEERS_LIMIT);
 
             assert_eq!(peers.len(), 74);
         }
 
         #[tokio::test]
         async fn it_should_return_the_torrent_metrics() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
-            let _ = tracker.upsert_peer_and_get_stats(&sample_info_hash(), &leecher());
+            let () = in_memory_torrent_repository.upsert_peer(&sample_info_hash(), &leecher());
 
             let torrent_metrics = in_memory_torrent_repository.get_torrents_metrics();
 
@@ -1001,11 +888,11 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_get_many_the_torrent_metrics() {
-            let (tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
+            let (_tracker, in_memory_torrent_repository) = public_tracker_and_in_memory_torrents_repository();
 
             let start_time = std::time::Instant::now();
             for i in 0..1_000_000 {
-                let _ = tracker.upsert_peer_and_get_stats(&gen_seeded_infohash(&i), &leecher());
+                let () = in_memory_torrent_repository.upsert_peer(&gen_seeded_infohash(&i), &leecher());
             }
             let result_a = start_time.elapsed();
 
@@ -1031,16 +918,16 @@ mod tests {
 
                 use std::sync::Arc;
 
+                use crate::core::announce_handler::PeersWanted;
                 use crate::core::tests::the_tracker::{
                     peer_ip, public_tracker, sample_info_hash, sample_peer, sample_peer_1, sample_peer_2,
                 };
-                use crate::core::PeersWanted;
 
                 mod should_assign_the_ip_to_the_peer {
 
                     use std::net::{IpAddr, Ipv4Addr};
 
-                    use crate::core::assign_ip_address_to_peer;
+                    use crate::core::announce_handler::assign_ip_address_to_peer;
 
                     #[test]
                     fn using_the_source_ip_instead_of_the_ip_in_the_announce_request() {
@@ -1056,7 +943,7 @@ mod tests {
                         use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
                         use std::str::FromStr;
 
-                        use crate::core::assign_ip_address_to_peer;
+                        use crate::core::announce_handler::assign_ip_address_to_peer;
 
                         #[test]
                         fn it_should_use_the_loopback_ip_if_the_tracker_does_not_have_the_external_ip_configuration() {
@@ -1097,7 +984,7 @@ mod tests {
                         use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
                         use std::str::FromStr;
 
-                        use crate::core::assign_ip_address_to_peer;
+                        use crate::core::announce_handler::assign_ip_address_to_peer;
 
                         #[test]
                         fn it_should_use_the_loopback_ip_if_the_tracker_does_not_have_the_external_ip_configuration() {
@@ -1136,21 +1023,21 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_an_empty_peer_list_when_it_is_the_first_announced_peer() {
-                    let (tracker, _scrape_handler) = public_tracker();
+                    let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut peer = sample_peer();
 
-                    let announce_data = tracker.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                    let announce_data = announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
 
                     assert_eq!(announce_data.peers, vec![]);
                 }
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_the_previously_announced_peers() {
-                    let (tracker, _scrape_handler) = public_tracker();
+                    let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                     let mut previously_announced_peer = sample_peer_1();
-                    tracker.announce(
+                    announce_handler.announce(
                         &sample_info_hash(),
                         &mut previously_announced_peer,
                         &peer_ip(),
@@ -1158,51 +1045,53 @@ mod tests {
                     );
 
                     let mut peer = sample_peer_2();
-                    let announce_data = tracker.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                    let announce_data = announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
 
                     assert_eq!(announce_data.peers, vec![Arc::new(previously_announced_peer)]);
                 }
 
                 mod it_should_update_the_swarm_stats_for_the_torrent {
 
+                    use crate::core::announce_handler::PeersWanted;
                     use crate::core::tests::the_tracker::{
                         completed_peer, leecher, peer_ip, public_tracker, sample_info_hash, seeder, started_peer,
                     };
-                    use crate::core::PeersWanted;
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = seeder();
 
-                        let announce_data = tracker.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                        let announce_data =
+                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
 
                         assert_eq!(announce_data.stats.complete, 1);
                     }
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_leecher() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         let mut peer = leecher();
 
-                        let announce_data = tracker.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                        let announce_data =
+                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
 
                         assert_eq!(announce_data.stats.incomplete, 1);
                     }
 
                     #[tokio::test]
                     async fn when_a_previously_announced_started_peer_has_completed_downloading() {
-                        let (tracker, _scrape_handler) = public_tracker();
+                        let (_tracker, announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
 
                         // We have to announce with "started" event because peer does not count if peer was not previously known
                         let mut started_peer = started_peer();
-                        tracker.announce(&sample_info_hash(), &mut started_peer, &peer_ip(), &PeersWanted::All);
+                        announce_handler.announce(&sample_info_hash(), &mut started_peer, &peer_ip(), &PeersWanted::All);
 
                         let mut completed_peer = completed_peer();
                         let announce_data =
-                            tracker.announce(&sample_info_hash(), &mut completed_peer, &peer_ip(), &PeersWanted::All);
+                            announce_handler.announce(&sample_info_hash(), &mut completed_peer, &peer_ip(), &PeersWanted::All);
 
                         assert_eq!(announce_data.stats.downloaded, 1);
                     }
@@ -1215,19 +1104,20 @@ mod tests {
 
                 use bittorrent_primitives::info_hash::InfoHash;
                 use torrust_tracker_primitives::core::ScrapeData;
+                use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
+                use crate::core::announce_handler::PeersWanted;
                 use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, public_tracker};
-                use crate::core::{PeersWanted, SwarmMetadata};
 
                 #[tokio::test]
                 async fn it_should_return_the_swarm_metadata_for_the_requested_file_if_the_tracker_has_that_torrent() {
-                    let (tracker, scrape_handler) = public_tracker();
+                    let (_tracker, announce_handler, _in_memory_torrent_repository, scrape_handler) = public_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
                     // Announce a "complete" peer for the torrent
                     let mut complete_peer = complete_peer();
-                    tracker.announce(
+                    announce_handler.announce(
                         &info_hash,
                         &mut complete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 10)),
@@ -1236,7 +1126,7 @@ mod tests {
 
                     // Announce an "incomplete" peer for the torrent
                     let mut incomplete_peer = incomplete_peer();
-                    tracker.announce(
+                    announce_handler.announce(
                         &info_hash,
                         &mut incomplete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 11)),
@@ -1269,7 +1159,8 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (_tracker, whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                    let (_tracker, _announce_handler, whitelist_authorization, whitelist_manager, _scrape_handler) =
+                        whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1282,7 +1173,8 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (_tracker, whitelist_authorization, _whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                    let (_tracker, _announce_handler, whitelist_authorization, _whitelist_manager, _scrape_handler) =
+                        whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1301,7 +1193,8 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_add_a_torrent_to_the_whitelist() {
-                    let (_tracker, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                    let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
+                        whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1312,7 +1205,8 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_remove_a_torrent_from_the_whitelist() {
-                    let (_tracker, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                    let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
+                        whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
@@ -1328,7 +1222,8 @@ mod tests {
 
                     #[tokio::test]
                     async fn it_should_load_the_whitelist_from_the_database() {
-                        let (_tracker, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                        let (_tracker, _announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
+                            whitelisted_tracker();
 
                         let info_hash = sample_info_hash();
 
@@ -1353,10 +1248,10 @@ mod tests {
                 use torrust_tracker_primitives::core::ScrapeData;
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
+                use crate::core::announce_handler::PeersWanted;
                 use crate::core::tests::the_tracker::{
                     complete_peer, incomplete_peer, peer_ip, sample_info_hash, whitelisted_tracker,
                 };
-                use crate::core::PeersWanted;
 
                 #[test]
                 fn it_should_be_able_to_build_a_zeroed_scrape_data_for_a_list_of_info_hashes() {
@@ -1372,16 +1267,17 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {
-                    let (tracker, _whitelist_authorization, _whitelist_manager, scrape_handler) = whitelisted_tracker();
+                    let (_tracker, announce_handler, _whitelist_authorization, _whitelist_manager, scrape_handler) =
+                        whitelisted_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
                     let mut peer = incomplete_peer();
-                    tracker.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
 
                     // Announce twice to force non zeroed swarm metadata
                     let mut peer = complete_peer();
-                    tracker.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
 
                     let scrape_data = scrape_handler.scrape(&vec![info_hash]).await;
 
@@ -1399,31 +1295,34 @@ mod tests {
             use aquatic_udp_protocol::AnnounceEvent;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core::tests::the_tracker::{sample_info_hash, sample_peer, tracker_persisting_torrents_in_database};
+            use crate::core::announce_handler::PeersWanted;
+            use crate::core::tests::the_tracker::{
+                peer_ip, sample_info_hash, sample_peer, tracker_persisting_torrents_in_database,
+            };
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let (tracker, torrents_manager, in_memory_torrent_repository) = tracker_persisting_torrents_in_database();
+                let (_tracker, announce_handler, torrents_manager, in_memory_torrent_repository) =
+                    tracker_persisting_torrents_in_database();
 
                 let info_hash = sample_info_hash();
 
                 let mut peer = sample_peer();
 
                 peer.event = AnnounceEvent::Started;
-                let swarm_stats = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
-                assert_eq!(swarm_stats.downloaded, 0);
+                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                assert_eq!(announce_data.stats.downloaded, 0);
 
                 peer.event = AnnounceEvent::Completed;
-                let swarm_stats = tracker.upsert_peer_and_get_stats(&info_hash, &peer);
-                assert_eq!(swarm_stats.downloaded, 1);
+                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                assert_eq!(announce_data.stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
                 let _unused = in_memory_torrent_repository.remove(&info_hash);
 
                 torrents_manager.load_torrents_from_database().unwrap();
 
-                let torrent_entry = tracker
-                    .in_memory_torrent_repository
+                let torrent_entry = in_memory_torrent_repository
                     .get(&info_hash)
                     .expect("it should be able to get entry");
 

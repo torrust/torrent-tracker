@@ -83,6 +83,7 @@ mod tests {
         let started = stopped
             .start(
                 app_container.tracker,
+                app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.whitelist_authorization,
                 app_container.stats_event_sender,
@@ -117,6 +118,7 @@ mod tests {
         let started = stopped
             .start(
                 app_container.tracker,
+                app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.whitelist_authorization,
                 app_container.stats_event_sender,

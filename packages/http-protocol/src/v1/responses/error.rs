@@ -1,4 +1,4 @@
-//! `Error` response for the [`HTTP tracker`](crate::servers::http).
+//! `Error` response for the HTTP tracker.
 //!
 //! Data structures and logic to build the error responses.
 //!
@@ -15,7 +15,7 @@ use serde::Serialize;
 
 use crate::v1::services::peer_ip_resolver::PeerIpResolutionError;
 
-/// `Error` response for the [`HTTP tracker`](crate::servers::http).
+/// `Error` response for the HTTP tracker.
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Error {
     /// Human readable string which explains why the request failed.

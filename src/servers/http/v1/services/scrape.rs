@@ -81,11 +81,12 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::announce_handler::AnnounceHandler;
     use crate::core::scrape_handler::ScrapeHandler;
     use crate::core::services::initialize_tracker;
     use crate::core::Tracker;
 
-    fn public_tracker_and_scrape_handler() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
+    fn public_tracker_and_announce_and_scrape_handlers() -> (Arc<Tracker>, Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
 
         let (
@@ -104,9 +105,15 @@ mod tests {
             &db_torrent_repository,
         ));
 
+        let announce_handler = Arc::new(AnnounceHandler::new(
+            &config.core,
+            &in_memory_torrent_repository,
+            &db_torrent_repository,
+        ));
+
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-        (tracker, scrape_handler)
+        (tracker, announce_handler, scrape_handler)
     }
 
     fn sample_info_hashes() -> Vec<InfoHash> {
@@ -159,10 +166,12 @@ mod tests {
         use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-        use crate::core::{statistics, PeersWanted};
+        use crate::core::announce_handler::PeersWanted;
+        use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker_and_scrape_handler, sample_info_hash, sample_info_hashes, sample_peer, test_tracker_factory,
+            public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes, sample_peer,
+            test_tracker_factory,
         };
 
         #[tokio::test]
@@ -170,7 +179,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (tracker, scrape_handler) = public_tracker_and_scrape_handler();
+            let (_tracker, announce_handler, scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];
@@ -178,7 +187,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            tracker.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
 
             let scrape_data = invoke(&scrape_handler, &stats_event_sender, &info_hashes, &original_peer_ip).await;
 
@@ -241,10 +250,11 @@ mod tests {
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::ScrapeData;
 
-        use crate::core::{statistics, PeersWanted};
+        use crate::core::announce_handler::PeersWanted;
+        use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker_and_scrape_handler, sample_info_hash, sample_info_hashes, sample_peer,
+            public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes, sample_peer,
         };
 
         #[tokio::test]
@@ -252,7 +262,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (tracker, _scrape_handler) = public_tracker_and_scrape_handler();
+            let (_tracker, announce_handler, _scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];
@@ -260,7 +270,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            tracker.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
 
             let scrape_data = fake(&stats_event_sender, &info_hashes, &original_peer_ip).await;
 

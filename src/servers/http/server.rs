@@ -11,6 +11,7 @@ use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
+use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::{statistics, whitelist, Tracker};
@@ -48,6 +49,7 @@ impl Launcher {
     #[instrument(skip(
         self,
         tracker,
+        announce_handler,
         scrape_handler,
         authentication_service,
         whitelist_authorization,
@@ -58,6 +60,7 @@ impl Launcher {
     fn start(
         &self,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -83,6 +86,7 @@ impl Launcher {
 
         let app = router(
             tracker,
+            announce_handler,
             scrape_handler,
             authentication_service,
             whitelist_authorization,
@@ -181,9 +185,11 @@ impl HttpServer<Stopped> {
     ///
     /// It would panic spawned HTTP server launcher cannot send the bound `SocketAddr`
     /// back to the main thread.
+    #[allow(clippy::too_many_arguments)]
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -198,6 +204,7 @@ impl HttpServer<Stopped> {
         let task = tokio::spawn(async move {
             let server = launcher.start(
                 tracker,
+                announce_handler,
                 scrape_handler,
                 authentication_service,
                 whitelist_authorization,
@@ -303,6 +310,7 @@ mod tests {
         let started = stopped
             .start(
                 app_container.tracker,
+                app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.authentication_service,
                 app_container.whitelist_authorization,
