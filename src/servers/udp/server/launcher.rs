@@ -8,6 +8,7 @@ use futures_util::StreamExt;
 use tokio::select;
 use tokio::sync::{oneshot, RwLock};
 use tokio::time::interval;
+use torrust_tracker_configuration::Core;
 use tracing::instrument;
 
 use super::banning::BanService;
@@ -55,6 +56,7 @@ impl Launcher {
         rx_halt
     ))]
     pub async fn run_with_graceful_shutdown(
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -68,7 +70,7 @@ impl Launcher {
     ) {
         tracing::info!(target: UDP_TRACKER_LOG_TARGET, "Starting on: {bind_to}");
 
-        if tracker.requires_authentication() {
+        if core_config.private {
             tracing::error!("udp services cannot be used for private trackers");
             panic!("it should not use udp if using authentication");
         }
@@ -100,6 +102,7 @@ impl Launcher {
                 tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr, "Udp::run_with_graceful_shutdown::task (listening...)");
                 let () = Self::run_udp_server_main(
                     receiver,
+                    core_config.clone(),
                     tracker.clone(),
                     announce_handler.clone(),
                     scrape_handler.clone(),
@@ -157,6 +160,7 @@ impl Launcher {
     ))]
     async fn run_udp_server_main(
         mut receiver: Receiver,
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -230,6 +234,7 @@ impl Launcher {
 
                 let processor = Processor::new(
                     receiver.socket.clone(),
+                    core_config.clone(),
                     tracker.clone(),
                     announce_handler.clone(),
                     scrape_handler.clone(),

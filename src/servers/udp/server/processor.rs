@@ -6,6 +6,7 @@ use std::time::Duration;
 use aquatic_udp_protocol::Response;
 use tokio::sync::RwLock;
 use tokio::time::Instant;
+use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
 
 use super::banning::BanService;
@@ -20,6 +21,7 @@ use crate::servers::udp::{handlers, RawRequest};
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
+    core_config: Arc<Core>,
     tracker: Arc<Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
@@ -29,8 +31,10 @@ pub struct Processor {
 }
 
 impl Processor {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         socket: Arc<BoundSocket>,
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -40,6 +44,7 @@ impl Processor {
     ) -> Self {
         Self {
             socket,
+            core_config,
             tracker,
             announce_handler,
             scrape_handler,
@@ -57,6 +62,7 @@ impl Processor {
 
         let response = handlers::handle_packet(
             request,
+            &self.core_config,
             &self.tracker,
             &self.announce_handler,
             &self.scrape_handler,

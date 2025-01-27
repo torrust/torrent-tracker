@@ -63,6 +63,7 @@ mod tests {
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
+    use torrust_tracker_configuration::Core;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
@@ -73,7 +74,7 @@ mod tests {
     use crate::core::Tracker;
 
     #[allow(clippy::type_complexity)]
-    fn public_tracker() -> (Arc<Tracker>, Arc<AnnounceHandler>, Arc<Option<Box<dyn Sender>>>) {
+    fn public_tracker() -> (Arc<Core>, Arc<Tracker>, Arc<AnnounceHandler>, Arc<Option<Box<dyn Sender>>>) {
         let config = configuration::ephemeral_public();
 
         let (
@@ -100,7 +101,9 @@ mod tests {
             &db_torrent_repository,
         ));
 
-        (tracker, announce_handler, stats_event_sender)
+        let core_config = Arc::new(config.core.clone());
+
+        (core_config, tracker, announce_handler, stats_event_sender)
     }
 
     fn sample_info_hash() -> InfoHash {
@@ -176,7 +179,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
-            let (tracker, announce_handler, stats_event_sender) = public_tracker();
+            let (core_config, tracker, announce_handler, stats_event_sender) = public_tracker();
 
             let mut peer = sample_peer();
 
@@ -197,7 +200,7 @@ mod tests {
                     complete: 1,
                     incomplete: 0,
                 },
-                policy: tracker.get_announce_policy(),
+                policy: core_config.announce_policy,
             };
 
             assert_eq!(announce_data, expected_announce_data);

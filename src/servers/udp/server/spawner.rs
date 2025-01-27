@@ -7,6 +7,7 @@ use derive_more::derive::Display;
 use derive_more::Constructor;
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
+use torrust_tracker_configuration::Core;
 
 use super::banning::BanService;
 use super::launcher::Launcher;
@@ -32,6 +33,7 @@ impl Spawner {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn_launcher(
         &self,
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -46,6 +48,7 @@ impl Spawner {
 
         tokio::spawn(async move {
             Launcher::run_with_graceful_shutdown(
+                core_config,
                 tracker,
                 announce_handler,
                 scrape_handler,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
-use torrust_tracker_configuration::{Configuration, HttpTracker};
+use torrust_tracker_configuration::{Configuration, Core, HttpTracker};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::core::announce_handler::AnnounceHandler;
@@ -20,7 +20,8 @@ use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_primitives::peer;
 
 pub struct Environment<S> {
-    pub config: Arc<HttpTracker>,
+    pub core_config: Arc<Core>,
+    pub http_tracker_config: Arc<HttpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
     pub announce_handler: Arc<AnnounceHandler>,
@@ -64,7 +65,8 @@ impl Environment<Stopped> {
         let server = HttpServer::new(Launcher::new(bind_to, tls));
 
         Self {
-            config,
+            http_tracker_config: config,
+            core_config: Arc::new(configuration.core.clone()),
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
             announce_handler: app_container.announce_handler.clone(),
@@ -84,7 +86,8 @@ impl Environment<Stopped> {
     #[allow(dead_code)]
     pub async fn start(self) -> Environment<Running> {
         Environment {
-            config: self.config,
+            http_tracker_config: self.http_tracker_config,
+            core_config: self.core_config.clone(),
             database: self.database.clone(),
             tracker: self.tracker.clone(),
             announce_handler: self.announce_handler.clone(),
@@ -100,6 +103,7 @@ impl Environment<Stopped> {
             server: self
                 .server
                 .start(
+                    self.core_config,
                     self.tracker,
                     self.announce_handler,
                     self.scrape_handler,
@@ -121,7 +125,8 @@ impl Environment<Running> {
 
     pub async fn stop(self) -> Environment<Stopped> {
         Environment {
-            config: self.config,
+            http_tracker_config: self.http_tracker_config,
+            core_config: self.core_config,
             database: self.database,
             tracker: self.tracker,
             announce_handler: self.announce_handler,

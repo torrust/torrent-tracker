@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
-use torrust_tracker_configuration::{Configuration, UdpTracker, DEFAULT_TIMEOUT};
+use torrust_tracker_configuration::{Configuration, Core, UdpTracker, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::core::announce_handler::AnnounceHandler;
 use torrust_tracker_lib::core::databases::Database;
@@ -23,6 +23,7 @@ pub struct Environment<S>
 where
     S: std::fmt::Debug + std::fmt::Display,
 {
+    pub core_config: Arc<Core>,
     pub config: Arc<UdpTracker>,
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
@@ -64,6 +65,7 @@ impl Environment<Stopped> {
         let server = Server::new(Spawner::new(bind_to));
 
         Self {
+            core_config: Arc::new(configuration.core.clone()),
             config,
             database: app_container.database.clone(),
             tracker: app_container.tracker.clone(),
@@ -83,6 +85,7 @@ impl Environment<Stopped> {
     pub async fn start(self) -> Environment<Running> {
         let cookie_lifetime = self.config.cookie_lifetime;
         Environment {
+            core_config: self.core_config.clone(),
             config: self.config,
             database: self.database.clone(),
             tracker: self.tracker.clone(),
@@ -97,6 +100,7 @@ impl Environment<Stopped> {
             server: self
                 .server
                 .start(
+                    self.core_config,
                     self.tracker,
                     self.announce_handler,
                     self.scrape_handler,
@@ -126,6 +130,7 @@ impl Environment<Running> {
             .expect("it should stop the environment within the timeout");
 
         Environment {
+            core_config: self.core_config,
             config: self.config,
             database: self.database,
             tracker: self.tracker,
