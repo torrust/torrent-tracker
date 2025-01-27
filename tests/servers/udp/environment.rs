@@ -11,7 +11,7 @@ use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrust_tracker_lib::core::{whitelist, Tracker};
+use torrust_tracker_lib::core::whitelist;
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
@@ -26,7 +26,6 @@ where
     pub core_config: Arc<Core>,
     pub config: Arc<UdpTracker>,
     pub database: Arc<Box<dyn Database>>,
-    pub tracker: Arc<Tracker>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
@@ -68,7 +67,6 @@ impl Environment<Stopped> {
             core_config: Arc::new(configuration.core.clone()),
             config,
             database: app_container.database.clone(),
-            tracker: app_container.tracker.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
@@ -88,7 +86,6 @@ impl Environment<Stopped> {
             core_config: self.core_config.clone(),
             config: self.config,
             database: self.database.clone(),
-            tracker: self.tracker.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             announce_handler: self.announce_handler.clone(),
             scrape_handler: self.scrape_handler.clone(),
@@ -101,7 +98,6 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.core_config,
-                    self.tracker,
                     self.announce_handler,
                     self.scrape_handler,
                     self.whitelist_authorization,
@@ -133,7 +129,6 @@ impl Environment<Running> {
             core_config: self.core_config,
             config: self.config,
             database: self.database,
-            tracker: self.tracker,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
             announce_handler: self.announce_handler,
             scrape_handler: self.scrape_handler,

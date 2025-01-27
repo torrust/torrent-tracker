@@ -118,7 +118,6 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::initialize_tracker;
     use crate::core::services::statistics::{self, get_metrics, TrackerMetrics};
     use crate::core::{self};
     use crate::servers::udp::server::banning::BanService;
@@ -138,18 +137,12 @@ mod tests {
             _whitelist_authorization,
             _authentication_service,
             in_memory_torrent_repository,
-            db_torrent_repository,
+            _db_torrent_repository,
             _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
         let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_repository = Arc::new(stats_repository);
-
-        let _tracker = Arc::new(initialize_tracker(
-            &config,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
 
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
 

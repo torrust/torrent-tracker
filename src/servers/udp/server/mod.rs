@@ -83,7 +83,6 @@ mod tests {
         let started = stopped
             .start(
                 Arc::new(cfg.core.clone()),
-                app_container.tracker,
                 app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.whitelist_authorization,
@@ -119,7 +118,6 @@ mod tests {
         let started = stopped
             .start(
                 Arc::new(cfg.core.clone()),
-                app_container.tracker,
                 app_container.announce_handler,
                 app_container.scrape_handler,
                 app_container.whitelist_authorization,

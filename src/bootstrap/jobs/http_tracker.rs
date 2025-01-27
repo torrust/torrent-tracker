@@ -23,7 +23,7 @@ use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{self, statistics, whitelist};
+use crate::core::{statistics, whitelist};
 use crate::servers::http::server::{HttpServer, Launcher};
 use crate::servers::http::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -39,7 +39,6 @@ use crate::servers::registar::ServiceRegistrationForm;
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip(
     config,
-    tracker,
     announce_handler,
     scrape_handler,
     authentication_service,
@@ -50,7 +49,6 @@ use crate::servers::registar::ServiceRegistrationForm;
 pub async fn start_job(
     config: &HttpTracker,
     core_config: Arc<Core>,
-    tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
@@ -71,7 +69,6 @@ pub async fn start_job(
                 socket,
                 tls,
                 core_config.clone(),
-                tracker.clone(),
                 announce_handler.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),
@@ -89,7 +86,6 @@ pub async fn start_job(
 #[instrument(skip(
     socket,
     tls,
-    tracker,
     announce_handler,
     scrape_handler,
     whitelist_authorization,
@@ -100,7 +96,6 @@ async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
     config: Arc<Core>,
-    tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
@@ -111,7 +106,6 @@ async fn start_v1(
     let server = HttpServer::new(Launcher::new(socket, tls))
         .start(
             config,
-            tracker,
             announce_handler,
             scrape_handler,
             authentication_service,
@@ -161,7 +155,6 @@ mod tests {
         start_job(
             config,
             Arc::new(cfg.core.clone()),
-            app_container.tracker,
             app_container.announce_handler,
             app_container.scrape_handler,
             app_container.authentication_service,

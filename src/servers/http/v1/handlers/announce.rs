@@ -26,7 +26,7 @@ use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::authentication::Key;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{whitelist, Tracker};
+use crate::core::whitelist;
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
@@ -41,7 +41,6 @@ use crate::CurrentClock;
 pub async fn handle_without_key(
     State(state): State<(
         Arc<Core>,
-        Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::Authorization>,
@@ -58,7 +57,6 @@ pub async fn handle_without_key(
         &state.2,
         &state.3,
         &state.4,
-        &state.5,
         &announce_request,
         &client_ip_sources,
         None,
@@ -73,7 +71,6 @@ pub async fn handle_without_key(
 pub async fn handle_with_key(
     State(state): State<(
         Arc<Core>,
-        Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::Authorization>,
@@ -91,7 +88,6 @@ pub async fn handle_with_key(
         &state.2,
         &state.3,
         &state.4,
-        &state.5,
         &announce_request,
         &client_ip_sources,
         Some(key),
@@ -106,7 +102,6 @@ pub async fn handle_with_key(
 #[allow(clippy::too_many_arguments)]
 async fn handle(
     config: &Arc<Core>,
-    tracker: &Arc<Tracker>,
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
@@ -117,7 +112,6 @@ async fn handle(
 ) -> Response {
     let announce_data = match handle_announce(
         config,
-        tracker,
         announce_handler,
         authentication_service,
         whitelist_authorization,
@@ -143,7 +137,6 @@ async fn handle(
 #[allow(clippy::too_many_arguments)]
 async fn handle_announce(
     core_config: &Arc<Core>,
-    tracker: &Arc<Tracker>,
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
@@ -185,7 +178,6 @@ async fn handle_announce(
     };
 
     let announce_data = services::announce::invoke(
-        tracker.clone(),
         announce_handler.clone(),
         opt_stats_event_sender.clone(),
         announce_request.info_hash,
@@ -265,13 +257,12 @@ mod tests {
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
     use crate::core::authentication::service::AuthenticationService;
-    use crate::core::services::{initialize_tracker, statistics};
+    use crate::core::services::statistics;
     use crate::core::statistics::event::sender::Sender;
-    use crate::core::{whitelist, Tracker};
+    use crate::core::whitelist;
 
     type TrackerAndDeps = (
         Arc<Core>,
-        Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<Option<Box<dyn Sender>>>,
         Arc<whitelist::authorization::Authorization>,
@@ -309,12 +300,6 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = Arc::new(initialize_tracker(
-            &config,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
@@ -325,7 +310,6 @@ mod tests {
 
         (
             config,
-            tracker,
             announce_handler,
             stats_event_sender,
             whitelist_authorization,
@@ -373,17 +357,15 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_missing() {
-            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 private_tracker();
 
-            let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let maybe_key = None;
 
             let response = handle_announce(
                 &config,
-                &tracker,
                 &announce_handler,
                 &authentication_service,
                 &whitelist_authorization,
@@ -403,10 +385,9 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_invalid() {
-            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 private_tracker();
 
-            let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
@@ -415,7 +396,6 @@ mod tests {
 
             let response = handle_announce(
                 &config,
-                &tracker,
                 &announce_handler,
                 &authentication_service,
                 &whitelist_authorization,
@@ -441,17 +421,15 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_announced_torrent_is_not_whitelisted() {
-            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 whitelisted_tracker();
 
-            let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let announce_request = sample_announce_request();
 
             let response = handle_announce(
                 &config,
-                &tracker,
                 &announce_handler,
                 &authentication_service,
                 &whitelist_authorization,
@@ -485,10 +463,9 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 tracker_on_reverse_proxy();
 
-            let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let client_ip_sources = ClientIpSources {
@@ -498,7 +475,6 @@ mod tests {
 
             let response = handle_announce(
                 &config,
-                &tracker,
                 &announce_handler,
                 &authentication_service,
                 &whitelist_authorization,
@@ -529,10 +505,9 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 tracker_not_on_reverse_proxy();
 
-            let tracker = Arc::new(tracker);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let client_ip_sources = ClientIpSources {
@@ -542,7 +517,6 @@ mod tests {
 
             let response = handle_announce(
                 &config,
-                &tracker,
                 &announce_handler,
                 &authentication_service,
                 &whitelist_authorization,

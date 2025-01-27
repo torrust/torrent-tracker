@@ -13,8 +13,8 @@ use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use torrust_tracker_lib::core::whitelist;
 use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
-use torrust_tracker_lib::core::{whitelist, Tracker};
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_primitives::peer;
@@ -23,7 +23,6 @@ pub struct Environment<S> {
     pub core_config: Arc<Core>,
     pub http_tracker_config: Arc<HttpTracker>,
     pub database: Arc<Box<dyn Database>>,
-    pub tracker: Arc<Tracker>,
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
@@ -68,7 +67,6 @@ impl Environment<Stopped> {
             http_tracker_config: config,
             core_config: Arc::new(configuration.core.clone()),
             database: app_container.database.clone(),
-            tracker: app_container.tracker.clone(),
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
@@ -89,7 +87,6 @@ impl Environment<Stopped> {
             http_tracker_config: self.http_tracker_config,
             core_config: self.core_config.clone(),
             database: self.database.clone(),
-            tracker: self.tracker.clone(),
             announce_handler: self.announce_handler.clone(),
             scrape_handler: self.scrape_handler.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
@@ -104,7 +101,6 @@ impl Environment<Stopped> {
                 .server
                 .start(
                     self.core_config,
-                    self.tracker,
                     self.announce_handler,
                     self.scrape_handler,
                     self.authentication_service,
@@ -128,7 +124,6 @@ impl Environment<Running> {
             http_tracker_config: self.http_tracker_config,
             core_config: self.core_config,
             database: self.database,
-            tracker: self.tracker,
             announce_handler: self.announce_handler,
             scrape_handler: self.scrape_handler,
             in_memory_torrent_repository: self.in_memory_torrent_repository,

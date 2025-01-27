@@ -14,31 +14,9 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
-use super::torrent::repository::in_memory::InMemoryTorrentRepository;
-use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use super::whitelist::manager::WhiteListManager;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::repository::persisted::DatabaseWhitelist;
-use crate::core::Tracker;
-
-/// It returns a new tracker building its dependencies.
-///
-/// # Panics
-///
-/// Will panic if tracker cannot be instantiated.
-#[must_use]
-pub fn initialize_tracker(
-    config: &Configuration,
-    in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
-    db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
-) -> Tracker {
-    match Tracker::new(&Arc::new(config).core, in_memory_torrent_repository, db_torrent_repository) {
-        Ok(tracker) => tracker,
-        Err(error) => {
-            panic!("{}", error)
-        }
-    }
-}
 
 /// # Panics
 ///

@@ -16,7 +16,7 @@ use tracing::instrument;
 use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{self, whitelist};
+use crate::core::whitelist;
 use crate::servers::registar::ServiceRegistrationForm;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::spawner::Spawner;
@@ -37,7 +37,6 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 #[allow(clippy::async_yields_async)]
 #[instrument(skip(
     config,
-    tracker,
     announce_handler,
     scrape_handler,
     whitelist_authorization,
@@ -48,7 +47,6 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 pub async fn start_job(
     core_config: Arc<Core>,
     config: &UdpTracker,
-    tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -62,7 +60,6 @@ pub async fn start_job(
     let server = Server::new(Spawner::new(bind_to))
         .start(
             core_config,
-            tracker,
             announce_handler,
             scrape_handler,
             whitelist_authorization,

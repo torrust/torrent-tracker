@@ -17,7 +17,7 @@ use crate::bootstrap::jobs::Started;
 use crate::core::announce_handler::AnnounceHandler;
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
-use crate::core::{statistics, whitelist, Tracker};
+use crate::core::{statistics, whitelist};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
 use crate::servers::signals::{shutdown_signal_with_message, Halted};
@@ -45,7 +45,6 @@ impl Launcher {
     /// It panics if the udp server is loaded when the tracker is private.
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
-        tracker,
         announce_handler,
         scrape_handler,
         whitelist_authorization,
@@ -57,7 +56,6 @@ impl Launcher {
     ))]
     pub async fn run_with_graceful_shutdown(
         core_config: Arc<Core>,
-        tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -103,7 +101,6 @@ impl Launcher {
                 let () = Self::run_udp_server_main(
                     receiver,
                     core_config.clone(),
-                    tracker.clone(),
                     announce_handler.clone(),
                     scrape_handler.clone(),
                     whitelist_authorization.clone(),
@@ -151,7 +148,6 @@ impl Launcher {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         receiver,
-        tracker,
         announce_handler,
         scrape_handler,
         whitelist_authorization,
@@ -161,7 +157,6 @@ impl Launcher {
     async fn run_udp_server_main(
         mut receiver: Receiver,
         core_config: Arc<Core>,
-        tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -235,7 +230,6 @@ impl Launcher {
                 let processor = Processor::new(
                     receiver.socket.clone(),
                     core_config.clone(),
-                    tracker.clone(),
                     announce_handler.clone(),
                     scrape_handler.clone(),
                     whitelist_authorization.clone(),

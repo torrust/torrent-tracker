@@ -15,7 +15,6 @@ use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
-use torrust_tracker_lib::core::Tracker;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
@@ -27,7 +26,6 @@ where
 {
     pub config: Arc<HttpApi>,
     pub database: Arc<Box<dyn Database>>,
-    pub tracker: Arc<Tracker>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
@@ -66,7 +64,6 @@ impl Environment<Stopped> {
         Self {
             config,
             database: app_container.database.clone(),
-            tracker: app_container.tracker.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             keys_handler: app_container.keys_handler.clone(),
             authentication_service: app_container.authentication_service.clone(),
@@ -85,7 +82,6 @@ impl Environment<Stopped> {
         Environment {
             config: self.config,
             database: self.database.clone(),
-            tracker: self.tracker.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
@@ -121,7 +117,6 @@ impl Environment<Running> {
         Environment {
             config: self.config,
             database: self.database,
-            tracker: self.tracker,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
             keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,

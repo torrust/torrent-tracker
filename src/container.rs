@@ -12,13 +12,12 @@ use crate::core::statistics::repository::Repository;
 use crate::core::torrent::manager::TorrentsManager;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+use crate::core::whitelist;
 use crate::core::whitelist::manager::WhiteListManager;
-use crate::core::{whitelist, Tracker};
 use crate::servers::udp::server::banning::BanService;
 
 pub struct AppContainer {
     pub database: Arc<Box<dyn Database>>,
-    pub tracker: Arc<Tracker>,
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub keys_handler: Arc<KeysHandler>,

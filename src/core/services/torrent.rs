@@ -119,28 +119,20 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 
     use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::services::initialize_tracker;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::Tracker;
 
-    fn initialize_tracker_and_deps(config: &Configuration) -> (Arc<Tracker>, Arc<InMemoryTorrentRepository>) {
+    fn initialize_in_memory_torrent_repository(config: &Configuration) -> Arc<InMemoryTorrentRepository> {
         let (
             _database,
             _in_memory_whitelist,
             _whitelist_authorization,
             _authentication_service,
             in_memory_torrent_repository,
-            db_torrent_repository,
+            _db_torrent_repository,
             _torrents_manager,
         ) = initialize_tracker_dependencies(config);
 
-        let tracker = Arc::new(initialize_tracker(
-            config,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
-        (tracker, in_memory_torrent_repository)
+        in_memory_torrent_repository
     }
 
     fn sample_peer() -> peer::Peer {
@@ -164,7 +156,7 @@ mod tests {
         use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::services::torrent::tests::{initialize_tracker_and_deps, sample_peer};
+        use crate::core::services::torrent::tests::{initialize_in_memory_torrent_repository, sample_peer};
         use crate::core::services::torrent::{get_torrent_info, Info};
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
@@ -189,7 +181,7 @@ mod tests {
         async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let config = tracker_configuration();
 
-            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let in_memory_torrent_repository = initialize_in_memory_torrent_repository(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -221,7 +213,7 @@ mod tests {
         use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::core::services::torrent::tests::{initialize_tracker_and_deps, sample_peer};
+        use crate::core::services::torrent::tests::{initialize_in_memory_torrent_repository, sample_peer};
         use crate::core::services::torrent::{get_torrents_page, BasicInfo, Pagination};
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
@@ -242,7 +234,7 @@ mod tests {
         async fn should_return_a_summarized_info_for_all_torrents() {
             let config = tracker_configuration();
 
-            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let in_memory_torrent_repository = initialize_in_memory_torrent_repository(&config);
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash = InfoHash::from_str(&hash).unwrap();
@@ -266,7 +258,7 @@ mod tests {
         async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
             let config = tracker_configuration();
 
-            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let in_memory_torrent_repository = initialize_in_memory_torrent_repository(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -289,7 +281,7 @@ mod tests {
         async fn should_allow_using_pagination_in_the_result() {
             let config = tracker_configuration();
 
-            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let in_memory_torrent_repository = initialize_in_memory_torrent_repository(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
@@ -321,7 +313,7 @@ mod tests {
         async fn should_return_torrents_ordered_by_info_hash() {
             let config = tracker_configuration();
 
-            let (_tracker, in_memory_torrent_repository) = initialize_tracker_and_deps(&config);
+            let in_memory_torrent_repository = initialize_in_memory_torrent_repository(&config);
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
