@@ -451,12 +451,11 @@ pub mod whitelist;
 
 pub mod peer_tests;
 
-use std::net::IpAddr;
 use std::sync::Arc;
 
 use torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use torrust_tracker_configuration::{AnnouncePolicy, Core};
+use torrust_tracker_configuration::Core;
 
 /// The domain layer tracker service.
 ///
@@ -469,7 +468,7 @@ use torrust_tracker_configuration::{AnnouncePolicy, Core};
 /// > the network layer.
 pub struct Tracker {
     /// The tracker configuration.
-    config: Core,
+    _core_config: Core,
 
     /// The in-memory torrents repository.
     _in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
@@ -485,37 +484,15 @@ impl Tracker {
     ///
     /// Will return a `databases::error::Error` if unable to connect to database. The `Tracker` is responsible for the persistence.
     pub fn new(
-        config: &Core,
+        core_config: &Core,
         in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
         db_torrent_repository: &Arc<DatabasePersistentTorrentRepository>,
     ) -> Result<Tracker, databases::error::Error> {
         Ok(Tracker {
-            config: config.clone(),
+            _core_config: core_config.clone(),
             _in_memory_torrent_repository: in_memory_torrent_repository.clone(),
             _db_torrent_repository: db_torrent_repository.clone(),
         })
-    }
-
-    /// Returns `true` if the tracker requires authentication.
-    #[must_use]
-    pub fn requires_authentication(&self) -> bool {
-        self.config.private
-    }
-
-    /// Returns `true` is the tracker is in whitelisted mode.
-    #[must_use]
-    pub fn is_behind_reverse_proxy(&self) -> bool {
-        self.config.net.on_reverse_proxy
-    }
-
-    #[must_use]
-    pub fn get_announce_policy(&self) -> AnnouncePolicy {
-        self.config.announce_policy
-    }
-
-    #[must_use]
-    pub fn get_maybe_external_ip(&self) -> Option<IpAddr> {
-        self.config.net.external_ip
     }
 }
 

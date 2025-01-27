@@ -13,6 +13,7 @@ use aquatic_udp_protocol::{
 use bittorrent_primitives::info_hash::InfoHash;
 use tokio::sync::RwLock;
 use torrust_tracker_clock::clock::Time as _;
+use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
 use uuid::Uuid;
 use zerocopy::network_endian::I32;
@@ -60,6 +61,7 @@ impl CookieTimeValues {
 #[instrument(fields(request_id), skip(udp_request, tracker, announce_handler, scrape_handler, whitelist_authorization, opt_stats_event_sender, cookie_time_values, ban_service), ret(level = Level::TRACE))]
 pub(crate) async fn handle_packet(
     udp_request: RawRequest,
+    core_config: &Arc<Core>,
     tracker: &Tracker,
     announce_handler: &Arc<AnnounceHandler>,
     scrape_handler: &Arc<ScrapeHandler>,
@@ -81,6 +83,7 @@ pub(crate) async fn handle_packet(
             Ok(request) => match handle_request(
                 request,
                 udp_request.from,
+                core_config,
                 tracker,
                 announce_handler,
                 scrape_handler,
@@ -154,6 +157,7 @@ pub(crate) async fn handle_packet(
 pub async fn handle_request(
     request: Request,
     remote_addr: SocketAddr,
+    core_config: &Arc<Core>,
     tracker: &Tracker,
     announce_handler: &Arc<AnnounceHandler>,
     scrape_handler: &Arc<ScrapeHandler>,
@@ -175,6 +179,7 @@ pub async fn handle_request(
             handle_announce(
                 remote_addr,
                 &announce_request,
+                core_config,
                 tracker,
                 announce_handler,
                 whitelist_authorization,
@@ -240,11 +245,13 @@ pub async fn handle_connect(
 /// # Errors
 ///
 /// If a error happens in the `handle_announce` function, it will just return the  `ServerError`.
-#[instrument(fields(transaction_id, connection_id, info_hash), skip(tracker, announce_handler, whitelist_authorization, opt_stats_event_sender), ret(level = Level::TRACE))]
+#[allow(clippy::too_many_arguments)]
+#[instrument(fields(transaction_id, connection_id, info_hash), skip(_tracker, announce_handler, whitelist_authorization, opt_stats_event_sender), ret(level = Level::TRACE))]
 pub async fn handle_announce(
     remote_addr: SocketAddr,
     request: &AnnounceRequest,
-    tracker: &Tracker,
+    core_config: &Arc<Core>,
+    _tracker: &Tracker,
     announce_handler: &Arc<AnnounceHandler>,
     whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
@@ -297,7 +304,7 @@ pub async fn handle_announce(
         let announce_response = AnnounceResponse {
             fixed: AnnounceResponseFixedData {
                 transaction_id: request.transaction_id,
-                announce_interval: AnnounceInterval(I32::new(i64::from(tracker.get_announce_policy().interval) as i32)),
+                announce_interval: AnnounceInterval(I32::new(i64::from(core_config.announce_policy.interval) as i32)),
                 leechers: NumberOfPeers(I32::new(i64::from(response.stats.incomplete) as i32)),
                 seeders: NumberOfPeers(I32::new(i64::from(response.stats.complete) as i32)),
             },
@@ -322,7 +329,7 @@ pub async fn handle_announce(
         let announce_response = AnnounceResponse {
             fixed: AnnounceResponseFixedData {
                 transaction_id: request.transaction_id,
-                announce_interval: AnnounceInterval(I32::new(i64::from(tracker.get_announce_policy().interval) as i32)),
+                announce_interval: AnnounceInterval(I32::new(i64::from(core_config.announce_policy.interval) as i32)),
                 leechers: NumberOfPeers(I32::new(i64::from(response.stats.incomplete) as i32)),
                 seeders: NumberOfPeers(I32::new(i64::from(response.stats.complete) as i32)),
             },
@@ -492,7 +499,7 @@ mod tests {
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
     use torrust_tracker_clock::clock::Time;
-    use torrust_tracker_configuration::Configuration;
+    use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_primitives::peer;
     use torrust_tracker_test_helpers::configuration;
 
@@ -509,6 +516,7 @@ mod tests {
     use crate::CurrentClock;
 
     type TrackerAndDeps = (
+        Arc<Core>,
         Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<ScrapeHandler>,
@@ -536,6 +544,8 @@ mod tests {
     }
 
     fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
+        let core_config = Arc::new(config.core.clone());
+
         let (
             database,
             in_memory_whitelist,
@@ -565,6 +575,7 @@ mod tests {
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
         (
+            core_config,
             tracker,
             announce_handler,
             scrape_handler,
@@ -670,13 +681,17 @@ mod tests {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn test_tracker_factory() -> (
+        Arc<Core>,
         Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<ScrapeHandler>,
         Arc<whitelist::authorization::Authorization>,
     ) {
         let config = tracker_configuration();
+
+        let core_config = Arc::new(config.core.clone());
 
         let (
             _database,
@@ -698,7 +713,13 @@ mod tests {
 
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-        (tracker, announce_handler, scrape_handler, whitelist_authorization)
+        (
+            core_config,
+            tracker,
+            announce_handler,
+            scrape_handler,
+            whitelist_authorization,
+        )
     }
 
     mod connect_request {
@@ -910,6 +931,7 @@ mod tests {
                 PeerId as AquaticPeerId, Response, ResponsePeer,
             };
             use mockall::predicate::eq;
+            use torrust_tracker_configuration::Core;
 
             use crate::core::announce_handler::AnnounceHandler;
             use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
@@ -925,6 +947,7 @@ mod tests {
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -953,6 +976,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -975,6 +999,7 @@ mod tests {
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -994,6 +1019,7 @@ mod tests {
                 let response = handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1025,6 +1051,7 @@ mod tests {
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1056,6 +1083,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1087,6 +1115,7 @@ mod tests {
             }
 
             async fn announce_a_new_peer_using_ipv4(
+                core_config: Arc<Core>,
                 tracker: Arc<core::Tracker>,
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -1102,6 +1131,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1115,6 +1145,7 @@ mod tests {
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv4_the_response_should_not_include_peers_using_ipv6() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1127,8 +1158,13 @@ mod tests {
 
                 add_a_torrent_peer_using_ipv6(&in_memory_torrent_repository);
 
-                let response =
-                    announce_a_new_peer_using_ipv4(tracker.clone(), announce_handler.clone(), whitelist_authorization).await;
+                let response = announce_a_new_peer_using_ipv4(
+                    core_config.clone(),
+                    tracker.clone(),
+                    announce_handler.clone(),
+                    whitelist_authorization,
+                )
+                .await;
 
                 // The response should not contain the peer using IPV6
                 let peers: Option<Vec<ResponsePeer<Ipv6AddrBytes>>> = match response {
@@ -1150,11 +1186,12 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let (tracker, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
+                let (core_config, tracker, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
 
                 handle_announce(
                     sample_ipv4_socket_address(),
                     &AnnounceRequestBuilder::default().into(),
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1181,6 +1218,7 @@ mod tests {
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration_if_defined() {
                     let (
+                        core_config,
                         tracker,
                         announce_handler,
                         _scrape_handler,
@@ -1209,6 +1247,7 @@ mod tests {
                     handle_announce(
                         remote_addr,
                         &request,
+                        &core_config,
                         &tracker,
                         &announce_handler,
                         &whitelist_authorization,
@@ -1220,7 +1259,7 @@ mod tests {
 
                     let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
-                    let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
+                    let external_ip_in_tracker_configuration = core_config.net.external_ip.unwrap();
 
                     let expected_peer = TorrentPeerBuilder::new()
                         .with_peer_id(peer_id)
@@ -1243,6 +1282,7 @@ mod tests {
                 PeerId as AquaticPeerId, Response, ResponsePeer,
             };
             use mockall::predicate::eq;
+            use torrust_tracker_configuration::Core;
 
             use crate::core::announce_handler::AnnounceHandler;
             use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
@@ -1258,6 +1298,7 @@ mod tests {
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1287,6 +1328,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1309,6 +1351,7 @@ mod tests {
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1331,6 +1374,7 @@ mod tests {
                 let response = handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1362,6 +1406,7 @@ mod tests {
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1393,6 +1438,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1424,6 +1470,7 @@ mod tests {
             }
 
             async fn announce_a_new_peer_using_ipv6(
+                core_config: Arc<Core>,
                 tracker: Arc<core::Tracker>,
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::Authorization>,
@@ -1442,6 +1489,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1455,6 +1503,7 @@ mod tests {
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv6_the_response_should_not_include_peers_using_ipv4() {
                 let (
+                    core_config,
                     tracker,
                     announce_handler,
                     _scrape_handler,
@@ -1467,8 +1516,13 @@ mod tests {
 
                 add_a_torrent_peer_using_ipv4(&in_memory_torrent_repository);
 
-                let response =
-                    announce_a_new_peer_using_ipv6(tracker.clone(), announce_handler.clone(), whitelist_authorization).await;
+                let response = announce_a_new_peer_using_ipv6(
+                    core_config.clone(),
+                    tracker.clone(),
+                    announce_handler.clone(),
+                    whitelist_authorization,
+                )
+                .await;
 
                 // The response should not contain the peer using IPV4
                 let peers: Option<Vec<ResponsePeer<Ipv4AddrBytes>>> = match response {
@@ -1490,7 +1544,7 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let (tracker, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
+                let (core_config, tracker, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
 
                 let remote_addr = sample_ipv6_remote_addr();
 
@@ -1501,6 +1555,7 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &announce_request,
+                    &core_config,
                     &tracker,
                     &announce_handler,
                     &whitelist_authorization,
@@ -1582,9 +1637,12 @@ mod tests {
                         .with_port(client_port)
                         .into();
 
+                    let core_config = Arc::new(config.core.clone());
+
                     handle_announce(
                         remote_addr,
                         &request,
+                        &core_config,
                         &tracker,
                         &announce_handler,
                         &whitelist_authorization,
@@ -1596,7 +1654,7 @@ mod tests {
 
                     let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
 
-                    let external_ip_in_tracker_configuration = tracker.get_maybe_external_ip().unwrap();
+                    let external_ip_in_tracker_configuration = core_config.net.external_ip.unwrap();
 
                     assert!(external_ip_in_tracker_configuration.is_ipv6());
 
@@ -1641,6 +1699,7 @@ mod tests {
         #[tokio::test]
         async fn should_return_no_stats_when_the_tracker_does_not_have_any_torrent() {
             let (
+                _core_config,
                 _tracker,
                 _announce_handler,
                 scrape_handler,
@@ -1750,6 +1809,7 @@ mod tests {
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
                 let (
+                    _core_config,
                     _tracker,
                     _announce_handler,
                     scrape_handler,
@@ -1786,6 +1846,7 @@ mod tests {
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
                 let (
+                    _core_config,
                     _tracker,
                     _announce_handler,
                     scrape_handler,
@@ -1830,6 +1891,7 @@ mod tests {
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
                 let (
+                    _core_config,
                     _tracker,
                     _announce_handler,
                     scrape_handler,
@@ -1903,7 +1965,8 @@ mod tests {
 
                 let remote_addr = sample_ipv4_remote_addr();
 
-                let (_tracker, _announce_handler, scrape_handler, _whitelist_authorization) = test_tracker_factory();
+                let (_core_config, _tracker, _announce_handler, scrape_handler, _whitelist_authorization) =
+                    test_tracker_factory();
 
                 handle_scrape(
                     remote_addr,
@@ -1943,7 +2006,8 @@ mod tests {
 
                 let remote_addr = sample_ipv6_remote_addr();
 
-                let (_tracker, _announce_handler, scrape_handler, _whitelist_authorization) = test_tracker_factory();
+                let (_core_config, _tracker, _announce_handler, scrape_handler, _whitelist_authorization) =
+                    test_tracker_factory();
 
                 handle_scrape(
                     remote_addr,

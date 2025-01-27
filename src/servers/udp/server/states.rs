@@ -7,6 +7,7 @@ use derive_more::derive::Display;
 use derive_more::Constructor;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
 
 use super::banning::BanService;
@@ -70,6 +71,7 @@ impl Server<Stopped> {
     #[instrument(skip(self, tracker, announce_handler, scrape_handler, whitelist_authorization, opt_stats_event_sender, ban_service, form), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -86,6 +88,7 @@ impl Server<Stopped> {
 
         // May need to wrap in a task to about a tokio bug.
         let task = self.state.spawner.spawn_launcher(
+            core_config,
             tracker,
             announce_handler,
             scrape_handler,

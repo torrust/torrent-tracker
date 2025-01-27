@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use torrust_tracker_configuration::UdpTracker;
+use torrust_tracker_configuration::{Core, UdpTracker};
 use tracing::instrument;
 
 use crate::core::announce_handler::AnnounceHandler;
@@ -46,6 +46,7 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
     form
 ))]
 pub async fn start_job(
+    core_config: Arc<Core>,
     config: &UdpTracker,
     tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
@@ -60,6 +61,7 @@ pub async fn start_job(
 
     let server = Server::new(Spawner::new(bind_to))
         .start(
+            core_config,
             tracker,
             announce_handler,
             scrape_handler,

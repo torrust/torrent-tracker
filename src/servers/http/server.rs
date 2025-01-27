@@ -7,6 +7,7 @@ use axum_server::Handle;
 use derive_more::Constructor;
 use futures::future::BoxFuture;
 use tokio::sync::oneshot::{Receiver, Sender};
+use torrust_tracker_configuration::Core;
 use tracing::instrument;
 
 use super::v1::routes::router;
@@ -59,6 +60,7 @@ impl Launcher {
     ))]
     fn start(
         &self,
+        config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -85,6 +87,7 @@ impl Launcher {
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
         let app = router(
+            config,
             tracker,
             announce_handler,
             scrape_handler,
@@ -188,6 +191,7 @@ impl HttpServer<Stopped> {
     #[allow(clippy::too_many_arguments)]
     pub async fn start(
         self,
+        core_config: Arc<Core>,
         tracker: Arc<Tracker>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
@@ -203,6 +207,7 @@ impl HttpServer<Stopped> {
 
         let task = tokio::spawn(async move {
             let server = launcher.start(
+                core_config,
                 tracker,
                 announce_handler,
                 scrape_handler,
@@ -309,6 +314,7 @@ mod tests {
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
         let started = stopped
             .start(
+                Arc::new(cfg.core.clone()),
                 app_container.tracker,
                 app_container.announce_handler,
                 app_container.scrape_handler,

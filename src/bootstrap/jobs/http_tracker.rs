@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
 use tokio::task::JoinHandle;
-use torrust_tracker_configuration::HttpTracker;
+use torrust_tracker_configuration::{Core, HttpTracker};
 use tracing::instrument;
 
 use super::make_rust_tls;
@@ -49,6 +49,7 @@ use crate::servers::registar::ServiceRegistrationForm;
 ))]
 pub async fn start_job(
     config: &HttpTracker,
+    core_config: Arc<Core>,
     tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
@@ -69,6 +70,7 @@ pub async fn start_job(
             start_v1(
                 socket,
                 tls,
+                core_config.clone(),
                 tracker.clone(),
                 announce_handler.clone(),
                 scrape_handler.clone(),
@@ -97,6 +99,7 @@ pub async fn start_job(
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
+    config: Arc<Core>,
     tracker: Arc<core::Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
@@ -107,6 +110,7 @@ async fn start_v1(
 ) -> JoinHandle<()> {
     let server = HttpServer::new(Launcher::new(socket, tls))
         .start(
+            config,
             tracker,
             announce_handler,
             scrape_handler,
@@ -156,6 +160,7 @@ mod tests {
 
         start_job(
             config,
+            Arc::new(cfg.core.clone()),
             app_container.tracker,
             app_container.announce_handler,
             app_container.scrape_handler,

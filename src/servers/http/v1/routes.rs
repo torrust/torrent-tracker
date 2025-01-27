@@ -10,7 +10,7 @@ use axum::routing::get;
 use axum::{BoxError, Router};
 use axum_client_ip::SecureClientIpSource;
 use hyper::{Request, StatusCode};
-use torrust_tracker_configuration::DEFAULT_TIMEOUT;
+use torrust_tracker_configuration::{Core, DEFAULT_TIMEOUT};
 use tower::timeout::TimeoutLayer;
 use tower::ServiceBuilder;
 use tower_http::classify::ServerErrorsFailureClass;
@@ -34,6 +34,7 @@ use crate::servers::logging::Latency;
 ///
 /// > **NOTICE**: it's added a layer to get the client IP from the connection
 /// > info. The tracker could use the connection info to get the client IP.
+#[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)]
 #[instrument(skip(
     tracker,
@@ -45,6 +46,7 @@ use crate::servers::logging::Latency;
     server_socket_addr
 ))]
 pub fn router(
+    core_config: Arc<Core>,
     tracker: Arc<Tracker>,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
@@ -60,6 +62,7 @@ pub fn router(
         .route(
             "/announce",
             get(announce::handle_without_key).with_state((
+                core_config.clone(),
                 tracker.clone(),
                 announce_handler.clone(),
                 authentication_service.clone(),
@@ -70,6 +73,7 @@ pub fn router(
         .route(
             "/announce/{key}",
             get(announce::handle_with_key).with_state((
+                core_config.clone(),
                 tracker.clone(),
                 announce_handler.clone(),
                 authentication_service.clone(),
@@ -81,6 +85,7 @@ pub fn router(
         .route(
             "/scrape",
             get(scrape::handle_without_key).with_state((
+                core_config.clone(),
                 tracker.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),
@@ -90,6 +95,7 @@ pub fn router(
         .route(
             "/scrape/{key}",
             get(scrape::handle_with_key).with_state((
+                core_config.clone(),
                 tracker.clone(),
                 scrape_handler.clone(),
                 authentication_service.clone(),

@@ -18,6 +18,7 @@ use bittorrent_http_protocol::v1::services::peer_ip_resolver;
 use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
 use hyper::StatusCode;
 use torrust_tracker_clock::clock::Time;
+use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
@@ -39,6 +40,7 @@ use crate::CurrentClock;
 #[allow(clippy::type_complexity)]
 pub async fn handle_without_key(
     State(state): State<(
+        Arc<Core>,
         Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
@@ -56,6 +58,7 @@ pub async fn handle_without_key(
         &state.2,
         &state.3,
         &state.4,
+        &state.5,
         &announce_request,
         &client_ip_sources,
         None,
@@ -69,6 +72,7 @@ pub async fn handle_without_key(
 #[allow(clippy::type_complexity)]
 pub async fn handle_with_key(
     State(state): State<(
+        Arc<Core>,
         Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
@@ -87,6 +91,7 @@ pub async fn handle_with_key(
         &state.2,
         &state.3,
         &state.4,
+        &state.5,
         &announce_request,
         &client_ip_sources,
         Some(key),
@@ -100,6 +105,7 @@ pub async fn handle_with_key(
 /// `unauthenticated` modes.
 #[allow(clippy::too_many_arguments)]
 async fn handle(
+    config: &Arc<Core>,
     tracker: &Arc<Tracker>,
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
@@ -110,6 +116,7 @@ async fn handle(
     maybe_key: Option<Key>,
 ) -> Response {
     let announce_data = match handle_announce(
+        config,
         tracker,
         announce_handler,
         authentication_service,
@@ -135,6 +142,7 @@ async fn handle(
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_announce(
+    core_config: &Arc<Core>,
     tracker: &Arc<Tracker>,
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
@@ -145,7 +153,7 @@ async fn handle_announce(
     maybe_key: Option<Key>,
 ) -> Result<AnnounceData, responses::error::Error> {
     // Authentication
-    if tracker.requires_authentication() {
+    if core_config.private {
         match maybe_key {
             Some(key) => match authentication_service.authenticate(&key).await {
                 Ok(()) => (),
@@ -165,7 +173,7 @@ async fn handle_announce(
         Err(error) => return Err(responses::error::Error::from(error)),
     }
 
-    let peer_ip = match peer_ip_resolver::invoke(tracker.is_behind_reverse_proxy(), client_ip_sources) {
+    let peer_ip = match peer_ip_resolver::invoke(core_config.net.on_reverse_proxy, client_ip_sources) {
         Ok(peer_ip) => peer_ip,
         Err(error) => return Err(responses::error::Error::from(error)),
     };
@@ -251,7 +259,7 @@ mod tests {
     use bittorrent_http_protocol::v1::responses;
     use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
     use bittorrent_primitives::info_hash::InfoHash;
-    use torrust_tracker_configuration::Configuration;
+    use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
@@ -262,6 +270,7 @@ mod tests {
     use crate::core::{whitelist, Tracker};
 
     type TrackerAndDeps = (
+        Arc<Core>,
         Arc<Tracker>,
         Arc<AnnounceHandler>,
         Arc<Option<Box<dyn Sender>>>,
@@ -270,23 +279,23 @@ mod tests {
     );
 
     fn private_tracker() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_private())
+        initialize_tracker_and_deps(configuration::ephemeral_private())
     }
 
     fn whitelisted_tracker() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_listed())
+        initialize_tracker_and_deps(configuration::ephemeral_listed())
     }
 
     fn tracker_on_reverse_proxy() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_with_reverse_proxy())
+        initialize_tracker_and_deps(configuration::ephemeral_with_reverse_proxy())
     }
 
     fn tracker_not_on_reverse_proxy() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_without_reverse_proxy())
+        initialize_tracker_and_deps(configuration::ephemeral_without_reverse_proxy())
     }
 
     /// Initialize tracker's dependencies and tracker.
-    fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
+    fn initialize_tracker_and_deps(config: Configuration) -> TrackerAndDeps {
         let (
             _database,
             _in_memory_whitelist,
@@ -295,13 +304,13 @@ mod tests {
             in_memory_torrent_repository,
             db_torrent_repository,
             _torrents_manager,
-        ) = initialize_tracker_dependencies(config);
+        ) = initialize_tracker_dependencies(&config);
 
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
         let tracker = Arc::new(initialize_tracker(
-            config,
+            &config,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
@@ -312,7 +321,10 @@ mod tests {
             &db_torrent_repository,
         ));
 
+        let config = Arc::new(config.core);
+
         (
+            config,
             tracker,
             announce_handler,
             stats_event_sender,
@@ -361,7 +373,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_missing() {
-            let (tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 private_tracker();
 
             let tracker = Arc::new(tracker);
@@ -370,6 +382,7 @@ mod tests {
             let maybe_key = None;
 
             let response = handle_announce(
+                &config,
                 &tracker,
                 &announce_handler,
                 &authentication_service,
@@ -390,7 +403,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_invalid() {
-            let (tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 private_tracker();
 
             let tracker = Arc::new(tracker);
@@ -401,6 +414,7 @@ mod tests {
             let maybe_key = Some(unregistered_key);
 
             let response = handle_announce(
+                &config,
                 &tracker,
                 &announce_handler,
                 &authentication_service,
@@ -427,7 +441,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_announced_torrent_is_not_whitelisted() {
-            let (tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 whitelisted_tracker();
 
             let tracker = Arc::new(tracker);
@@ -436,6 +450,7 @@ mod tests {
             let announce_request = sample_announce_request();
 
             let response = handle_announce(
+                &config,
                 &tracker,
                 &announce_handler,
                 &authentication_service,
@@ -470,7 +485,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 tracker_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
@@ -482,6 +497,7 @@ mod tests {
             };
 
             let response = handle_announce(
+                &config,
                 &tracker,
                 &announce_handler,
                 &authentication_service,
@@ -513,7 +529,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
+            let (config, tracker, announce_handler, stats_event_sender, whitelist_authorization, authentication_service) =
                 tracker_not_on_reverse_proxy();
 
             let tracker = Arc::new(tracker);
@@ -525,6 +541,7 @@ mod tests {
             };
 
             let response = handle_announce(
+                &config,
                 &tracker,
                 &announce_handler,
                 &authentication_service,

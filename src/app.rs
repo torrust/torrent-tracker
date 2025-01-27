@@ -21,6 +21,8 @@
 //! - UDP trackers: the user can enable multiple UDP tracker on several ports.
 //! - HTTP trackers: the user can enable multiple HTTP tracker on several ports.
 //! - Tracker REST API: the tracker API can be enabled/disabled.
+use std::sync::Arc;
+
 use tokio::task::JoinHandle;
 use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
@@ -78,6 +80,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
             } else {
                 jobs.push(
                     udp_tracker::start_job(
+                        Arc::new(config.core.clone()),
                         udp_tracker_config,
                         app_container.tracker.clone(),
                         app_container.announce_handler.clone(),
@@ -100,6 +103,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
         for http_tracker_config in http_trackers {
             if let Some(job) = http_tracker::start_job(
                 http_tracker_config,
+                Arc::new(config.core.clone()),
                 app_container.tracker.clone(),
                 app_container.announce_handler.clone(),
                 app_container.scrape_handler.clone(),
