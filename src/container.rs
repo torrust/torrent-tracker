@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 use crate::core::authentication::handler::KeysHandler;
 use crate::core::authentication::service::AuthenticationService;
 use crate::core::databases::Database;
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
 use crate::core::torrent::manager::TorrentsManager;
@@ -17,6 +18,7 @@ use crate::servers::udp::server::banning::BanService;
 pub struct AppContainer {
     pub database: Arc<Box<dyn Database>>,
     pub tracker: Arc<Tracker>,
+    pub scrape_handler: Arc<ScrapeHandler>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
     pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,

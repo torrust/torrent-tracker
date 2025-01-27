@@ -12,6 +12,7 @@ use tracing::instrument;
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
 use crate::core::authentication::service::AuthenticationService;
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::{statistics, whitelist, Tracker};
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
@@ -43,9 +44,11 @@ pub struct Launcher {
 }
 
 impl Launcher {
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip(
         self,
         tracker,
+        scrape_handler,
         authentication_service,
         whitelist_authorization,
         stats_event_sender,
@@ -55,6 +58,7 @@ impl Launcher {
     fn start(
         &self,
         tracker: Arc<Tracker>,
+        scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
@@ -79,6 +83,7 @@ impl Launcher {
 
         let app = router(
             tracker,
+            scrape_handler,
             authentication_service,
             whitelist_authorization,
             stats_event_sender,
@@ -179,6 +184,7 @@ impl HttpServer<Stopped> {
     pub async fn start(
         self,
         tracker: Arc<Tracker>,
+        scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
         whitelist_authorization: Arc<whitelist::authorization::Authorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
@@ -192,6 +198,7 @@ impl HttpServer<Stopped> {
         let task = tokio::spawn(async move {
             let server = launcher.start(
                 tracker,
+                scrape_handler,
                 authentication_service,
                 whitelist_authorization,
                 stats_event_sender,
@@ -296,6 +303,7 @@ mod tests {
         let started = stopped
             .start(
                 app_container.tracker,
+                app_container.scrape_handler,
                 app_container.authentication_service,
                 app_container.whitelist_authorization,
                 app_container.stats_event_sender,

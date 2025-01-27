@@ -2,9 +2,8 @@
 //!
 //! The service is responsible for handling the `scrape` requests.
 //!
-//! It delegates the `scrape` logic to the [`Tracker`](crate::core::Tracker::scrape)
-//! and it returns the [`ScrapeData`] returned
-//! by the [`Tracker`].
+//! It delegates the `scrape` logic to the [`ScrapeHandler`] and it returns the
+//! [`ScrapeData`].
 //!
 //! It also sends an [`statistics::event::Event`]
 //! because events are specific for the HTTP tracker.
@@ -14,9 +13,9 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_primitives::core::ScrapeData;
 
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::{self};
-use crate::core::Tracker;
 
 /// The HTTP tracker `scrape` service.
 ///
@@ -29,12 +28,12 @@ use crate::core::Tracker;
 /// > like the UDP tracker, the number of TCP connections is incremented for
 /// > each `scrape` request.
 pub async fn invoke(
-    tracker: &Arc<Tracker>,
+    scrape_handler: &Arc<ScrapeHandler>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     info_hashes: &Vec<InfoHash>,
     original_peer_ip: &IpAddr,
 ) -> ScrapeData {
-    let scrape_data = tracker.scrape(info_hashes).await;
+    let scrape_data = scrape_handler.scrape(info_hashes).await;
 
     send_scrape_event(original_peer_ip, opt_stats_event_sender).await;
 
@@ -74,6 +73,7 @@ async fn send_scrape_event(original_peer_ip: &IpAddr, opt_stats_event_sender: &A
 mod tests {
 
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
@@ -81,10 +81,11 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::scrape_handler::ScrapeHandler;
     use crate::core::services::initialize_tracker;
     use crate::core::Tracker;
 
-    fn public_tracker() -> Tracker {
+    fn public_tracker_and_scrape_handler() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
 
         let (
@@ -97,12 +98,15 @@ mod tests {
             _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
-        initialize_tracker(
+        let tracker = Arc::new(initialize_tracker(
             &config,
-            &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
-        )
+        ));
+
+        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
+
+        (tracker, scrape_handler)
     }
 
     fn sample_info_hashes() -> Vec<InfoHash> {
@@ -110,7 +114,7 @@ mod tests {
     }
 
     fn sample_info_hash() -> InfoHash {
-        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()
+        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap() // # DevSkim: ignore DS173237
     }
 
     fn sample_peer() -> peer::Peer {
@@ -125,7 +129,7 @@ mod tests {
         }
     }
 
-    fn test_tracker_factory() -> Tracker {
+    fn test_tracker_factory() -> (Arc<Tracker>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral();
 
         let (
@@ -138,13 +142,11 @@ mod tests {
             _torrents_manager,
         ) = initialize_tracker_dependencies(&config);
 
-        Tracker::new(
-            &config.core,
-            &whitelist_authorization,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        )
-        .unwrap()
+        let tracker = Arc::new(Tracker::new(&config.core, &in_memory_torrent_repository, &db_torrent_repository).unwrap());
+
+        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
+
+        (tracker, scrape_handler)
     }
 
     mod with_real_data {
@@ -160,7 +162,7 @@ mod tests {
         use crate::core::{statistics, PeersWanted};
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker, sample_info_hash, sample_info_hashes, sample_peer, test_tracker_factory,
+            public_tracker_and_scrape_handler, sample_info_hash, sample_info_hashes, sample_peer, test_tracker_factory,
         };
 
         #[tokio::test]
@@ -168,7 +170,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let tracker = Arc::new(public_tracker());
+            let (tracker, scrape_handler) = public_tracker_and_scrape_handler();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];
@@ -178,7 +180,7 @@ mod tests {
             let original_peer_ip = peer.ip();
             tracker.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
 
-            let scrape_data = invoke(&tracker, &stats_event_sender, &info_hashes, &original_peer_ip).await;
+            let scrape_data = invoke(&scrape_handler, &stats_event_sender, &info_hashes, &original_peer_ip).await;
 
             let mut expected_scrape_data = ScrapeData::empty();
             expected_scrape_data.add_file(
@@ -204,11 +206,11 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let tracker = Arc::new(test_tracker_factory());
+            let (_tracker, scrape_handler) = test_tracker_factory();
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
-            invoke(&tracker, &stats_event_sender, &sample_info_hashes(), &peer_ip).await;
+            invoke(&scrape_handler, &stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
 
         #[tokio::test]
@@ -222,11 +224,11 @@ mod tests {
             let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                 Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-            let tracker = Arc::new(test_tracker_factory());
+            let (_tracker, scrape_handler) = test_tracker_factory();
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 
-            invoke(&tracker, &stats_event_sender, &sample_info_hashes(), &peer_ip).await;
+            invoke(&scrape_handler, &stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
     }
 
@@ -242,14 +244,15 @@ mod tests {
         use crate::core::{statistics, PeersWanted};
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
+            public_tracker_and_scrape_handler, sample_info_hash, sample_info_hashes, sample_peer,
         };
 
         #[tokio::test]
         async fn it_should_always_return_the_zeroed_scrape_data_for_a_torrent() {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
-            let tracker = Arc::new(public_tracker());
+
+            let (tracker, _scrape_handler) = public_tracker_and_scrape_handler();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];

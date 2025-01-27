@@ -127,7 +127,7 @@ mod tests {
         let (
             _database,
             _in_memory_whitelist,
-            whitelist_authorization,
+            _whitelist_authorization,
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
@@ -136,7 +136,6 @@ mod tests {
 
         let tracker = Arc::new(initialize_tracker(
             config,
-            &whitelist_authorization,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));

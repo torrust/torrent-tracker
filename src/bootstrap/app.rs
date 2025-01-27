@@ -26,6 +26,7 @@ use crate::core::authentication::handler::KeysHandler;
 use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
 use crate::core::authentication::service;
+use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::services::{initialize_database, initialize_tracker, initialize_whitelist_manager, statistics};
 use crate::core::torrent::manager::TorrentsManager;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
@@ -116,14 +117,16 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
 
     let tracker = Arc::new(initialize_tracker(
         configuration,
-        &whitelist_authorization,
         &in_memory_torrent_repository,
         &db_torrent_repository,
     ));
 
+    let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
+
     AppContainer {
         database,
         tracker,
+        scrape_handler,
         keys_handler,
         authentication_service,
         whitelist_authorization,

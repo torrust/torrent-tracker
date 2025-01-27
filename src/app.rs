@@ -80,6 +80,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
                     udp_tracker::start_job(
                         udp_tracker_config,
                         app_container.tracker.clone(),
+                        app_container.scrape_handler.clone(),
                         app_container.whitelist_authorization.clone(),
                         app_container.stats_event_sender.clone(),
                         app_container.ban_service.clone(),
@@ -99,6 +100,7 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
             if let Some(job) = http_tracker::start_job(
                 http_tracker_config,
                 app_container.tracker.clone(),
+                app_container.scrape_handler.clone(),
                 app_container.authentication_service.clone(),
                 app_container.whitelist_authorization.clone(),
                 app_container.stats_event_sender.clone(),

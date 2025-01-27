@@ -76,7 +76,7 @@ mod tests {
         let (
             _database,
             _in_memory_whitelist,
-            whitelist_authorization,
+            _whitelist_authorization,
             _authentication_service,
             in_memory_torrent_repository,
             db_torrent_repository,
@@ -85,12 +85,7 @@ mod tests {
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
 
-        let tracker = initialize_tracker(
-            &config,
-            &whitelist_authorization,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        );
+        let tracker = initialize_tracker(&config, &in_memory_torrent_repository, &db_torrent_repository);
 
         (tracker, stats_event_sender)
     }
@@ -147,20 +142,14 @@ mod tests {
             let (
                 _database,
                 _in_memory_whitelist,
-                whitelist_authorization,
+                _whitelist_authorization,
                 _authentication_service,
                 in_memory_torrent_repository,
                 db_torrent_repository,
                 _torrents_manager,
             ) = initialize_tracker_dependencies(&config);
 
-            Tracker::new(
-                &config.core,
-                &whitelist_authorization,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            )
-            .unwrap()
+            Tracker::new(&config.core, &in_memory_torrent_repository, &db_torrent_repository).unwrap()
         }
 
         #[tokio::test]
