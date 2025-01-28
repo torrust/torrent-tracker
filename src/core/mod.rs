@@ -460,7 +460,6 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::Peer;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
@@ -527,10 +526,6 @@ mod tests {
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
             (announce_handler, whitelist_authorization, whitelist_manager, scrape_handler)
-        }
-
-        fn sample_info_hash() -> InfoHash {
-            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()
         }
 
         // The client peer IP
@@ -631,21 +626,7 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::tests::the_tracker::{
-                    complete_peer, incomplete_peer, peer_ip, sample_info_hash, whitelisted_tracker,
-                };
-
-                #[test]
-                fn it_should_be_able_to_build_a_zeroed_scrape_data_for_a_list_of_info_hashes() {
-                    // Zeroed scrape data is used when the authentication for the scrape request fails.
-
-                    let sample_info_hash = sample_info_hash();
-
-                    let mut expected_scrape_data = ScrapeData::empty();
-                    expected_scrape_data.add_file_with_zeroed_metadata(&sample_info_hash);
-
-                    assert_eq!(ScrapeData::zeroed(&vec![sample_info_hash]), expected_scrape_data);
-                }
+                use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, peer_ip, whitelisted_tracker};
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {
