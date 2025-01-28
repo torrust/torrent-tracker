@@ -460,62 +460,38 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
+        use torrust_tracker_configuration::Configuration;
         use torrust_tracker_primitives::peer::Peer;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::AnnounceHandler;
         use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::services::initialize_whitelist_manager;
+        use crate::core::services::initialize_database;
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use crate::core::whitelist;
-        use crate::core::whitelist::manager::WhiteListManager;
+        use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
-        fn public_tracker() -> (Arc<AnnounceHandler>, Arc<InMemoryTorrentRepository>, Arc<ScrapeHandler>) {
+        fn initialize_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
-
-            let (
-                _database,
-                _in_memory_whitelist,
-                whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                db_torrent_repository,
-                _torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
-
-            let announce_handler = Arc::new(AnnounceHandler::new(
-                &config.core,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
-            let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-            (announce_handler, in_memory_torrent_repository, scrape_handler)
+            initialize_handlers(&config)
         }
 
-        #[allow(clippy::type_complexity)]
-        fn whitelisted_tracker() -> (
-            Arc<AnnounceHandler>,
-            Arc<whitelist::authorization::Authorization>,
-            Arc<WhiteListManager>,
-            Arc<ScrapeHandler>,
-        ) {
+        fn initialize_handlers_for_listed_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_listed();
+            initialize_handlers(&config)
+        }
 
-            let (
-                database,
-                in_memory_whitelist,
-                whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                db_torrent_repository,
-                _torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
-
-            let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
+        fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
+            let database = initialize_database(config);
+            let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+            let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+                &config.core,
+                &in_memory_whitelist.clone(),
+            ));
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+            let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 
             let announce_handler = Arc::new(AnnounceHandler::new(
                 &config.core,
@@ -525,7 +501,7 @@ mod tests {
 
             let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-            (announce_handler, whitelist_authorization, whitelist_manager, scrape_handler)
+            (announce_handler, scrape_handler)
         }
 
         // The client peer IP
@@ -572,11 +548,11 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, public_tracker};
+                use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, initialize_handlers_for_public_tracker};
 
                 #[tokio::test]
                 async fn it_should_return_the_swarm_metadata_for_the_requested_file_if_the_tracker_has_that_torrent() {
-                    let (announce_handler, _in_memory_torrent_repository, scrape_handler) = public_tracker();
+                    let (announce_handler, scrape_handler) = initialize_handlers_for_public_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
@@ -619,18 +595,20 @@ mod tests {
 
         mod configured_as_whitelisted {
 
-            mod handling_an_scrape_request {
+            mod handling_a_scrape_request {
 
                 use bittorrent_primitives::info_hash::InfoHash;
                 use torrust_tracker_primitives::core::ScrapeData;
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, peer_ip, whitelisted_tracker};
+                use crate::core::tests::the_tracker::{
+                    complete_peer, incomplete_peer, initialize_handlers_for_listed_tracker, peer_ip,
+                };
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {
-                    let (announce_handler, _whitelist_authorization, _whitelist_manager, scrape_handler) = whitelisted_tracker();
+                    let (announce_handler, scrape_handler) = initialize_handlers_for_listed_tracker();
 
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // # DevSkim: ignore DS173237
 
