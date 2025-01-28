@@ -171,137 +171,62 @@ mod tests {
     use bittorrent_http_protocol::v1::responses;
     use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
     use bittorrent_primitives::info_hash::InfoHash;
-    use torrust_tracker_configuration::Core;
+    use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::app_test::initialize_tracker_dependencies;
+    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
     use crate::core::authentication::service::AuthenticationService;
     use crate::core::scrape_handler::ScrapeHandler;
     use crate::core::services::statistics;
+    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use crate::core::whitelist::authorization::WhitelistAuthorization;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
-    #[allow(clippy::type_complexity)]
-    fn private_tracker() -> (
-        Arc<Core>,
-        Arc<ScrapeHandler>,
-        Arc<Option<Box<dyn crate::core::statistics::event::sender::Sender>>>,
-        Arc<AuthenticationService>,
-    ) {
-        let config = configuration::ephemeral_private();
-
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            authentication_service,
-            in_memory_torrent_repository,
-            _db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
-
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        let stats_event_sender = Arc::new(stats_event_sender);
-
-        let core_config = Arc::new(config.core.clone());
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (core_config, scrape_handler, stats_event_sender, authentication_service)
+    struct CoreTrackerServices {
+        pub core_config: Arc<Core>,
+        pub scrape_handler: Arc<ScrapeHandler>,
+        pub stats_event_sender: Arc<Option<Box<dyn crate::core::statistics::event::sender::Sender>>>,
+        pub authentication_service: Arc<AuthenticationService>,
     }
 
-    #[allow(clippy::type_complexity)]
-    fn whitelisted_tracker() -> (
-        Arc<Core>,
-        Arc<ScrapeHandler>,
-        Arc<Option<Box<dyn crate::core::statistics::event::sender::Sender>>>,
-        Arc<AuthenticationService>,
-    ) {
-        let config = configuration::ephemeral_listed();
-
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            authentication_service,
-            in_memory_torrent_repository,
-            _db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
-
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        let stats_event_sender = Arc::new(stats_event_sender);
-
-        let core_config = Arc::new(config.core.clone());
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (core_config, scrape_handler, stats_event_sender, authentication_service)
+    fn initialize_private_tracker() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_private())
     }
 
-    #[allow(clippy::type_complexity)]
-    fn tracker_on_reverse_proxy() -> (
-        Arc<Core>,
-        Arc<ScrapeHandler>,
-        Arc<Option<Box<dyn crate::core::statistics::event::sender::Sender>>>,
-        Arc<AuthenticationService>,
-    ) {
-        let config = configuration::ephemeral_with_reverse_proxy();
-
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            authentication_service,
-            in_memory_torrent_repository,
-            _db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
-
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        let stats_event_sender = Arc::new(stats_event_sender);
-
-        let core_config = Arc::new(config.core.clone());
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (core_config, scrape_handler, stats_event_sender, authentication_service)
+    fn initialize_listed_tracker() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_listed())
     }
 
-    #[allow(clippy::type_complexity)]
-    fn tracker_not_on_reverse_proxy() -> (
-        Arc<Core>,
-        Arc<ScrapeHandler>,
-        Arc<Option<Box<dyn crate::core::statistics::event::sender::Sender>>>,
-        Arc<AuthenticationService>,
-    ) {
-        let config = configuration::ephemeral_without_reverse_proxy();
+    fn initialize_tracker_on_reverse_proxy() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_with_reverse_proxy())
+    }
 
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            authentication_service,
-            in_memory_torrent_repository,
-            _db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
+    fn initialize_tracker_not_on_reverse_proxy() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_without_reverse_proxy())
+    }
 
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-
-        let stats_event_sender = Arc::new(stats_event_sender);
-
+    fn initialize_core_tracker_services(config: &Configuration) -> CoreTrackerServices {
         let core_config = Arc::new(config.core.clone());
-
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
+        let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+        let authentication_service = Arc::new(AuthenticationService::new(&config.core, &in_memory_key_repository));
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-        (core_config, scrape_handler, stats_event_sender, authentication_service)
+        CoreTrackerServices {
+            core_config,
+            scrape_handler,
+            stats_event_sender,
+            authentication_service,
+        }
     }
 
     fn sample_scrape_request() -> Scrape {
         Scrape {
-            info_hashes: vec!["3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()], // # DevSkim: ignore DS173237
+            info_hashes: vec!["3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()], // DevSkim: ignore DS173237
         }
     }
 
@@ -324,22 +249,22 @@ mod tests {
 
         use torrust_tracker_primitives::core::ScrapeData;
 
-        use super::{private_tracker, sample_client_ip_sources, sample_scrape_request};
+        use super::{initialize_private_tracker, sample_client_ip_sources, sample_scrape_request};
         use crate::core::authentication;
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_authentication_key_is_missing() {
-            let (core_config, scrape_handler, stats_event_sender, authentication_service) = private_tracker();
+            let core_tracker_services = initialize_private_tracker();
 
             let scrape_request = sample_scrape_request();
             let maybe_key = None;
 
             let scrape_data = handle_scrape(
-                &core_config,
-                &scrape_handler,
-                &authentication_service,
-                &stats_event_sender,
+                &core_tracker_services.core_config,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.authentication_service,
+                &core_tracker_services.stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
                 maybe_key,
@@ -354,17 +279,17 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_authentication_key_is_invalid() {
-            let (core_config, scrape_handler, stats_event_sender, authentication_service) = private_tracker();
+            let core_tracker_services = initialize_private_tracker();
 
             let scrape_request = sample_scrape_request();
             let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
             let maybe_key = Some(unregistered_key);
 
             let scrape_data = handle_scrape(
-                &core_config,
-                &scrape_handler,
-                &authentication_service,
-                &stats_event_sender,
+                &core_tracker_services.core_config,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.authentication_service,
+                &core_tracker_services.stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
                 maybe_key,
@@ -382,20 +307,20 @@ mod tests {
 
         use torrust_tracker_primitives::core::ScrapeData;
 
-        use super::{sample_client_ip_sources, sample_scrape_request, whitelisted_tracker};
+        use super::{initialize_listed_tracker, sample_client_ip_sources, sample_scrape_request};
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
 
         #[tokio::test]
         async fn it_should_return_zeroed_swarm_metadata_when_the_torrent_is_not_whitelisted() {
-            let (core_config, scrape_handler, stats_event_sender, authentication_service) = whitelisted_tracker();
+            let core_tracker_services = initialize_listed_tracker();
 
             let scrape_request = sample_scrape_request();
 
             let scrape_data = handle_scrape(
-                &core_config,
-                &scrape_handler,
-                &authentication_service,
-                &stats_event_sender,
+                &core_tracker_services.core_config,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.authentication_service,
+                &core_tracker_services.stats_event_sender,
                 &scrape_request,
                 &sample_client_ip_sources(),
                 None,
@@ -413,13 +338,13 @@ mod tests {
 
         use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
 
-        use super::{sample_scrape_request, tracker_on_reverse_proxy};
+        use super::{initialize_tracker_on_reverse_proxy, sample_scrape_request};
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
         use crate::servers::http::v1::handlers::scrape::tests::assert_error_response;
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let (core_config, scrape_handler, stats_event_sender, authentication_service) = tracker_on_reverse_proxy();
+            let core_tracker_services = initialize_tracker_on_reverse_proxy();
 
             let client_ip_sources = ClientIpSources {
                 right_most_x_forwarded_for: None,
@@ -427,10 +352,10 @@ mod tests {
             };
 
             let response = handle_scrape(
-                &core_config,
-                &scrape_handler,
-                &authentication_service,
-                &stats_event_sender,
+                &core_tracker_services.core_config,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.authentication_service,
+                &core_tracker_services.stats_event_sender,
                 &sample_scrape_request(),
                 &client_ip_sources,
                 None,
@@ -449,13 +374,13 @@ mod tests {
 
         use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
 
-        use super::{sample_scrape_request, tracker_not_on_reverse_proxy};
+        use super::{initialize_tracker_not_on_reverse_proxy, sample_scrape_request};
         use crate::servers::http::v1::handlers::scrape::handle_scrape;
         use crate::servers::http::v1::handlers::scrape::tests::assert_error_response;
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let (core_config, scrape_handler, stats_event_sender, authentication_service) = tracker_not_on_reverse_proxy();
+            let core_tracker_services = initialize_tracker_not_on_reverse_proxy();
 
             let client_ip_sources = ClientIpSources {
                 right_most_x_forwarded_for: None,
@@ -463,10 +388,10 @@ mod tests {
             };
 
             let response = handle_scrape(
-                &core_config,
-                &scrape_handler,
-                &authentication_service,
-                &stats_event_sender,
+                &core_tracker_services.core_config,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.authentication_service,
+                &core_tracker_services.stats_event_sender,
                 &sample_scrape_request(),
                 &client_ip_sources,
                 None,

@@ -498,79 +498,68 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
     use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::{initialize_whitelist_manager, statistics};
+    use crate::core::services::{initialize_database, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use crate::core::whitelist;
-    use crate::core::whitelist::manager::WhitelistManager;
+    use crate::core::whitelist::authorization::WhitelistAuthorization;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::CurrentClock;
 
-    type TrackerAndDeps = (
-        Arc<Core>,
-        Arc<AnnounceHandler>,
-        Arc<ScrapeHandler>,
-        Arc<InMemoryTorrentRepository>,
-        Arc<Option<Box<dyn Sender>>>,
-        Arc<InMemoryWhitelist>,
-        Arc<WhitelistManager>,
-        Arc<whitelist::authorization::WhitelistAuthorization>,
-    );
-
-    fn tracker_configuration() -> Configuration {
-        default_testing_tracker_configuration()
+    struct CoreTrackerServices {
+        pub core_config: Arc<Core>,
+        pub announce_handler: Arc<AnnounceHandler>,
+        pub scrape_handler: Arc<ScrapeHandler>,
+        pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+        pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+        pub in_memory_whitelist: Arc<InMemoryWhitelist>,
+        pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     }
 
     fn default_testing_tracker_configuration() -> Configuration {
         configuration::ephemeral()
     }
 
-    fn public_tracker() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_public())
+    fn initialize_core_tracker_services_for_default_tracker_configuration() -> CoreTrackerServices {
+        initialize_core_tracker_services(&default_testing_tracker_configuration())
     }
 
-    fn whitelisted_tracker() -> TrackerAndDeps {
-        initialize_tracker_and_deps(&configuration::ephemeral_listed())
+    fn initialize_core_tracker_services_for_public_tracker() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_public())
     }
 
-    fn initialize_tracker_and_deps(config: &Configuration) -> TrackerAndDeps {
+    fn initialize_core_tracker_services_for_listed_tracker() -> CoreTrackerServices {
+        initialize_core_tracker_services(&configuration::ephemeral_listed())
+    }
+
+    fn initialize_core_tracker_services(config: &Configuration) -> CoreTrackerServices {
         let core_config = Arc::new(config.core.clone());
-
-        let (
-            database,
-            in_memory_whitelist,
-            whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(config);
-
+        let database = initialize_database(config);
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
-        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
-
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
-        (
+        CoreTrackerServices {
             core_config,
             announce_handler,
             scrape_handler,
             in_memory_torrent_repository,
             stats_event_sender,
             in_memory_whitelist,
-            whitelist_manager,
             whitelist_authorization,
-        )
+        }
     }
 
     fn sample_ipv4_remote_addr() -> SocketAddr {
@@ -665,38 +654,6 @@ mod tests {
         pub fn into(self) -> Configuration {
             self.configuration
         }
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn test_tracker_factory() -> (
-        Arc<Core>,
-        Arc<AnnounceHandler>,
-        Arc<ScrapeHandler>,
-        Arc<whitelist::authorization::WhitelistAuthorization>,
-    ) {
-        let config = tracker_configuration();
-
-        let core_config = Arc::new(config.core.clone());
-
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
-
-        let announce_handler = Arc::new(AnnounceHandler::new(
-            &config.core,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (core_config, announce_handler, scrape_handler, whitelist_authorization)
     }
 
     mod connect_request {
@@ -916,23 +873,15 @@ mod tests {
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
-                gen_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv4_socket_address, sample_issue_time,
-                test_tracker_factory, TorrentPeerBuilder,
+                gen_remote_fingerprint, initialize_core_tracker_services_for_default_tracker_configuration,
+                initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range, sample_ipv4_socket_address,
+                sample_issue_time, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let client_ip = Ipv4Addr::new(126, 0, 0, 1);
                 let client_port = 8080;
@@ -952,16 +901,18 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
                 .unwrap();
 
-                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
+                let peers = core_tracker_services
+                    .in_memory_torrent_repository
+                    .get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -973,16 +924,7 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    _in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
 
@@ -993,10 +935,10 @@ mod tests {
                 let response = handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
@@ -1023,16 +965,7 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1055,16 +988,18 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
                 .unwrap();
 
-                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
+                let peers = core_tracker_services
+                    .in_memory_torrent_repository
+                    .get_torrent_peers(&info_hash.0.into());
 
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V4(remote_client_ip), client_port));
             }
@@ -1113,21 +1048,16 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv4_the_response_should_not_include_peers_using_ipv6() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    _stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
-                add_a_torrent_peer_using_ipv6(&in_memory_torrent_repository);
+                add_a_torrent_peer_using_ipv6(&core_tracker_services.in_memory_torrent_repository);
 
-                let response =
-                    announce_a_new_peer_using_ipv4(core_config.clone(), announce_handler.clone(), whitelist_authorization).await;
+                let response = announce_a_new_peer_using_ipv4(
+                    core_tracker_services.core_config.clone(),
+                    core_tracker_services.announce_handler.clone(),
+                    core_tracker_services.whitelist_authorization,
+                )
+                .await;
 
                 // The response should not contain the peer using IPV6
                 let peers: Option<Vec<ResponsePeer<Ipv6AddrBytes>>> = match response {
@@ -1149,14 +1079,14 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let (core_config, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
+                let core_tracker_services = initialize_core_tracker_services_for_default_tracker_configuration();
 
                 handle_announce(
                     sample_ipv4_socket_address(),
                     &AnnounceRequestBuilder::default().into(),
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1174,21 +1104,13 @@ mod tests {
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
                 use crate::servers::udp::handlers::tests::{
-                    gen_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_issue_time, TorrentPeerBuilder,
+                    gen_remote_fingerprint, initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range,
+                    sample_issue_time, TorrentPeerBuilder,
                 };
 
                 #[tokio::test]
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration_if_defined() {
-                    let (
-                        core_config,
-                        announce_handler,
-                        _scrape_handler,
-                        in_memory_torrent_repository,
-                        stats_event_sender,
-                        _in_memory_whitelist,
-                        _whitelist_manager,
-                        whitelist_authorization,
-                    ) = public_tracker();
+                    let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                     let client_ip = Ipv4Addr::new(127, 0, 0, 1);
                     let client_port = 8080;
@@ -1208,18 +1130,20 @@ mod tests {
                     handle_announce(
                         remote_addr,
                         &request,
-                        &core_config,
-                        &announce_handler,
-                        &whitelist_authorization,
-                        &stats_event_sender,
+                        &core_tracker_services.core_config,
+                        &core_tracker_services.announce_handler,
+                        &core_tracker_services.whitelist_authorization,
+                        &core_tracker_services.stats_event_sender,
                         sample_cookie_valid_range(),
                     )
                     .await
                     .unwrap();
 
-                    let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
+                    let peers = core_tracker_services
+                        .in_memory_torrent_repository
+                        .get_torrent_peers(&info_hash.0.into());
 
-                    let external_ip_in_tracker_configuration = core_config.net.external_ip.unwrap();
+                    let external_ip_in_tracker_configuration = core_tracker_services.core_config.net.external_ip.unwrap();
 
                     let expected_peer = TorrentPeerBuilder::new()
                         .with_peer_id(peer_id)
@@ -1250,23 +1174,15 @@ mod tests {
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
-                gen_remote_fingerprint, public_tracker, sample_cookie_valid_range, sample_ipv6_remote_addr, sample_issue_time,
-                test_tracker_factory, TorrentPeerBuilder,
+                gen_remote_fingerprint, initialize_core_tracker_services_for_default_tracker_configuration,
+                initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range, sample_ipv6_remote_addr,
+                sample_issue_time, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
             #[tokio::test]
             async fn an_announced_peer_should_be_added_to_the_tracker() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1287,16 +1203,18 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
                 .unwrap();
 
-                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
+                let peers = core_tracker_services
+                    .in_memory_torrent_repository
+                    .get_torrent_peers(&info_hash.0.into());
 
                 let expected_peer = TorrentPeerBuilder::new()
                     .with_peer_id(peer_id)
@@ -1308,16 +1226,7 @@ mod tests {
 
             #[tokio::test]
             async fn the_announced_peer_should_not_be_included_in_the_response() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    _in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
                 let client_ip_v6 = client_ip_v4.to_ipv6_compatible();
@@ -1331,10 +1240,10 @@ mod tests {
                 let response = handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
@@ -1361,16 +1270,7 @@ mod tests {
                 // From the BEP 15 (https://www.bittorrent.org/beps/bep_0015.html):
                 // "Do note that most trackers will only honor the IP address field under limited circumstances."
 
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let info_hash = AquaticInfoHash([0u8; 20]);
                 let peer_id = AquaticPeerId([255u8; 20]);
@@ -1393,16 +1293,18 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
-                    &stats_event_sender,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
+                    &core_tracker_services.stats_event_sender,
                     sample_cookie_valid_range(),
                 )
                 .await
                 .unwrap();
 
-                let peers = in_memory_torrent_repository.get_torrent_peers(&info_hash.0.into());
+                let peers = core_tracker_services
+                    .in_memory_torrent_repository
+                    .get_torrent_peers(&info_hash.0.into());
 
                 // When using IPv6 the tracker converts the remote client ip into a IPv4 address
                 assert_eq!(peers[0].peer_addr, SocketAddr::new(IpAddr::V6(remote_client_ip), client_port));
@@ -1454,21 +1356,16 @@ mod tests {
 
             #[tokio::test]
             async fn when_the_announce_request_comes_from_a_client_using_ipv6_the_response_should_not_include_peers_using_ipv4() {
-                let (
-                    core_config,
-                    announce_handler,
-                    _scrape_handler,
-                    in_memory_torrent_repository,
-                    _stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
-                add_a_torrent_peer_using_ipv4(&in_memory_torrent_repository);
+                add_a_torrent_peer_using_ipv4(&core_tracker_services.in_memory_torrent_repository);
 
-                let response =
-                    announce_a_new_peer_using_ipv6(core_config.clone(), announce_handler.clone(), whitelist_authorization).await;
+                let response = announce_a_new_peer_using_ipv6(
+                    core_tracker_services.core_config.clone(),
+                    core_tracker_services.announce_handler.clone(),
+                    core_tracker_services.whitelist_authorization,
+                )
+                .await;
 
                 // The response should not contain the peer using IPV4
                 let peers: Option<Vec<ResponsePeer<Ipv4AddrBytes>>> = match response {
@@ -1490,7 +1387,7 @@ mod tests {
                 let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
                     Arc::new(Some(Box::new(stats_event_sender_mock)));
 
-                let (core_config, announce_handler, _scrape_handler, whitelist_authorization) = test_tracker_factory();
+                let core_tracker_services = initialize_core_tracker_services_for_default_tracker_configuration();
 
                 let remote_addr = sample_ipv6_remote_addr();
 
@@ -1501,9 +1398,9 @@ mod tests {
                 handle_announce(
                     remote_addr,
                     &announce_request,
-                    &core_config,
-                    &announce_handler,
-                    &whitelist_authorization,
+                    &core_tracker_services.core_config,
+                    &core_tracker_services.announce_handler,
+                    &core_tracker_services.whitelist_authorization,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1519,9 +1416,13 @@ mod tests {
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
                 use mockall::predicate::eq;
 
-                use crate::app_test::initialize_tracker_dependencies;
                 use crate::core::announce_handler::AnnounceHandler;
+                use crate::core::services::initialize_database;
                 use crate::core::statistics;
+                use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+                use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+                use crate::core::whitelist::authorization::WhitelistAuthorization;
+                use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1533,15 +1434,12 @@ mod tests {
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
-                    let (
-                        _database,
-                        _in_memory_whitelist,
-                        whitelist_authorization,
-                        _authentication_service,
-                        in_memory_torrent_repository,
-                        db_torrent_repository,
-                        _torrents_manager,
-                    ) = initialize_tracker_dependencies(&config);
+                    let database = initialize_database(&config);
+                    let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+                    let whitelist_authorization =
+                        Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
+                    let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+                    let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 
                     let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
                     stats_event_sender_mock
@@ -1625,7 +1523,8 @@ mod tests {
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
         use crate::servers::udp::handlers::tests::{
-            public_tracker, sample_cookie_valid_range, sample_ipv4_remote_addr, sample_issue_time,
+            initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range, sample_ipv4_remote_addr,
+            sample_issue_time,
         };
 
         fn zeroed_torrent_statistics() -> TorrentScrapeStatistics {
@@ -1638,16 +1537,7 @@ mod tests {
 
         #[tokio::test]
         async fn should_return_no_stats_when_the_tracker_does_not_have_any_torrent() {
-            let (
-                _core_config,
-                _announce_handler,
-                scrape_handler,
-                _in_memory_torrent_repository,
-                stats_event_sender,
-                _in_memory_whitelist,
-                _whitelist_manager,
-                _whitelist_authorization,
-            ) = public_tracker();
+            let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
             let remote_addr = sample_ipv4_remote_addr();
 
@@ -1663,8 +1553,8 @@ mod tests {
             let response = handle_scrape(
                 remote_addr,
                 &request,
-                &scrape_handler,
-                &stats_event_sender,
+                &core_tracker_services.scrape_handler,
+                &core_tracker_services.stats_event_sender,
                 sample_cookie_valid_range(),
             )
             .await
@@ -1742,24 +1632,19 @@ mod tests {
         mod with_a_public_tracker {
             use aquatic_udp_protocol::{NumberOfDownloads, NumberOfPeers, TorrentScrapeStatistics};
 
-            use crate::servers::udp::handlers::tests::public_tracker;
+            use crate::servers::udp::handlers::tests::initialize_core_tracker_services_for_public_tracker;
             use crate::servers::udp::handlers::tests::scrape_request::{add_a_sample_seeder_and_scrape, match_scrape_response};
 
             #[tokio::test]
             async fn should_return_torrent_statistics_when_the_tracker_has_the_requested_torrent() {
-                let (
-                    _core_config,
-                    _announce_handler,
-                    scrape_handler,
-                    in_memory_torrent_repository,
-                    _stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    _whitelist_authorization,
-                ) = public_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_public_tracker();
 
                 let torrent_stats = match_scrape_response(
-                    add_a_sample_seeder_and_scrape(in_memory_torrent_repository.clone(), scrape_handler.clone()).await,
+                    add_a_sample_seeder_and_scrape(
+                        core_tracker_services.in_memory_torrent_repository.clone(),
+                        core_tracker_services.scrape_handler.clone(),
+                    )
+                    .await,
                 );
 
                 let expected_torrent_stats = vec![TorrentScrapeStatistics {
@@ -1779,27 +1664,25 @@ mod tests {
             use crate::servers::udp::handlers::tests::scrape_request::{
                 add_a_seeder, build_scrape_request, match_scrape_response, zeroed_torrent_statistics,
             };
-            use crate::servers::udp::handlers::tests::{sample_cookie_valid_range, sample_ipv4_remote_addr, whitelisted_tracker};
+            use crate::servers::udp::handlers::tests::{
+                initialize_core_tracker_services_for_listed_tracker, sample_cookie_valid_range, sample_ipv4_remote_addr,
+            };
 
             #[tokio::test]
             async fn should_return_the_torrent_statistics_when_the_requested_torrent_is_whitelisted() {
-                let (
-                    _core_config,
-                    _announce_handler,
-                    scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    in_memory_whitelist,
-                    _whitelist_manager,
-                    _whitelist_authorization,
-                ) = whitelisted_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_listed_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
 
-                add_a_seeder(in_memory_torrent_repository.clone(), &remote_addr, &info_hash).await;
+                add_a_seeder(
+                    core_tracker_services.in_memory_torrent_repository.clone(),
+                    &remote_addr,
+                    &info_hash,
+                )
+                .await;
 
-                in_memory_whitelist.add(&info_hash.0.into()).await;
+                core_tracker_services.in_memory_whitelist.add(&info_hash.0.into()).await;
 
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
@@ -1807,8 +1690,8 @@ mod tests {
                     handle_scrape(
                         remote_addr,
                         &request,
-                        &scrape_handler,
-                        &stats_event_sender,
+                        &core_tracker_services.scrape_handler,
+                        &core_tracker_services.stats_event_sender,
                         sample_cookie_valid_range(),
                     )
                     .await
@@ -1827,21 +1710,17 @@ mod tests {
 
             #[tokio::test]
             async fn should_return_zeroed_statistics_when_the_requested_torrent_is_not_whitelisted() {
-                let (
-                    _core_config,
-                    _announce_handler,
-                    scrape_handler,
-                    in_memory_torrent_repository,
-                    stats_event_sender,
-                    _in_memory_whitelist,
-                    _whitelist_manager,
-                    _whitelist_authorization,
-                ) = whitelisted_tracker();
+                let core_tracker_services = initialize_core_tracker_services_for_listed_tracker();
 
                 let remote_addr = sample_ipv4_remote_addr();
                 let info_hash = InfoHash([0u8; 20]);
 
-                add_a_seeder(in_memory_torrent_repository.clone(), &remote_addr, &info_hash).await;
+                add_a_seeder(
+                    core_tracker_services.in_memory_torrent_repository.clone(),
+                    &remote_addr,
+                    &info_hash,
+                )
+                .await;
 
                 let request = build_scrape_request(&remote_addr, &info_hash);
 
@@ -1849,8 +1728,8 @@ mod tests {
                     handle_scrape(
                         remote_addr,
                         &request,
-                        &scrape_handler,
-                        &stats_event_sender,
+                        &core_tracker_services.scrape_handler,
+                        &core_tracker_services.stats_event_sender,
                         sample_cookie_valid_range(),
                     )
                     .await
@@ -1885,7 +1764,8 @@ mod tests {
             use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
-                sample_cookie_valid_range, sample_ipv4_remote_addr, test_tracker_factory,
+                initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,
+                sample_ipv4_remote_addr,
             };
 
             #[tokio::test]
@@ -1901,12 +1781,12 @@ mod tests {
 
                 let remote_addr = sample_ipv4_remote_addr();
 
-                let (_core_config, _announce_handler, scrape_handler, _whitelist_authorization) = test_tracker_factory();
+                let core_tracker_services = initialize_core_tracker_services_for_default_tracker_configuration();
 
                 handle_scrape(
                     remote_addr,
                     &sample_scrape_request(&remote_addr),
-                    &scrape_handler,
+                    &core_tracker_services.scrape_handler,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )
@@ -1925,7 +1805,8 @@ mod tests {
             use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
-                sample_cookie_valid_range, sample_ipv6_remote_addr, test_tracker_factory,
+                initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,
+                sample_ipv6_remote_addr,
             };
 
             #[tokio::test]
@@ -1941,12 +1822,12 @@ mod tests {
 
                 let remote_addr = sample_ipv6_remote_addr();
 
-                let (_core_config, _announce_handler, scrape_handler, _whitelist_authorization) = test_tracker_factory();
+                let core_tracker_services = initialize_core_tracker_services_for_default_tracker_configuration();
 
                 handle_scrape(
                     remote_addr,
                     &sample_scrape_request(&remote_addr),
-                    &scrape_handler,
+                    &core_tracker_services.scrape_handler,
                     &stats_event_sender,
                     sample_cookie_valid_range(),
                 )

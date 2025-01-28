@@ -80,30 +80,28 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
     use crate::core::core_tests::sample_info_hash;
     use crate::core::scrape_handler::ScrapeHandler;
+    use crate::core::services::initialize_database;
+    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use crate::core::whitelist::authorization::WhitelistAuthorization;
+    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
-    fn public_tracker_and_announce_and_scrape_handlers() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
+    fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
 
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
-
+        let database = initialize_database(&config);
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
-
         let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
         (announce_handler, scrape_handler)
@@ -128,15 +126,9 @@ mod tests {
     fn initialize_scrape_handler() -> Arc<ScrapeHandler> {
         let config = configuration::ephemeral();
 
-        let (
-            _database,
-            _in_memory_whitelist,
-            whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            _db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
         Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository))
     }
@@ -155,8 +147,8 @@ mod tests {
         use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            initialize_scrape_handler, public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes,
-            sample_peer,
+            initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hash,
+            sample_info_hashes, sample_peer,
         };
 
         #[tokio::test]
@@ -164,7 +156,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (announce_handler, scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
+            let (announce_handler, scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];
@@ -239,7 +231,7 @@ mod tests {
         use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
-            public_tracker_and_announce_and_scrape_handlers, sample_info_hash, sample_info_hashes, sample_peer,
+            initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
         };
 
         #[tokio::test]
@@ -247,7 +239,7 @@ mod tests {
             let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
-            let (announce_handler, _scrape_handler) = public_tracker_and_announce_and_scrape_handlers();
+            let (announce_handler, _scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
 
             let info_hash = sample_info_hash();
             let info_hashes = vec![info_hash];

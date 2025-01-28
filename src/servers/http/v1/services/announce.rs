@@ -64,36 +64,38 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::services::statistics;
+    use crate::core::services::{initialize_database, statistics};
     use crate::core::statistics::event::sender::Sender;
+    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 
-    #[allow(clippy::type_complexity)]
-    fn public_tracker() -> (Arc<Core>, Arc<AnnounceHandler>, Arc<Option<Box<dyn Sender>>>) {
+    struct CoreTrackerServices {
+        pub core_config: Arc<Core>,
+        pub announce_handler: Arc<AnnounceHandler>,
+        pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    }
+
+    fn initialize_core_tracker_services() -> CoreTrackerServices {
         let config = configuration::ephemeral_public();
 
-        let (
-            _database,
-            _in_memory_whitelist,
-            _whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
+        let core_config = Arc::new(config.core.clone());
+        let database = initialize_database(&config);
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
         let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
         let stats_event_sender = Arc::new(stats_event_sender);
-
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
 
-        let core_config = Arc::new(config.core.clone());
-
-        (core_config, announce_handler, stats_event_sender)
+        CoreTrackerServices {
+            core_config,
+            announce_handler,
+            stats_event_sender,
+        }
     }
 
     fn sample_peer_using_ipv4() -> peer::Peer {
@@ -133,25 +135,21 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
-        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
         use crate::core::core_tests::sample_info_hash;
+        use crate::core::services::initialize_database;
         use crate::core::statistics;
+        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use crate::servers::http::v1::services::announce::invoke;
-        use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_peer};
+        use crate::servers::http::v1::services::announce::tests::{initialize_core_tracker_services, sample_peer};
 
         fn initialize_announce_handler() -> Arc<AnnounceHandler> {
             let config = configuration::ephemeral();
 
-            let (
-                _database,
-                _in_memory_whitelist,
-                _whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                db_torrent_repository,
-                _torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
+            let database = initialize_database(&config);
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+            let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 
             Arc::new(AnnounceHandler::new(
                 &config.core,
@@ -162,13 +160,13 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
-            let (core_config, announce_handler, stats_event_sender) = public_tracker();
+            let core_tracker_services = initialize_core_tracker_services();
 
             let mut peer = sample_peer();
 
             let announce_data = invoke(
-                announce_handler.clone(),
-                stats_event_sender.clone(),
+                core_tracker_services.announce_handler.clone(),
+                core_tracker_services.stats_event_sender.clone(),
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,
@@ -182,7 +180,7 @@ mod tests {
                     complete: 1,
                     incomplete: 0,
                 },
-                policy: core_config.announce_policy,
+                policy: core_tracker_services.core_config.announce_policy,
             };
 
             assert_eq!(announce_data, expected_announce_data);
