@@ -60,7 +60,6 @@ mod tests {
     use std::sync::Arc;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_configuration::Core;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
@@ -95,10 +94,6 @@ mod tests {
         let core_config = Arc::new(config.core.clone());
 
         (core_config, announce_handler, stats_event_sender)
-    }
-
-    fn sample_info_hash() -> InfoHash {
-        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()
     }
 
     fn sample_peer_using_ipv4() -> peer::Peer {
@@ -140,9 +135,10 @@ mod tests {
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
         use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
+        use crate::core::core_tests::sample_info_hash;
         use crate::core::statistics;
         use crate::servers::http::v1::services::announce::invoke;
-        use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_info_hash, sample_peer};
+        use crate::servers::http::v1::services::announce::tests::{public_tracker, sample_peer};
 
         fn initialize_announce_handler() -> Arc<AnnounceHandler> {
             let config = configuration::ephemeral();

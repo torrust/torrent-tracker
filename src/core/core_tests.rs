@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_configuration::Configuration;
 
 use super::announce_handler::AnnounceHandler;
@@ -9,6 +10,16 @@ use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::{self};
+
+/// # Panics
+///
+/// Will panic if the string representation of the info hash is not a valid info hash.
+#[must_use]
+pub fn sample_info_hash() -> InfoHash {
+    "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0" // DevSkim: ignore DS173237
+        .parse::<InfoHash>()
+        .expect("String should be a valid info hash")
+}
 
 #[must_use]
 pub fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {

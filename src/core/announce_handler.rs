@@ -172,7 +172,6 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-        use bittorrent_primitives::info_hash::InfoHash;
         use torrust_tracker_primitives::peer::Peer;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
@@ -184,12 +183,6 @@ mod tests {
         fn public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
             initialize_handlers(&config)
-        }
-
-        fn sample_info_hash() -> InfoHash {
-            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0" // DevSkim: ignore DS173237
-                .parse::<InfoHash>()
-                .expect("String should be a valid info hash")
         }
 
         // The client peer IP
@@ -279,9 +272,10 @@ mod tests {
                 use std::sync::Arc;
 
                 use crate::core::announce_handler::tests::the_announce_handler::{
-                    peer_ip, public_tracker, sample_info_hash, sample_peer, sample_peer_1, sample_peer_2,
+                    peer_ip, public_tracker, sample_peer, sample_peer_1, sample_peer_2,
                 };
                 use crate::core::announce_handler::PeersWanted;
+                use crate::core::core_tests::sample_info_hash;
 
                 mod should_assign_the_ip_to_the_peer {
 
@@ -413,9 +407,10 @@ mod tests {
                 mod it_should_update_the_swarm_stats_for_the_torrent {
 
                     use crate::core::announce_handler::tests::the_announce_handler::{
-                        completed_peer, leecher, peer_ip, public_tracker, sample_info_hash, seeder, started_peer,
+                        completed_peer, leecher, peer_ip, public_tracker, seeder, started_peer,
                     };
                     use crate::core::announce_handler::PeersWanted;
+                    use crate::core::core_tests::sample_info_hash;
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
@@ -467,8 +462,9 @@ mod tests {
             use torrust_tracker_test_helpers::configuration;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core::announce_handler::tests::the_announce_handler::{peer_ip, sample_info_hash, sample_peer};
+            use crate::core::announce_handler::tests::the_announce_handler::{peer_ip, sample_peer};
             use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
+            use crate::core::core_tests::sample_info_hash;
             use crate::core::services::initialize_database;
             use crate::core::torrent::manager::TorrentsManager;
             use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;

@@ -7,7 +7,6 @@ mod tests {
 
     use std::sync::Arc;
 
-    use bittorrent_primitives::info_hash::InfoHash;
     use torrust_tracker_test_helpers::configuration;
 
     use crate::app_test::initialize_tracker_dependencies;
@@ -49,14 +48,11 @@ mod tests {
         (announce_handler, whitelist_authorization, whitelist_manager, scrape_handler)
     }
 
-    fn sample_info_hash() -> InfoHash {
-        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()
-    }
-
     mod configured_as_whitelisted {
 
         mod handling_authorization {
-            use crate::core::whitelist::tests::{sample_info_hash, whitelisted_tracker};
+            use crate::core::core_tests::sample_info_hash;
+            use crate::core::whitelist::tests::whitelisted_tracker;
 
             #[tokio::test]
             async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {

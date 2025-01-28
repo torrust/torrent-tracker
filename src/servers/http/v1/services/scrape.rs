@@ -82,6 +82,7 @@ mod tests {
 
     use crate::app_test::initialize_tracker_dependencies;
     use crate::core::announce_handler::AnnounceHandler;
+    use crate::core::core_tests::sample_info_hash;
     use crate::core::scrape_handler::ScrapeHandler;
 
     fn public_tracker_and_announce_and_scrape_handlers() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
@@ -110,10 +111,6 @@ mod tests {
 
     fn sample_info_hashes() -> Vec<InfoHash> {
         vec![sample_info_hash()]
-    }
-
-    fn sample_info_hash() -> InfoHash {
-        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap() // # DevSkim: ignore DS173237
     }
 
     fn sample_peer() -> peer::Peer {
