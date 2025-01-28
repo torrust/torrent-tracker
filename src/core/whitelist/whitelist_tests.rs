@@ -3,12 +3,12 @@ use std::sync::Arc;
 use torrust_tracker_configuration::Configuration;
 
 use super::authorization::WhitelistAuthorization;
-use super::manager::WhiteListManager;
+use super::manager::WhitelistManager;
 use super::repository::in_memory::InMemoryWhitelist;
 use crate::core::services::{initialize_database, initialize_whitelist_manager};
 
 #[must_use]
-pub fn initialize_whitelist_services(config: &Configuration) -> (Arc<WhitelistAuthorization>, Arc<WhiteListManager>) {
+pub fn initialize_whitelist_services(config: &Configuration) -> (Arc<WhitelistAuthorization>, Arc<WhitelistManager>) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
     let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
@@ -19,7 +19,7 @@ pub fn initialize_whitelist_services(config: &Configuration) -> (Arc<WhitelistAu
 
 #[cfg(test)]
 #[must_use]
-pub fn initialize_whitelist_services_for_listed_tracker() -> (Arc<WhitelistAuthorization>, Arc<WhiteListManager>) {
+pub fn initialize_whitelist_services_for_listed_tracker() -> (Arc<WhitelistAuthorization>, Arc<WhitelistManager>) {
     use torrust_tracker_test_helpers::configuration;
 
     initialize_whitelist_services(&configuration::ephemeral_listed())

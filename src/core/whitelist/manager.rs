@@ -7,7 +7,7 @@ use super::repository::persisted::DatabaseWhitelist;
 use crate::core::databases;
 
 /// It handles the list of allowed torrents. Only for listed trackers.
-pub struct WhiteListManager {
+pub struct WhitelistManager {
     /// The in-memory list of allowed torrents.
     in_memory_whitelist: Arc<InMemoryWhitelist>,
 
@@ -15,7 +15,7 @@ pub struct WhiteListManager {
     database_whitelist: Arc<DatabaseWhitelist>,
 }
 
-impl WhiteListManager {
+impl WhitelistManager {
     #[must_use]
     pub fn new(database_whitelist: Arc<DatabaseWhitelist>, in_memory_whitelist: Arc<InMemoryWhitelist>) -> Self {
         Self {
@@ -97,10 +97,10 @@ mod tests {
 
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::whitelist::manager::WhiteListManager;
+    use crate::core::whitelist::manager::WhitelistManager;
     use crate::core::whitelist::whitelist_tests::initialize_whitelist_services;
 
-    fn initialize_whitelist_manager_for_whitelisted_tracker() -> Arc<WhiteListManager> {
+    fn initialize_whitelist_manager_for_whitelisted_tracker() -> Arc<WhitelistManager> {
         let config = configuration::ephemeral_listed();
 
         let (_whitelist_authorization, whitelist_manager) = initialize_whitelist_services(&config);

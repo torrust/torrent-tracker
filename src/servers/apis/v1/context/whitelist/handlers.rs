@@ -10,7 +10,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use super::responses::{
     failed_to_reload_whitelist_response, failed_to_remove_torrent_from_whitelist_response, failed_to_whitelist_torrent_response,
 };
-use crate::core::whitelist::manager::WhiteListManager;
+use crate::core::whitelist::manager::WhitelistManager;
 use crate::servers::apis::v1::responses::{invalid_info_hash_param_response, ok_response};
 use crate::servers::apis::InfoHashParam;
 
@@ -24,7 +24,7 @@ use crate::servers::apis::InfoHashParam;
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::whitelist#add-a-torrent-to-the-whitelist)
 /// for more information about this endpoint.
 pub async fn add_torrent_to_whitelist_handler(
-    State(whitelist_manager): State<Arc<WhiteListManager>>,
+    State(whitelist_manager): State<Arc<WhitelistManager>>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     match InfoHash::from_str(&info_hash.0) {
@@ -47,7 +47,7 @@ pub async fn add_torrent_to_whitelist_handler(
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::whitelist#remove-a-torrent-from-the-whitelist)
 /// for more information about this endpoint.
 pub async fn remove_torrent_from_whitelist_handler(
-    State(whitelist_manager): State<Arc<WhiteListManager>>,
+    State(whitelist_manager): State<Arc<WhitelistManager>>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     match InfoHash::from_str(&info_hash.0) {
@@ -69,7 +69,7 @@ pub async fn remove_torrent_from_whitelist_handler(
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::whitelist#reload-the-whitelist)
 /// for more information about this endpoint.
-pub async fn reload_whitelist_handler(State(whitelist_manager): State<Arc<WhiteListManager>>) -> Response {
+pub async fn reload_whitelist_handler(State(whitelist_manager): State<Arc<WhitelistManager>>) -> Response {
     match whitelist_manager.load_whitelist_from_database().await {
         Ok(()) => ok_response(),
         Err(e) => failed_to_reload_whitelist_response(e),

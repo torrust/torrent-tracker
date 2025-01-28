@@ -14,7 +14,7 @@ use torrust_tracker_lib::core::databases::Database;
 use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
+use torrust_tracker_lib::core::whitelist::manager::WhitelistManager;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::banning::BanService;
@@ -31,7 +31,7 @@ where
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
-    pub whitelist_manager: Arc<WhiteListManager>,
+    pub whitelist_manager: Arc<WhitelistManager>,
     pub ban_service: Arc<RwLock<BanService>>,
     pub registar: Registar,
     pub server: ApiServer<S>,

@@ -505,7 +505,7 @@ mod tests {
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::whitelist;
-    use crate::core::whitelist::manager::WhiteListManager;
+    use crate::core::whitelist::manager::WhitelistManager;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::CurrentClock;
 
@@ -516,7 +516,7 @@ mod tests {
         Arc<InMemoryTorrentRepository>,
         Arc<Option<Box<dyn Sender>>>,
         Arc<InMemoryWhitelist>,
-        Arc<WhiteListManager>,
+        Arc<WhitelistManager>,
         Arc<whitelist::authorization::WhitelistAuthorization>,
     );
 

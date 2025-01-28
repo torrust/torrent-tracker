@@ -14,7 +14,7 @@ use torrust_tracker_configuration::v2_0_0::database;
 use torrust_tracker_configuration::Configuration;
 
 use super::databases::{self, Database};
-use super::whitelist::manager::WhiteListManager;
+use super::whitelist::manager::WhitelistManager;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::repository::persisted::DatabaseWhitelist;
 
@@ -35,7 +35,7 @@ pub fn initialize_database(config: &Configuration) -> Arc<Box<dyn Database>> {
 pub fn initialize_whitelist_manager(
     database: Arc<Box<dyn Database>>,
     in_memory_whitelist: Arc<InMemoryWhitelist>,
-) -> Arc<WhiteListManager> {
+) -> Arc<WhitelistManager> {
     let database_whitelist = Arc::new(DatabaseWhitelist::new(database));
-    Arc::new(WhiteListManager::new(database_whitelist, in_memory_whitelist))
+    Arc::new(WhitelistManager::new(database_whitelist, in_memory_whitelist))
 }
