@@ -61,35 +61,15 @@ impl WhitelistAuthorization {
 #[cfg(test)]
 mod tests {
 
-    use std::sync::Arc;
-
-    use torrust_tracker_test_helpers::configuration;
-
-    use super::WhitelistAuthorization;
-    use crate::core::services::{initialize_database, initialize_whitelist_manager};
-    use crate::core::whitelist::manager::WhiteListManager;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-
-    fn initialize_whitelist_services() -> (Arc<WhitelistAuthorization>, Arc<WhiteListManager>) {
-        let config = configuration::ephemeral_listed();
-
-        let database = initialize_database(&config);
-        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
-        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-
-        (whitelist_authorization, whitelist_manager)
-    }
-
     mod configured_as_whitelisted {
 
         mod handling_authorization {
             use crate::core::core_tests::sample_info_hash;
-            use crate::core::whitelist::authorization::tests::initialize_whitelist_services;
+            use crate::core::whitelist::whitelist_tests::initialize_whitelist_services_for_listed_tracker;
 
             #[tokio::test]
             async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                let (whitelist_authorization, whitelist_manager) = initialize_whitelist_services();
+                let (whitelist_authorization, whitelist_manager) = initialize_whitelist_services_for_listed_tracker();
 
                 let info_hash = sample_info_hash();
 
@@ -102,7 +82,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                let (whitelist_authorization, _whitelist_manager) = initialize_whitelist_services();
+                let (whitelist_authorization, _whitelist_manager) = initialize_whitelist_services_for_listed_tracker();
 
                 let info_hash = sample_info_hash();
 

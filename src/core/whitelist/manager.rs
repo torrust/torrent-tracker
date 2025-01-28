@@ -97,59 +97,26 @@ mod tests {
 
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::app_test::initialize_tracker_dependencies;
-    use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::initialize_whitelist_manager;
-    use crate::core::whitelist;
     use crate::core::whitelist::manager::WhiteListManager;
+    use crate::core::whitelist::whitelist_tests::initialize_whitelist_services;
 
-    #[allow(clippy::type_complexity)]
-    fn whitelisted_tracker() -> (
-        Arc<AnnounceHandler>,
-        Arc<whitelist::authorization::WhitelistAuthorization>,
-        Arc<WhiteListManager>,
-        Arc<ScrapeHandler>,
-    ) {
+    fn initialize_whitelist_manager_for_whitelisted_tracker() -> Arc<WhiteListManager> {
         let config = configuration::ephemeral_listed();
 
-        let (
-            database,
-            in_memory_whitelist,
-            whitelist_authorization,
-            _authentication_service,
-            in_memory_torrent_repository,
-            db_torrent_repository,
-            _torrents_manager,
-        ) = initialize_tracker_dependencies(&config);
+        let (_whitelist_authorization, whitelist_manager) = initialize_whitelist_services(&config);
 
-        let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
-
-        let announce_handler = Arc::new(AnnounceHandler::new(
-            &config.core,
-            &in_memory_torrent_repository,
-            &db_torrent_repository,
-        ));
-
-        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-        (announce_handler, whitelist_authorization, whitelist_manager, scrape_handler)
+        whitelist_manager
     }
 
     mod configured_as_whitelisted {
 
         mod handling_the_torrent_whitelist {
             use crate::core::core_tests::sample_info_hash;
-            use crate::core::whitelist::manager::tests::whitelisted_tracker;
-
-            // todo: after extracting the WhitelistManager from the Tracker,
-            // there is no need to use the tracker to test the whitelist.
-            // Test not using the `tracker` (`_tracker` variable) should be
-            // moved to the whitelist module.
+            use crate::core::whitelist::manager::tests::initialize_whitelist_manager_for_whitelisted_tracker;
 
             #[tokio::test]
             async fn it_should_add_a_torrent_to_the_whitelist() {
-                let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
 
                 let info_hash = sample_info_hash();
 
@@ -160,7 +127,7 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_remove_a_torrent_from_the_whitelist() {
-                let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
 
                 let info_hash = sample_info_hash();
 
@@ -173,11 +140,11 @@ mod tests {
 
             mod persistence {
                 use crate::core::core_tests::sample_info_hash;
-                use crate::core::whitelist::manager::tests::whitelisted_tracker;
+                use crate::core::whitelist::manager::tests::initialize_whitelist_manager_for_whitelisted_tracker;
 
                 #[tokio::test]
                 async fn it_should_load_the_whitelist_from_the_database() {
-                    let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
+                    let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
