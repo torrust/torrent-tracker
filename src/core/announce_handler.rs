@@ -165,8 +165,6 @@ fn assign_ip_address_to_peer(remote_client_ip: &IpAddr, tracker_external_ip: Opt
 
 #[cfg(test)]
 mod tests {
-    // Integration tests for the core module.
-
     mod the_announce_handler {
 
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};

@@ -453,8 +453,6 @@ pub mod peer_tests;
 
 #[cfg(test)]
 mod tests {
-    // Integration tests for the core module.
-
     mod the_tracker {
 
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -625,88 +623,6 @@ mod tests {
         }
 
         mod configured_as_whitelisted {
-
-            mod handling_authorization {
-                use crate::core::tests::the_tracker::{sample_info_hash, whitelisted_tracker};
-
-                #[tokio::test]
-                async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                    let (_announce_handler, whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
-
-                    let info_hash = sample_info_hash();
-
-                    let result = whitelist_manager.add_torrent_to_whitelist(&info_hash).await;
-                    assert!(result.is_ok());
-
-                    let result = whitelist_authorization.authorize(&info_hash).await;
-                    assert!(result.is_ok());
-                }
-
-                #[tokio::test]
-                async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                    let (_announce_handler, whitelist_authorization, _whitelist_manager, _scrape_handler) = whitelisted_tracker();
-
-                    let info_hash = sample_info_hash();
-
-                    let result = whitelist_authorization.authorize(&info_hash).await;
-                    assert!(result.is_err());
-                }
-            }
-
-            mod handling_the_torrent_whitelist {
-                use crate::core::tests::the_tracker::{sample_info_hash, whitelisted_tracker};
-
-                // todo: after extracting the WhitelistManager from the Tracker,
-                // there is no need to use the tracker to test the whitelist.
-                // Test not using the `tracker` (`_tracker` variable) should be
-                // moved to the whitelist module.
-
-                #[tokio::test]
-                async fn it_should_add_a_torrent_to_the_whitelist() {
-                    let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
-
-                    let info_hash = sample_info_hash();
-
-                    whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
-
-                    assert!(whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
-                }
-
-                #[tokio::test]
-                async fn it_should_remove_a_torrent_from_the_whitelist() {
-                    let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) = whitelisted_tracker();
-
-                    let info_hash = sample_info_hash();
-
-                    whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
-
-                    whitelist_manager.remove_torrent_from_whitelist(&info_hash).await.unwrap();
-
-                    assert!(!whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
-                }
-
-                mod persistence {
-                    use crate::core::tests::the_tracker::{sample_info_hash, whitelisted_tracker};
-
-                    #[tokio::test]
-                    async fn it_should_load_the_whitelist_from_the_database() {
-                        let (_announce_handler, _whitelist_authorization, whitelist_manager, _scrape_handler) =
-                            whitelisted_tracker();
-
-                        let info_hash = sample_info_hash();
-
-                        whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
-
-                        whitelist_manager.remove_torrent_from_memory_whitelist(&info_hash).await;
-
-                        assert!(!whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
-
-                        whitelist_manager.load_whitelist_from_database().await.unwrap();
-
-                        assert!(whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
-                    }
-                }
-            }
 
             mod handling_an_scrape_request {
 
