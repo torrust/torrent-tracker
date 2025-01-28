@@ -455,14 +455,10 @@ pub mod peer_tests;
 #[cfg(test)]
 mod tests {
     mod the_tracker {
-
-        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        use std::net::{IpAddr, Ipv4Addr};
         use std::str::FromStr;
         use std::sync::Arc;
 
-        use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-        use torrust_tracker_primitives::peer::Peer;
-        use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::announce_handler::AnnounceHandler;
@@ -484,34 +480,6 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from_str("126.0.0.1").unwrap())
         }
 
-        /// A peer that counts as `complete` is swarm metadata
-        /// IMPORTANT!: it only counts if the it has been announce at least once before
-        /// announcing the `AnnounceEvent::Completed` event.
-        fn complete_peer() -> Peer {
-            Peer {
-                peer_id: PeerId(*b"-qB00000000000000000"),
-                peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-                updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                uploaded: NumberOfBytes::new(0),
-                downloaded: NumberOfBytes::new(0),
-                left: NumberOfBytes::new(0), // No bytes left to download
-                event: AnnounceEvent::Completed,
-            }
-        }
-
-        /// A peer that counts as `incomplete` is swarm metadata
-        fn incomplete_peer() -> Peer {
-            Peer {
-                peer_id: PeerId(*b"-qB00000000000000000"),
-                peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-                updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                uploaded: NumberOfBytes::new(0),
-                downloaded: NumberOfBytes::new(0),
-                left: NumberOfBytes::new(1000), // Still bytes to download
-                event: AnnounceEvent::Started,
-            }
-        }
-
         mod for_all_config_modes {
 
             mod handling_a_scrape_request {
@@ -523,7 +491,8 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::tests::the_tracker::{complete_peer, incomplete_peer, initialize_handlers_for_public_tracker};
+                use crate::core::core_tests::{complete_peer, incomplete_peer};
+                use crate::core::tests::the_tracker::initialize_handlers_for_public_tracker;
 
                 #[tokio::test]
                 async fn it_should_return_the_swarm_metadata_for_the_requested_file_if_the_tracker_has_that_torrent() {
@@ -577,9 +546,8 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::tests::the_tracker::{
-                    complete_peer, incomplete_peer, initialize_handlers_for_listed_tracker, peer_ip,
-                };
+                use crate::core::core_tests::{complete_peer, incomplete_peer};
+                use crate::core::tests::the_tracker::{initialize_handlers_for_listed_tracker, peer_ip};
 
                 #[tokio::test]
                 async fn it_should_return_the_zeroed_swarm_metadata_for_the_requested_file_if_it_is_not_whitelisted() {

@@ -114,45 +114,8 @@ mod tests {
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-    use crate::core::core_tests::sample_info_hash;
+    use crate::core::core_tests::{leecher, sample_info_hash, sample_peer};
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-
-    /// Sample peer whose state is not relevant for the tests
-    fn sample_peer() -> Peer {
-        complete_peer()
-    }
-
-    fn leecher() -> Peer {
-        incomplete_peer()
-    }
-
-    /// A peer that counts as `complete` is swarm metadata
-    /// IMPORTANT!: it only counts if the it has been announce at least once before
-    /// announcing the `AnnounceEvent::Completed` event.
-    fn complete_peer() -> Peer {
-        Peer {
-            peer_id: PeerId(*b"-qB00000000000000000"),
-            peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-            updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-            uploaded: NumberOfBytes::new(0),
-            downloaded: NumberOfBytes::new(0),
-            left: NumberOfBytes::new(0), // No bytes left to download
-            event: AnnounceEvent::Completed,
-        }
-    }
-
-    /// A peer that counts as `incomplete` is swarm metadata
-    fn incomplete_peer() -> Peer {
-        Peer {
-            peer_id: PeerId(*b"-qB00000000000000000"),
-            peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-            updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-            uploaded: NumberOfBytes::new(0),
-            downloaded: NumberOfBytes::new(0),
-            left: NumberOfBytes::new(1000), // Still bytes to download
-            event: AnnounceEvent::Started,
-        }
-    }
 
     /// It generates a peer id from a number where the number is the last
     /// part of the peer ID. For example, for `12` it returns

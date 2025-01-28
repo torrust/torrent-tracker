@@ -190,11 +190,6 @@ mod tests {
             IpAddr::V4(Ipv4Addr::from_str("126.0.0.1").unwrap())
         }
 
-        /// Sample peer whose state is not relevant for the tests
-        fn sample_peer() -> Peer {
-            complete_peer()
-        }
-
         /// Sample peer when for tests that need more than one peer
         fn sample_peer_1() -> Peer {
             Peer {
@@ -221,50 +216,6 @@ mod tests {
             }
         }
 
-        fn seeder() -> Peer {
-            complete_peer()
-        }
-
-        fn leecher() -> Peer {
-            incomplete_peer()
-        }
-
-        fn started_peer() -> Peer {
-            incomplete_peer()
-        }
-
-        fn completed_peer() -> Peer {
-            complete_peer()
-        }
-
-        /// A peer that counts as `complete` is swarm metadata
-        /// IMPORTANT!: it only counts if the it has been announce at least once before
-        /// announcing the `AnnounceEvent::Completed` event.
-        fn complete_peer() -> Peer {
-            Peer {
-                peer_id: PeerId(*b"-qB00000000000000000"),
-                peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-                updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                uploaded: NumberOfBytes::new(0),
-                downloaded: NumberOfBytes::new(0),
-                left: NumberOfBytes::new(0), // No bytes left to download
-                event: AnnounceEvent::Completed,
-            }
-        }
-
-        /// A peer that counts as `incomplete` is swarm metadata
-        fn incomplete_peer() -> Peer {
-            Peer {
-                peer_id: PeerId(*b"-qB00000000000000000"),
-                peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080),
-                updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-                uploaded: NumberOfBytes::new(0),
-                downloaded: NumberOfBytes::new(0),
-                left: NumberOfBytes::new(1000), // Still bytes to download
-                event: AnnounceEvent::Started,
-            }
-        }
-
         mod for_all_tracker_config_modes {
 
             mod handling_an_announce_request {
@@ -272,10 +223,10 @@ mod tests {
                 use std::sync::Arc;
 
                 use crate::core::announce_handler::tests::the_announce_handler::{
-                    peer_ip, public_tracker, sample_peer, sample_peer_1, sample_peer_2,
+                    peer_ip, public_tracker, sample_peer_1, sample_peer_2,
                 };
                 use crate::core::announce_handler::PeersWanted;
-                use crate::core::core_tests::sample_info_hash;
+                use crate::core::core_tests::{sample_info_hash, sample_peer};
 
                 mod should_assign_the_ip_to_the_peer {
 
@@ -406,11 +357,9 @@ mod tests {
 
                 mod it_should_update_the_swarm_stats_for_the_torrent {
 
-                    use crate::core::announce_handler::tests::the_announce_handler::{
-                        completed_peer, leecher, peer_ip, public_tracker, seeder, started_peer,
-                    };
+                    use crate::core::announce_handler::tests::the_announce_handler::{peer_ip, public_tracker};
                     use crate::core::announce_handler::PeersWanted;
-                    use crate::core::core_tests::sample_info_hash;
+                    use crate::core::core_tests::{completed_peer, leecher, sample_info_hash, seeder, started_peer};
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
@@ -462,9 +411,9 @@ mod tests {
             use torrust_tracker_test_helpers::configuration;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core::announce_handler::tests::the_announce_handler::{peer_ip, sample_peer};
+            use crate::core::announce_handler::tests::the_announce_handler::peer_ip;
             use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-            use crate::core::core_tests::sample_info_hash;
+            use crate::core::core_tests::{sample_info_hash, sample_peer};
             use crate::core::services::initialize_database;
             use crate::core::torrent::manager::TorrentsManager;
             use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
