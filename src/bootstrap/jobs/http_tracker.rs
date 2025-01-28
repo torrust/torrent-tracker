@@ -52,7 +52,7 @@ pub async fn start_job(
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     form: ServiceRegistrationForm,
     version: Version,
@@ -99,7 +99,7 @@ async fn start_v1(
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
     form: ServiceRegistrationForm,
 ) -> JoinHandle<()> {

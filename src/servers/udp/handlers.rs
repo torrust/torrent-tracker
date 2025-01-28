@@ -64,7 +64,7 @@ pub(crate) async fn handle_packet(
     core_config: &Arc<Core>,
     announce_handler: &Arc<AnnounceHandler>,
     scrape_handler: &Arc<ScrapeHandler>,
-    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     local_addr: SocketAddr,
     cookie_time_values: CookieTimeValues,
@@ -157,7 +157,7 @@ pub async fn handle_request(
     core_config: &Arc<Core>,
     announce_handler: &Arc<AnnounceHandler>,
     scrape_handler: &Arc<ScrapeHandler>,
-    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_time_values: CookieTimeValues,
 ) -> Result<Response, (Error, TransactionId)> {
@@ -247,7 +247,7 @@ pub async fn handle_announce(
     request: &AnnounceRequest,
     core_config: &Arc<Core>,
     announce_handler: &Arc<AnnounceHandler>,
-    whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     cookie_valid_range: Range<f64>,
 ) -> Result<Response, (Error, TransactionId)> {
@@ -505,7 +505,7 @@ mod tests {
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::whitelist;
-    use crate::core::whitelist::manager::WhiteListManager;
+    use crate::core::whitelist::manager::WhitelistManager;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::CurrentClock;
 
@@ -516,8 +516,8 @@ mod tests {
         Arc<InMemoryTorrentRepository>,
         Arc<Option<Box<dyn Sender>>>,
         Arc<InMemoryWhitelist>,
-        Arc<WhiteListManager>,
-        Arc<whitelist::authorization::Authorization>,
+        Arc<WhitelistManager>,
+        Arc<whitelist::authorization::WhitelistAuthorization>,
     );
 
     fn tracker_configuration() -> Configuration {
@@ -672,7 +672,7 @@ mod tests {
         Arc<Core>,
         Arc<AnnounceHandler>,
         Arc<ScrapeHandler>,
-        Arc<whitelist::authorization::Authorization>,
+        Arc<whitelist::authorization::WhitelistAuthorization>,
     ) {
         let config = tracker_configuration();
 
@@ -1088,7 +1088,7 @@ mod tests {
             async fn announce_a_new_peer_using_ipv4(
                 core_config: Arc<Core>,
                 announce_handler: Arc<AnnounceHandler>,
-                whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+                whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
                 let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
@@ -1426,7 +1426,7 @@ mod tests {
             async fn announce_a_new_peer_using_ipv6(
                 core_config: Arc<Core>,
                 announce_handler: Arc<AnnounceHandler>,
-                whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+                whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
                 let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);

@@ -63,7 +63,7 @@ impl Launcher {
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
-        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
@@ -192,7 +192,7 @@ impl HttpServer<Stopped> {
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
         authentication_service: Arc<AuthenticationService>,
-        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
         stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
         form: ServiceRegistrationForm,
     ) -> Result<HttpServer<Running>, Error> {

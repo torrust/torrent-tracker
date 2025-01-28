@@ -29,7 +29,7 @@ where
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
     pub ban_service: Arc<RwLock<BanService>>,

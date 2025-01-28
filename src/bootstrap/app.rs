@@ -93,7 +93,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
     let database = initialize_database(configuration);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-    let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+    let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
         &configuration.core,
         &in_memory_whitelist.clone(),
     ));

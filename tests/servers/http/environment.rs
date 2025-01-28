@@ -14,7 +14,7 @@ use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_lib::core::whitelist;
-use torrust_tracker_lib::core::whitelist::manager::WhiteListManager;
+use torrust_tracker_lib::core::whitelist::manager::WhitelistManager;
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_primitives::peer;
@@ -30,8 +30,8 @@ pub struct Environment<S> {
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
-    pub whitelist_manager: Arc<WhiteListManager>,
+    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
+    pub whitelist_manager: Arc<WhitelistManager>,
     pub registar: Registar,
     pub server: HttpServer<S>,
 }

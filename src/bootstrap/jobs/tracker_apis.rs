@@ -34,7 +34,7 @@ use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use crate::core::whitelist::manager::WhiteListManager;
+use crate::core::whitelist::manager::WhitelistManager;
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -74,7 +74,7 @@ pub async fn start_job(
     config: &HttpApi,
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
-    whitelist_manager: Arc<WhiteListManager>,
+    whitelist_manager: Arc<WhitelistManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,
@@ -126,7 +126,7 @@ async fn start_v1(
     tls: Option<RustlsConfig>,
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
-    whitelist_manager: Arc<WhiteListManager>,
+    whitelist_manager: Arc<WhitelistManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,

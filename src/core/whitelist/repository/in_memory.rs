@@ -32,13 +32,9 @@ impl InMemoryWhitelist {
 
 #[cfg(test)]
 mod tests {
-    use bittorrent_primitives::info_hash::InfoHash;
 
+    use crate::core::core_tests::sample_info_hash;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-
-    fn sample_info_hash() -> InfoHash {
-        "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap() // # DevSkim: ignore DS173237
-    }
 
     #[tokio::test]
     async fn should_allow_adding_a_new_torrent_to_the_whitelist() {

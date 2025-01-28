@@ -34,7 +34,7 @@ use crate::core::authentication::handler::KeysHandler;
 use crate::core::statistics::event::sender::Sender;
 use crate::core::statistics::repository::Repository;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use crate::core::whitelist::manager::WhiteListManager;
+use crate::core::whitelist::manager::WhitelistManager;
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::logging::Latency;
 use crate::servers::udp::server::banning::BanService;
@@ -53,7 +53,7 @@ use crate::servers::udp::server::banning::BanService;
 pub fn router(
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     keys_handler: Arc<KeysHandler>,
-    whitelist_manager: Arc<WhiteListManager>,
+    whitelist_manager: Arc<WhitelistManager>,
     ban_service: Arc<RwLock<BanService>>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     stats_repository: Arc<Repository>,

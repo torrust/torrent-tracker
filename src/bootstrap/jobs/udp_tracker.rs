@@ -49,7 +49,7 @@ pub async fn start_job(
     config: &UdpTracker,
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
-    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     ban_service: Arc<RwLock<BanService>>,
     form: ServiceRegistrationForm,
