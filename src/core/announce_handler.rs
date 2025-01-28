@@ -177,62 +177,19 @@ mod tests {
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
-        use crate::app_test::initialize_tracker_dependencies;
         use crate::core::announce_handler::AnnounceHandler;
+        use crate::core::core_tests::initialize_handlers;
         use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::torrent::manager::TorrentsManager;
-        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
-        fn public_tracker() -> (Arc<AnnounceHandler>, Arc<InMemoryTorrentRepository>, Arc<ScrapeHandler>) {
+        fn public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
-
-            let (
-                _database,
-                _in_memory_whitelist,
-                whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                db_torrent_repository,
-                _torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
-
-            let announce_handler = Arc::new(AnnounceHandler::new(
-                &config.core,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
-            let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-            (announce_handler, in_memory_torrent_repository, scrape_handler)
-        }
-
-        pub fn tracker_persisting_torrents_in_database(
-        ) -> (Arc<AnnounceHandler>, Arc<TorrentsManager>, Arc<InMemoryTorrentRepository>) {
-            let mut config = configuration::ephemeral_listed();
-            config.core.tracker_policy.persistent_torrent_completed_stat = true;
-
-            let (
-                _database,
-                _in_memory_whitelist,
-                _whitelist_authorization,
-                _authentication_service,
-                in_memory_torrent_repository,
-                db_torrent_repository,
-                torrents_manager,
-            ) = initialize_tracker_dependencies(&config);
-
-            let announce_handler = Arc::new(AnnounceHandler::new(
-                &config.core,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
-            (announce_handler, torrents_manager, in_memory_torrent_repository)
+            initialize_handlers(&config)
         }
 
         fn sample_info_hash() -> InfoHash {
-            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()
+            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0" // DevSkim: ignore DS173237
+                .parse::<InfoHash>()
+                .expect("String should be a valid info hash")
         }
 
         // The client peer IP
@@ -426,7 +383,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_an_empty_peer_list_when_it_is_the_first_announced_peer() {
-                    let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                    let (announce_handler, _scrape_handler) = public_tracker();
 
                     let mut peer = sample_peer();
 
@@ -437,7 +394,7 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_return_the_announce_data_with_the_previously_announced_peers() {
-                    let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                    let (announce_handler, _scrape_handler) = public_tracker();
 
                     let mut previously_announced_peer = sample_peer_1();
                     announce_handler.announce(
@@ -462,7 +419,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
-                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _scrape_handler) = public_tracker();
 
                         let mut peer = seeder();
 
@@ -474,7 +431,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_leecher() {
-                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _scrape_handler) = public_tracker();
 
                         let mut peer = leecher();
 
@@ -486,7 +443,7 @@ mod tests {
 
                     #[tokio::test]
                     async fn when_a_previously_announced_started_peer_has_completed_downloading() {
-                        let (announce_handler, _in_memory_torrent_repository, _scrape_handler) = public_tracker();
+                        let (announce_handler, _scrape_handler) = public_tracker();
 
                         // We have to announce with "started" event because peer does not count if peer was not previously known
                         let mut started_peer = started_peer();
@@ -504,18 +461,38 @@ mod tests {
 
         mod handling_torrent_persistence {
 
+            use std::sync::Arc;
+
             use aquatic_udp_protocol::AnnounceEvent;
+            use torrust_tracker_test_helpers::configuration;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core::announce_handler::tests::the_announce_handler::{
-                peer_ip, sample_info_hash, sample_peer, tracker_persisting_torrents_in_database,
-            };
-            use crate::core::announce_handler::PeersWanted;
+            use crate::core::announce_handler::tests::the_announce_handler::{peer_ip, sample_info_hash, sample_peer};
+            use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
+            use crate::core::services::initialize_database;
+            use crate::core::torrent::manager::TorrentsManager;
+            use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+            use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 
             #[tokio::test]
             async fn it_should_persist_the_number_of_completed_peers_for_all_torrents_into_the_database() {
-                let (announce_handler, torrents_manager, in_memory_torrent_repository) =
-                    tracker_persisting_torrents_in_database();
+                let mut config = configuration::ephemeral_listed();
+
+                config.core.tracker_policy.persistent_torrent_completed_stat = true;
+
+                let database = initialize_database(&config);
+                let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+                let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
+                let torrents_manager = Arc::new(TorrentsManager::new(
+                    &config.core,
+                    &in_memory_torrent_repository,
+                    &db_torrent_repository,
+                ));
+                let announce_handler = Arc::new(AnnounceHandler::new(
+                    &config.core,
+                    &in_memory_torrent_repository,
+                    &db_torrent_repository,
+                ));
 
                 let info_hash = sample_info_hash();
 

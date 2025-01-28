@@ -449,6 +449,7 @@ pub mod statistics;
 pub mod torrent;
 pub mod whitelist;
 
+pub mod core_tests;
 pub mod peer_tests;
 
 #[cfg(test)]
@@ -460,18 +461,13 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-        use torrust_tracker_configuration::Configuration;
         use torrust_tracker_primitives::peer::Peer;
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
         use torrust_tracker_test_helpers::configuration;
 
         use crate::core::announce_handler::AnnounceHandler;
+        use crate::core::core_tests::initialize_handlers;
         use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::services::initialize_database;
-        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-        use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-        use crate::core::whitelist;
-        use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
         fn initialize_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
@@ -481,27 +477,6 @@ mod tests {
         fn initialize_handlers_for_listed_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_listed();
             initialize_handlers(&config)
-        }
-
-        fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
-            let database = initialize_database(config);
-            let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-            let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
-                &config.core,
-                &in_memory_whitelist.clone(),
-            ));
-            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
-            let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
-
-            let announce_handler = Arc::new(AnnounceHandler::new(
-                &config.core,
-                &in_memory_torrent_repository,
-                &db_torrent_repository,
-            ));
-
-            let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
-
-            (announce_handler, scrape_handler)
         }
 
         // The client peer IP
