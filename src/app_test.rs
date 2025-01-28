@@ -23,7 +23,7 @@ pub fn initialize_tracker_dependencies(
 ) -> (
     Arc<Box<dyn Database>>,
     Arc<InMemoryWhitelist>,
-    Arc<whitelist::authorization::Authorization>,
+    Arc<whitelist::authorization::WhitelistAuthorization>,
     Arc<AuthenticationService>,
     Arc<InMemoryTorrentRepository>,
     Arc<DatabasePersistentTorrentRepository>,
@@ -31,7 +31,7 @@ pub fn initialize_tracker_dependencies(
 ) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-    let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+    let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
         &config.core,
         &in_memory_whitelist.clone(),
     ));

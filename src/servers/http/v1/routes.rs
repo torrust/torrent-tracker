@@ -49,7 +49,7 @@ pub fn router(
     announce_handler: Arc<AnnounceHandler>,
     scrape_handler: Arc<ScrapeHandler>,
     authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     server_socket_addr: SocketAddr,
 ) -> Router {

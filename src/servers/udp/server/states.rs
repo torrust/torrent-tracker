@@ -74,7 +74,7 @@ impl Server<Stopped> {
         core_config: Arc<Core>,
         announce_handler: Arc<AnnounceHandler>,
         scrape_handler: Arc<ScrapeHandler>,
-        whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
         opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         ban_service: Arc<RwLock<BanService>>,
         form: ServiceRegistrationForm,

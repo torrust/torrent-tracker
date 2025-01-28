@@ -8,7 +8,7 @@ use tracing::instrument;
 use super::repository::in_memory::InMemoryWhitelist;
 use crate::core::error::Error;
 
-pub struct Authorization {
+pub struct WhitelistAuthorization {
     /// Core tracker configuration.
     config: Core,
 
@@ -16,7 +16,7 @@ pub struct Authorization {
     in_memory_whitelist: Arc<InMemoryWhitelist>,
 }
 
-impl Authorization {
+impl WhitelistAuthorization {
     /// Creates a new authorization instance.
     pub fn new(config: &Core, in_memory_whitelist: &Arc<InMemoryWhitelist>) -> Self {
         Self {
@@ -65,17 +65,17 @@ mod tests {
 
     use torrust_tracker_test_helpers::configuration;
 
-    use super::Authorization;
+    use super::WhitelistAuthorization;
     use crate::core::services::{initialize_database, initialize_whitelist_manager};
     use crate::core::whitelist::manager::WhiteListManager;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
-    fn initialize_whitelist_services() -> (Arc<Authorization>, Arc<WhiteListManager>) {
+    fn initialize_whitelist_services() -> (Arc<WhitelistAuthorization>, Arc<WhiteListManager>) {
         let config = configuration::ephemeral_listed();
 
         let database = initialize_database(&config);
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-        let whitelist_authorization = Arc::new(Authorization::new(&config.core, &in_memory_whitelist.clone()));
+        let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
         let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
 
         (whitelist_authorization, whitelist_manager)

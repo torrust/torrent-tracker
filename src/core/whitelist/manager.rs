@@ -107,7 +107,7 @@ mod tests {
     #[allow(clippy::type_complexity)]
     fn whitelisted_tracker() -> (
         Arc<AnnounceHandler>,
-        Arc<whitelist::authorization::Authorization>,
+        Arc<whitelist::authorization::WhitelistAuthorization>,
         Arc<WhiteListManager>,
         Arc<ScrapeHandler>,
     ) {

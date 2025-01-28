@@ -30,7 +30,7 @@ pub struct Environment<S> {
     pub authentication_service: Arc<AuthenticationService>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub whitelist_manager: Arc<WhiteListManager>,
     pub registar: Registar,
     pub server: HttpServer<S>,

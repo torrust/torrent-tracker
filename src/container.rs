@@ -22,7 +22,7 @@ pub struct AppContainer {
     pub scrape_handler: Arc<ScrapeHandler>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
-    pub whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub ban_service: Arc<RwLock<BanService>>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,

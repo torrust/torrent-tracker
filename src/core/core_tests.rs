@@ -86,7 +86,7 @@ pub fn incomplete_peer() -> Peer {
 pub fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
     let database = initialize_database(config);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-    let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+    let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
         &config.core,
         &in_memory_whitelist.clone(),
     ));

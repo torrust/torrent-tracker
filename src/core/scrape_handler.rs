@@ -9,7 +9,7 @@ use super::whitelist;
 
 pub struct ScrapeHandler {
     /// The service to check is a torrent is whitelisted.
-    whitelist_authorization: Arc<whitelist::authorization::Authorization>,
+    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
 
     /// The in-memory torrents repository.
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
@@ -18,7 +18,7 @@ pub struct ScrapeHandler {
 impl ScrapeHandler {
     #[must_use]
     pub fn new(
-        whitelist_authorization: &Arc<whitelist::authorization::Authorization>,
+        whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
         in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
     ) -> Self {
         Self {
@@ -62,7 +62,7 @@ mod tests {
         let config = configuration::ephemeral_public();
 
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-        let whitelist_authorization = Arc::new(whitelist::authorization::Authorization::new(
+        let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
             &config.core,
             &in_memory_whitelist.clone(),
         ));
