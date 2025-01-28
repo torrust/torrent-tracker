@@ -28,7 +28,7 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use crate::bootstrap::jobs::{health_check_api, http_tracker, torrent_cleanup, tracker_apis, udp_tracker};
-use crate::container::AppContainer;
+use crate::container::{AppContainer, UdpTrackerContainer};
 use crate::servers;
 use crate::servers::registar::Registar;
 
@@ -39,7 +39,7 @@ use crate::servers::registar::Registar;
 /// - Can't retrieve tracker keys from database.
 /// - Can't load whitelist from database.
 #[instrument(skip(config, app_container))]
-pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<JoinHandle<()>> {
+pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) -> Vec<JoinHandle<()>> {
     if config.http_api.is_none()
         && (config.udp_trackers.is_none() || config.udp_trackers.as_ref().map_or(true, std::vec::Vec::is_empty))
         && (config.http_trackers.is_none() || config.http_trackers.as_ref().map_or(true, std::vec::Vec::is_empty))
@@ -78,19 +78,9 @@ pub async fn start(config: &Configuration, app_container: &AppContainer) -> Vec<
                     udp_tracker_config.bind_address
                 );
             } else {
-                jobs.push(
-                    udp_tracker::start_job(
-                        Arc::new(config.core.clone()),
-                        udp_tracker_config,
-                        app_container.announce_handler.clone(),
-                        app_container.scrape_handler.clone(),
-                        app_container.whitelist_authorization.clone(),
-                        app_container.stats_event_sender.clone(),
-                        app_container.ban_service.clone(),
-                        registar.give_form(),
-                    )
-                    .await,
-                );
+                let udp_tracker_config = Arc::new(udp_tracker_config.clone());
+                let udp_tracker_container = Arc::new(UdpTrackerContainer::from_app_container(&udp_tracker_config, app_container));
+                jobs.push(udp_tracker::start_job(udp_tracker_container, registar.give_form()).await);
             }
         }
     } else {

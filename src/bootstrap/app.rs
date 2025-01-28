@@ -32,7 +32,7 @@ use crate::core::services::{initialize_database, initialize_whitelist_manager, s
 use crate::core::torrent::manager::TorrentsManager;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use crate::core::whitelist;
+use crate::core::whitelist::authorization::WhitelistAuthorization;
 use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
@@ -87,16 +87,14 @@ pub fn initialize_global_services(configuration: &Configuration) {
 /// It initializes the IoC Container.
 #[instrument(skip())]
 pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
+    let core_config = Arc::new(configuration.core.clone());
     let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
     let stats_event_sender = Arc::new(stats_event_sender);
     let stats_repository = Arc::new(stats_repository);
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
     let database = initialize_database(configuration);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
-    let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
-        &configuration.core,
-        &in_memory_whitelist.clone(),
-    ));
+    let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&configuration.core, &in_memory_whitelist.clone()));
     let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
     let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
     let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
@@ -125,6 +123,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
     AppContainer {
+        core_config,
         database,
         announce_handler,
         scrape_handler,

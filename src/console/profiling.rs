@@ -157,6 +157,7 @@
 //! kcachegrind callgrind.out
 //! ```
 use std::env;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::time::sleep;
@@ -180,6 +181,8 @@ pub async fn run() {
     };
 
     let (config, app_container) = bootstrap::app::setup();
+
+    let app_container = Arc::new(app_container);
 
     let jobs = app::start(&config, &app_container).await;
 

@@ -229,7 +229,7 @@ mod receiving_an_announce_request {
         logging::setup();
 
         let env = Started::new(&configuration::ephemeral().into()).await;
-        let ban_service = env.ban_service.clone();
+        let ban_service = env.udp_tracker_container.ban_service.clone();
 
         let client = match UdpTrackerClient::new(env.bind_address(), DEFAULT_TIMEOUT).await {
             Ok(udp_tracker_client) => udp_tracker_client,

@@ -11,7 +11,6 @@ use aquatic_udp_protocol::{
     ResponsePeer, ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics, TransactionId,
 };
 use bittorrent_primitives::info_hash::InfoHash;
-use tokio::sync::RwLock;
 use torrust_tracker_clock::clock::Time as _;
 use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
@@ -19,8 +18,8 @@ use uuid::Uuid;
 use zerocopy::network_endian::I32;
 
 use super::connection_cookie::{check, make};
-use super::server::banning::BanService;
 use super::RawRequest;
+use crate::container::UdpTrackerContainer;
 use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
 use crate::core::scrape_handler::ScrapeHandler;
 use crate::core::statistics::event::sender::Sender;
@@ -57,18 +56,12 @@ impl CookieTimeValues {
 /// - Delegating the request to the correct handler depending on the request type.
 ///
 /// It will return an `Error` response if the request is invalid.
-#[allow(clippy::too_many_arguments)]
-#[instrument(fields(request_id), skip(udp_request, announce_handler, scrape_handler, whitelist_authorization, opt_stats_event_sender, cookie_time_values, ban_service), ret(level = Level::TRACE))]
+#[instrument(fields(request_id), skip(udp_request, udp_tracker_container, cookie_time_values), ret(level = Level::TRACE))]
 pub(crate) async fn handle_packet(
     udp_request: RawRequest,
-    core_config: &Arc<Core>,
-    announce_handler: &Arc<AnnounceHandler>,
-    scrape_handler: &Arc<ScrapeHandler>,
-    whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
+    udp_tracker_container: Arc<UdpTrackerContainer>,
     local_addr: SocketAddr,
     cookie_time_values: CookieTimeValues,
-    ban_service: Arc<RwLock<BanService>>,
 ) -> Response {
     let request_id = Uuid::new_v4();
 
@@ -82,11 +75,7 @@ pub(crate) async fn handle_packet(
             Ok(request) => match handle_request(
                 request,
                 udp_request.from,
-                core_config,
-                announce_handler,
-                scrape_handler,
-                whitelist_authorization,
-                opt_stats_event_sender,
+                udp_tracker_container.clone(),
                 cookie_time_values.clone(),
             )
             .await
@@ -98,7 +87,7 @@ pub(crate) async fn handle_packet(
                         | Error::CookieValueExpired { .. }
                         | Error::CookieValueFromFuture { .. } => {
                             // code-review: should we include `RequestParseError` and `BadRequest`?
-                            let mut ban_service = ban_service.write().await;
+                            let mut ban_service = udp_tracker_container.ban_service.write().await;
                             ban_service.increase_counter(&udp_request.from.ip());
                         }
                         _ => {}
@@ -108,7 +97,7 @@ pub(crate) async fn handle_packet(
                         udp_request.from,
                         local_addr,
                         request_id,
-                        opt_stats_event_sender,
+                        &udp_tracker_container.stats_event_sender,
                         cookie_time_values.valid_range.clone(),
                         &e,
                         Some(transaction_id),
@@ -121,7 +110,7 @@ pub(crate) async fn handle_packet(
                     udp_request.from,
                     local_addr,
                     request_id,
-                    opt_stats_event_sender,
+                    &udp_tracker_container.stats_event_sender,
                     cookie_time_values.valid_range.clone(),
                     &e,
                     None,
@@ -141,24 +130,11 @@ pub(crate) async fn handle_packet(
 /// # Errors
 ///
 /// If a error happens in the `handle_request` function, it will just return the  `ServerError`.
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip(
-    request,
-    remote_addr,
-    announce_handler,
-    scrape_handler,
-    whitelist_authorization,
-    opt_stats_event_sender,
-    cookie_time_values
-))]
+#[instrument(skip(request, remote_addr, udp_tracker_container, cookie_time_values))]
 pub async fn handle_request(
     request: Request,
     remote_addr: SocketAddr,
-    core_config: &Arc<Core>,
-    announce_handler: &Arc<AnnounceHandler>,
-    scrape_handler: &Arc<ScrapeHandler>,
-    whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
+    udp_tracker_container: Arc<UdpTrackerContainer>,
     cookie_time_values: CookieTimeValues,
 ) -> Result<Response, (Error, TransactionId)> {
     tracing::trace!("handle request");
@@ -167,7 +143,7 @@ pub async fn handle_request(
         Request::Connect(connect_request) => Ok(handle_connect(
             remote_addr,
             &connect_request,
-            opt_stats_event_sender,
+            &udp_tracker_container.stats_event_sender,
             cookie_time_values.issue_time,
         )
         .await),
@@ -175,10 +151,10 @@ pub async fn handle_request(
             handle_announce(
                 remote_addr,
                 &announce_request,
-                core_config,
-                announce_handler,
-                whitelist_authorization,
-                opt_stats_event_sender,
+                &udp_tracker_container.core_config,
+                &udp_tracker_container.announce_handler,
+                &udp_tracker_container.whitelist_authorization,
+                &udp_tracker_container.stats_event_sender,
                 cookie_time_values.valid_range,
             )
             .await
@@ -187,8 +163,8 @@ pub async fn handle_request(
             handle_scrape(
                 remote_addr,
                 &scrape_request,
-                scrape_handler,
-                opt_stats_event_sender,
+                &udp_tracker_container.scrape_handler,
+                &udp_tracker_container.stats_event_sender,
                 cookie_time_values.valid_range,
             )
             .await

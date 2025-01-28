@@ -4,69 +4,43 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use aquatic_udp_protocol::Response;
-use tokio::sync::RwLock;
 use tokio::time::Instant;
-use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
 
-use super::banning::BanService;
 use super::bound_socket::BoundSocket;
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
+use crate::container::UdpTrackerContainer;
+use crate::core::statistics;
 use crate::core::statistics::event::UdpResponseKind;
-use crate::core::{statistics, whitelist};
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
 pub struct Processor {
     socket: Arc<BoundSocket>,
-    core_config: Arc<Core>,
-    announce_handler: Arc<AnnounceHandler>,
-    scrape_handler: Arc<ScrapeHandler>,
-    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    udp_tracker_container: Arc<UdpTrackerContainer>,
     cookie_lifetime: f64,
 }
 
 impl Processor {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        socket: Arc<BoundSocket>,
-        core_config: Arc<Core>,
-        announce_handler: Arc<AnnounceHandler>,
-        scrape_handler: Arc<ScrapeHandler>,
-        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-        opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-        cookie_lifetime: f64,
-    ) -> Self {
+    pub fn new(socket: Arc<BoundSocket>, udp_tracker_container: Arc<UdpTrackerContainer>, cookie_lifetime: f64) -> Self {
         Self {
             socket,
-            core_config,
-            announce_handler,
-            scrape_handler,
-            whitelist_authorization,
-            opt_stats_event_sender,
+            udp_tracker_container,
             cookie_lifetime,
         }
     }
 
-    #[instrument(skip(self, request, ban_service))]
-    pub async fn process_request(self, request: RawRequest, ban_service: Arc<RwLock<BanService>>) {
+    #[instrument(skip(self, request))]
+    pub async fn process_request(self, request: RawRequest) {
         let from = request.from;
 
         let start_time = Instant::now();
 
         let response = handlers::handle_packet(
             request,
-            &self.core_config,
-            &self.announce_handler,
-            &self.scrape_handler,
-            &self.whitelist_authorization,
-            &self.opt_stats_event_sender,
+            self.udp_tracker_container.clone(),
             self.socket.address(),
             CookieTimeValues::new(self.cookie_lifetime),
-            ban_service,
         )
         .await;
 
@@ -109,7 +83,7 @@ impl Processor {
                             tracing::debug!(%bytes_count, %sent_bytes, "sent {response_type}");
                         }
 
-                        if let Some(stats_event_sender) = self.opt_stats_event_sender.as_deref() {
+                        if let Some(stats_event_sender) = self.udp_tracker_container.stats_event_sender.as_deref() {
                             match target.ip() {
                                 IpAddr::V4(_) => {
                                     stats_event_sender

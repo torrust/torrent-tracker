@@ -2,18 +2,13 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use tokio::sync::RwLock;
-use torrust_tracker_configuration::{Configuration, Core, UdpTracker, DEFAULT_TIMEOUT};
+use torrust_tracker_configuration::{Configuration, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
-use torrust_tracker_lib::core::announce_handler::AnnounceHandler;
+use torrust_tracker_lib::container::UdpTrackerContainer;
 use torrust_tracker_lib::core::databases::Database;
-use torrust_tracker_lib::core::scrape_handler::ScrapeHandler;
-use torrust_tracker_lib::core::statistics::event::sender::Sender;
 use torrust_tracker_lib::core::statistics::repository::Repository;
 use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrust_tracker_lib::core::whitelist;
 use torrust_tracker_lib::servers::registar::Registar;
-use torrust_tracker_lib::servers::udp::server::banning::BanService;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
 use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};
 use torrust_tracker_lib::servers::udp::server::Server;
@@ -23,16 +18,12 @@ pub struct Environment<S>
 where
     S: std::fmt::Debug + std::fmt::Display,
 {
-    pub core_config: Arc<Core>,
-    pub config: Arc<UdpTracker>,
+    pub udp_tracker_container: Arc<UdpTrackerContainer>,
+
     pub database: Arc<Box<dyn Database>>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-    pub announce_handler: Arc<AnnounceHandler>,
-    pub scrape_handler: Arc<ScrapeHandler>,
-    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     pub stats_repository: Arc<Repository>,
-    pub ban_service: Arc<RwLock<BanService>>,
+
     pub registar: Registar,
     pub server: Server<S>,
 }
@@ -55,25 +46,31 @@ impl Environment<Stopped> {
 
         let app_container = initialize_app_container(configuration);
 
-        let udp_tracker = configuration.udp_trackers.clone().expect("missing UDP tracker configuration");
+        let udp_tracker_configurations = configuration.udp_trackers.clone().expect("missing UDP tracker configuration");
 
-        let config = Arc::new(udp_tracker[0].clone());
+        let udp_tracker_config = Arc::new(udp_tracker_configurations[0].clone());
 
-        let bind_to = config.bind_address;
+        let bind_to = udp_tracker_config.bind_address;
 
         let server = Server::new(Spawner::new(bind_to));
 
-        Self {
-            core_config: Arc::new(configuration.core.clone()),
-            config,
-            database: app_container.database.clone(),
-            in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
+        let udp_tracker_container = Arc::new(UdpTrackerContainer {
+            udp_tracker_config: udp_tracker_config.clone(),
+            core_config: app_container.core_config.clone(),
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
-            stats_repository: app_container.stats_repository.clone(),
             ban_service: app_container.ban_service.clone(),
+        });
+
+        Self {
+            udp_tracker_container,
+
+            database: app_container.database.clone(),
+            in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
+            stats_repository: app_container.stats_repository.clone(),
+
             registar: Registar::default(),
             server,
         }
@@ -81,31 +78,19 @@ impl Environment<Stopped> {
 
     #[allow(dead_code)]
     pub async fn start(self) -> Environment<Running> {
-        let cookie_lifetime = self.config.cookie_lifetime;
+        let cookie_lifetime = self.udp_tracker_container.udp_tracker_config.cookie_lifetime;
+
         Environment {
-            core_config: self.core_config.clone(),
-            config: self.config,
+            udp_tracker_container: self.udp_tracker_container.clone(),
+
             database: self.database.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
-            announce_handler: self.announce_handler.clone(),
-            scrape_handler: self.scrape_handler.clone(),
-            whitelist_authorization: self.whitelist_authorization.clone(),
-            stats_event_sender: self.stats_event_sender.clone(),
             stats_repository: self.stats_repository.clone(),
-            ban_service: self.ban_service.clone(),
+
             registar: self.registar.clone(),
             server: self
                 .server
-                .start(
-                    self.core_config,
-                    self.announce_handler,
-                    self.scrape_handler,
-                    self.whitelist_authorization,
-                    self.stats_event_sender,
-                    self.ban_service,
-                    self.registar.give_form(),
-                    cookie_lifetime,
-                )
+                .start(self.udp_tracker_container, self.registar.give_form(), cookie_lifetime)
                 .await
                 .unwrap(),
         }
@@ -126,16 +111,12 @@ impl Environment<Running> {
             .expect("it should stop the environment within the timeout");
 
         Environment {
-            core_config: self.core_config,
-            config: self.config,
+            udp_tracker_container: self.udp_tracker_container,
+
             database: self.database,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
-            announce_handler: self.announce_handler,
-            scrape_handler: self.scrape_handler,
-            whitelist_authorization: self.whitelist_authorization,
-            stats_event_sender: self.stats_event_sender,
             stats_repository: self.stats_repository,
-            ban_service: self.ban_service,
+
             registar: Registar::default(),
             server: stopped.expect("it stop the udp tracker service"),
         }
