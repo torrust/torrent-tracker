@@ -28,7 +28,8 @@ use crate::core::authentication::key::repository::in_memory::InMemoryKeyReposito
 use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
 use crate::core::authentication::service;
 use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::services::{initialize_database, initialize_whitelist_manager, statistics};
+use crate::core::services::{initialize_database, initialize_whitelist_manager};
+use crate::core::statistics;
 use crate::core::torrent::manager::TorrentsManager;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;

@@ -153,7 +153,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
@@ -236,7 +236,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_always_return_the_zeroed_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, _scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();

@@ -2,7 +2,7 @@
 //!
 //! It includes:
 //!
-//! - A [`factory`](crate::core::services::statistics::setup::factory) function to build the structs needed to collect the tracker metrics.
+//! - A [`factory`](crate::core::statistics::setup::factory) function to build the structs needed to collect the tracker metrics.
 //! - A [`get_metrics`] service to get the tracker [`metrics`](crate::core::statistics::metrics::Metrics).
 //!
 //! Tracker metrics are collected using a Publisher-Subscribe pattern.
@@ -36,8 +36,6 @@
 //!     // ...
 //! }
 //! ```
-pub mod setup;
-
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -117,9 +115,9 @@ mod tests {
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::services::statistics::{self, get_metrics, TrackerMetrics};
+    use crate::core::statistics::services::{get_metrics, TrackerMetrics};
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::{self};
+    use crate::core::{self, statistics};
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 

@@ -1,10 +1,3 @@
-//! Tracker domain services. Core and statistics services.
-//!
-//! There are two types of service:
-//!
-//! - [Core tracker services](crate::core::services::torrent): related to the tracker main functionalities like getting info about torrents.
-//! - [Services for statistics](crate::core::services::statistics): related to tracker metrics. Aggregate data about the tracker server.
-pub mod statistics;
 pub mod torrent;
 
 use std::sync::Arc;

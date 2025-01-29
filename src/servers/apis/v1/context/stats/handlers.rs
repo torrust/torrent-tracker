@@ -9,8 +9,8 @@ use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use super::responses::{metrics_response, stats_response};
-use crate::core::services::statistics::get_metrics;
 use crate::core::statistics::repository::Repository;
+use crate::core::statistics::services::get_metrics;
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use crate::servers::udp::server::banning::BanService;
 

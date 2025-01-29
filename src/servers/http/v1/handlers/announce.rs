@@ -257,7 +257,8 @@ mod tests {
     use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
     use crate::core::authentication::service::AuthenticationService;
     use crate::core::core_tests::sample_info_hash;
-    use crate::core::services::{initialize_database, statistics};
+    use crate::core::services::initialize_database;
+    use crate::core::statistics;
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
