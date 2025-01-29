@@ -19,7 +19,7 @@ async fn should_allow_getting_tracker_statistics() {
     let env = Started::new(&configuration::ephemeral().into()).await;
 
     env.add_torrent_peer(
-        &InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(),
+        &InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(), // DevSkim: ignore DS173237
         &PeerBuilder::default().into(),
     );
 

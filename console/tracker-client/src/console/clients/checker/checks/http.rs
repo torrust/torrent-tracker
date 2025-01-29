@@ -61,7 +61,7 @@ pub async fn run(http_trackers: Vec<Url>, timeout: Duration) -> Vec<Result<Check
 }
 
 async fn check_http_announce(url: &Url, timeout: Duration) -> Result<Announce, Error> {
-    let info_hash_str = "9c38422213e30bff212b30c360d26f9a02136422".to_string(); // # DevSkim: ignore DS173237
+    let info_hash_str = "9c38422213e30bff212b30c360d26f9a02136422".to_string(); // DevSkim: ignore DS173237
     let info_hash = InfoHash::from_str(&info_hash_str).expect("a valid info-hash is required");
 
     let client = Client::new(url.clone(), timeout).map_err(|err| Error::HttpClientError { err })?;
@@ -86,7 +86,7 @@ async fn check_http_announce(url: &Url, timeout: Duration) -> Result<Announce, E
 }
 
 async fn check_http_scrape(url: &Url, timeout: Duration) -> Result<scrape::Response, Error> {
-    let info_hashes: Vec<String> = vec!["9c38422213e30bff212b30c360d26f9a02136422".to_string()]; // # DevSkim: ignore DS173237
+    let info_hashes: Vec<String> = vec!["9c38422213e30bff212b30c360d26f9a02136422".to_string()]; // DevSkim: ignore DS173237
     let query = requests::scrape::Query::try_from(info_hashes).expect("a valid array of info-hashes is required");
 
     let client = Client::new(url.clone(), timeout).map_err(|err| Error::HttpClientError { err })?;

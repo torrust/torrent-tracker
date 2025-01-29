@@ -29,7 +29,7 @@ pub async fn run(udp_trackers: Vec<Url>, timeout: Duration) -> Vec<Result<Checks
 
     tracing::debug!("UDP trackers ...");
 
-    let info_hash = aquatic_udp_protocol::InfoHash(hex!("9c38422213e30bff212b30c360d26f9a02136422")); // # DevSkim: ignore DS173237
+    let info_hash = aquatic_udp_protocol::InfoHash(hex!("9c38422213e30bff212b30c360d26f9a02136422")); // DevSkim: ignore DS173237
 
     for remote_url in udp_trackers {
         let remote_addr = resolve_socket_addr(&remote_url);
