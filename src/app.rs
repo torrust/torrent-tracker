@@ -28,7 +28,7 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use crate::bootstrap::jobs::{health_check_api, http_tracker, torrent_cleanup, tracker_apis, udp_tracker};
-use crate::container::{AppContainer, HttpTrackerContainer, UdpTrackerContainer};
+use crate::container::{AppContainer, HttpApiContainer, HttpTrackerContainer, UdpTrackerContainer};
 use crate::servers;
 use crate::servers::registar::Registar;
 
@@ -106,19 +106,10 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
 
     // Start HTTP API
     if let Some(http_api_config) = &config.http_api {
-        if let Some(job) = tracker_apis::start_job(
-            http_api_config,
-            app_container.in_memory_torrent_repository.clone(),
-            app_container.keys_handler.clone(),
-            app_container.whitelist_manager.clone(),
-            app_container.ban_service.clone(),
-            app_container.stats_event_sender.clone(),
-            app_container.stats_repository.clone(),
-            registar.give_form(),
-            servers::apis::Version::V1,
-        )
-        .await
-        {
+        let http_api_config = Arc::new(http_api_config.clone());
+        let http_api_container = Arc::new(HttpApiContainer::from_app_container(&http_api_config, app_container));
+
+        if let Some(job) = tracker_apis::start_job(http_api_container, registar.give_form(), servers::apis::Version::V1).await {
             jobs.push(job);
         };
     } else {

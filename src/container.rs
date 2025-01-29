@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use torrust_tracker_configuration::{Core, HttpTracker, UdpTracker};
+use torrust_tracker_configuration::{Core, HttpApi, HttpTracker, UdpTracker};
 
 use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::handler::KeysHandler;
@@ -80,6 +80,33 @@ impl HttpTrackerContainer {
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             authentication_service: app_container.authentication_service.clone(),
+        }
+    }
+}
+
+pub struct HttpApiContainer {
+    pub core_config: Arc<Core>,
+    pub http_api_config: Arc<HttpApi>,
+    pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
+    pub keys_handler: Arc<KeysHandler>,
+    pub whitelist_manager: Arc<WhitelistManager>,
+    pub ban_service: Arc<RwLock<BanService>>,
+    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub stats_repository: Arc<Repository>,
+}
+
+impl HttpApiContainer {
+    #[must_use]
+    pub fn from_app_container(http_api_config: &Arc<HttpApi>, app_container: &Arc<AppContainer>) -> Self {
+        Self {
+            http_api_config: http_api_config.clone(),
+            core_config: app_container.core_config.clone(),
+            in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
+            keys_handler: app_container.keys_handler.clone(),
+            whitelist_manager: app_container.whitelist_manager.clone(),
+            ban_service: app_container.ban_service.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            stats_repository: app_container.stats_repository.clone(),
         }
     }
 }

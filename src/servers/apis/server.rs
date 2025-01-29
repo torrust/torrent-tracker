@@ -33,23 +33,17 @@ use derive_more::Constructor;
 use futures::future::BoxFuture;
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
-use tokio::sync::RwLock;
 use torrust_tracker_configuration::AccessTokens;
 use tracing::{instrument, Level};
 
 use super::routes::router;
 use crate::bootstrap::jobs::Started;
-use crate::core::authentication::handler::KeysHandler;
-use crate::core::statistics;
-use crate::core::statistics::repository::Repository;
-use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use crate::core::whitelist::manager::WhitelistManager;
+use crate::container::HttpApiContainer;
 use crate::servers::apis::API_LOG_TARGET;
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::{ServiceHealthCheckJob, ServiceRegistration, ServiceRegistrationForm};
 use crate::servers::signals::{graceful_shutdown, Halted};
-use crate::servers::udp::server::banning::BanService;
 
 /// Errors that can occur when starting or stopping the API server.
 #[derive(Debug, Error)]
@@ -128,16 +122,10 @@ impl ApiServer<Stopped> {
     /// # Panics
     ///
     /// It would panic if the bound socket address cannot be sent back to this starter.
-    #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(self, in_memory_torrent_repository, keys_handler, whitelist_manager, stats_event_sender, ban_service, stats_repository, form, access_tokens), err, ret(Display, level = Level::INFO))]
+    #[instrument(skip(self, http_api_container, form, access_tokens), err, ret(Display, level = Level::INFO))]
     pub async fn start(
         self,
-        in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-        keys_handler: Arc<KeysHandler>,
-        whitelist_manager: Arc<WhitelistManager>,
-        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
-        stats_repository: Arc<Repository>,
-        ban_service: Arc<RwLock<BanService>>,
+        http_api_container: Arc<HttpApiContainer>,
         form: ServiceRegistrationForm,
         access_tokens: Arc<AccessTokens>,
     ) -> Result<ApiServer<Running>, Error> {
@@ -149,19 +137,7 @@ impl ApiServer<Stopped> {
         let task = tokio::spawn(async move {
             tracing::debug!(target: API_LOG_TARGET, "Starting with launcher in spawned task ...");
 
-            let _task = launcher
-                .start(
-                    in_memory_torrent_repository,
-                    keys_handler,
-                    whitelist_manager,
-                    ban_service,
-                    stats_event_sender,
-                    stats_repository,
-                    access_tokens,
-                    tx_start,
-                    rx_halt,
-                )
-                .await;
+            let _task = launcher.start(http_api_container, access_tokens, tx_start, rx_halt).await;
 
             tracing::debug!(target: API_LOG_TARGET, "Started with launcher in spawned task");
 
@@ -259,26 +235,10 @@ impl Launcher {
     ///
     /// Will panic if unable to bind to the socket, or unable to get the address of the bound socket.
     /// Will also panic if unable to send message regarding the bound socket address.
-    #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(
-        self,
-        keys_handler,
-        whitelist_manager,
-        ban_service,
-        stats_event_sender,
-        stats_repository,
-        access_tokens,
-        tx_start,
-        rx_halt
-    ))]
+    #[instrument(skip(self, http_api_container, access_tokens, tx_start, rx_halt))]
     pub fn start(
         &self,
-        in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-        keys_handler: Arc<KeysHandler>,
-        whitelist_manager: Arc<WhitelistManager>,
-        ban_service: Arc<RwLock<BanService>>,
-        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
-        stats_repository: Arc<Repository>,
+        http_api_container: Arc<HttpApiContainer>,
         access_tokens: Arc<AccessTokens>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
@@ -286,16 +246,7 @@ impl Launcher {
         let socket = std::net::TcpListener::bind(self.bind_to).expect("Could not bind tcp_listener to address.");
         let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
-        let router = router(
-            in_memory_torrent_repository,
-            keys_handler,
-            whitelist_manager,
-            ban_service,
-            stats_event_sender,
-            stats_repository,
-            access_tokens,
-            address,
-        );
+        let router = router(http_api_container, access_tokens, address);
 
         let handle = Handle::new();
 
@@ -347,41 +298,35 @@ mod tests {
 
     use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::make_rust_tls;
+    use crate::container::HttpApiContainer;
     use crate::servers::apis::server::{ApiServer, Launcher};
     use crate::servers::registar::Registar;
 
     #[tokio::test]
     async fn it_should_be_able_to_start_and_stop() {
         let cfg = Arc::new(ephemeral_public());
-        let config = &cfg.http_api.clone().unwrap();
+        let http_api_config = Arc::new(cfg.http_api.clone().unwrap());
 
         initialize_global_services(&cfg);
 
-        let app_container = initialize_app_container(&cfg);
+        let app_container = Arc::new(initialize_app_container(&cfg));
 
-        let bind_to = config.bind_address;
+        let bind_to = http_api_config.bind_address;
 
-        let tls = make_rust_tls(&config.tsl_config)
+        let tls = make_rust_tls(&http_api_config.tsl_config)
             .await
             .map(|tls| tls.expect("tls config failed"));
 
-        let access_tokens = Arc::new(config.access_tokens.clone());
+        let access_tokens = Arc::new(http_api_config.access_tokens.clone());
 
         let stopped = ApiServer::new(Launcher::new(bind_to, tls));
 
         let register = &Registar::default();
 
+        let http_api_container = Arc::new(HttpApiContainer::from_app_container(&http_api_config, &app_container));
+
         let started = stopped
-            .start(
-                app_container.in_memory_torrent_repository,
-                app_container.keys_handler,
-                app_container.whitelist_manager,
-                app_container.stats_event_sender,
-                app_container.stats_repository,
-                app_container.ban_service,
-                register.give_form(),
-                access_tokens,
-            )
+            .start(http_api_container, register.give_form(), access_tokens)
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

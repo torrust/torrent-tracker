@@ -31,7 +31,8 @@ async fn should_allow_whitelisting_a_torrent() {
 
     assert_ok(response).await;
     assert!(
-        env.whitelist_manager
+        env.http_api_container
+            .whitelist_manager
             .is_info_hash_whitelisted(&InfoHash::from_str(&info_hash).unwrap())
             .await
     );
@@ -167,7 +168,11 @@ async fn should_allow_removing_a_torrent_from_the_whitelist() {
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
 
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     let request_id = Uuid::new_v4();
 
@@ -176,7 +181,12 @@ async fn should_allow_removing_a_torrent_from_the_whitelist() {
         .await;
 
     assert_ok(response).await;
-    assert!(!env.whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
+    assert!(
+        !env.http_api_container
+            .whitelist_manager
+            .is_info_hash_whitelisted(&info_hash)
+            .await
+    );
 
     env.stop().await;
 }
@@ -237,7 +247,11 @@ async fn should_fail_when_the_torrent_cannot_be_removed_from_the_whitelist() {
 
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     force_database_error(&env.database);
 
@@ -266,7 +280,11 @@ async fn should_not_allow_removing_a_torrent_from_the_whitelist_for_unauthentica
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
 
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     let request_id = Uuid::new_v4();
 
@@ -281,7 +299,11 @@ async fn should_not_allow_removing_a_torrent_from_the_whitelist_for_unauthentica
         "Expected logs to contain: ERROR ... API ... request_id={request_id}"
     );
 
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     let request_id = Uuid::new_v4();
 
@@ -307,7 +329,11 @@ async fn should_allow_reload_the_whitelist_from_the_database() {
 
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     let request_id = Uuid::new_v4();
 
@@ -338,7 +364,11 @@ async fn should_fail_when_the_whitelist_cannot_be_reloaded_from_the_database() {
 
     let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned();
     let info_hash = InfoHash::from_str(&hash).unwrap();
-    env.whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
+    env.http_api_container
+        .whitelist_manager
+        .add_torrent_to_whitelist(&info_hash)
+        .await
+        .unwrap();
 
     force_database_error(&env.database);
 
