@@ -444,7 +444,6 @@ pub mod authentication;
 pub mod databases;
 pub mod error;
 pub mod scrape_handler;
-pub mod services;
 pub mod statistics;
 pub mod torrent;
 pub mod whitelist;

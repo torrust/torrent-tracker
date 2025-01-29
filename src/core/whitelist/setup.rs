@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use super::databases::Database;
-use super::whitelist::manager::WhitelistManager;
-use super::whitelist::repository::in_memory::InMemoryWhitelist;
-use super::whitelist::repository::persisted::DatabaseWhitelist;
+use super::manager::WhitelistManager;
+use super::repository::in_memory::InMemoryWhitelist;
+use super::repository::persisted::DatabaseWhitelist;
+use crate::core::databases::Database;
 
 #[must_use]
 pub fn initialize_whitelist_manager(
