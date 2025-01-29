@@ -27,6 +27,7 @@
 //!
 pub mod manager;
 pub mod repository;
+pub mod services;
 
 use torrust_tracker_torrent_repository::TorrentsSkipMapMutexStd;
 

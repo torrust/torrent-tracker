@@ -1,5 +1,3 @@
-pub mod torrent;
-
 use std::sync::Arc;
 
 use databases::driver::Driver;
