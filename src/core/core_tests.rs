@@ -9,8 +9,8 @@ use torrust_tracker_primitives::peer::Peer;
 use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
 use super::announce_handler::AnnounceHandler;
+use super::databases::setup::initialize_database;
 use super::scrape_handler::ScrapeHandler;
-use super::services::initialize_database;
 use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;

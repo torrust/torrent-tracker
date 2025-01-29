@@ -177,7 +177,7 @@ mod tests {
     use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
     use crate::core::authentication::service::AuthenticationService;
     use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::statistics;
+    use crate::core::statistics;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::whitelist::authorization::WhitelistAuthorization;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;

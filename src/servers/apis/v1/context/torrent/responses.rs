@@ -4,7 +4,7 @@ use axum::response::{IntoResponse, Json, Response};
 use serde_json::json;
 
 use super::resources::torrent::{ListItem, Torrent};
-use crate::core::services::torrent::{BasicInfo, Info};
+use crate::core::torrent::services::{BasicInfo, Info};
 
 /// `200` response that contains an array of
 /// [`ListItem`]

@@ -6,7 +6,7 @@
 //!   the JSON response.
 use serde::{Deserialize, Serialize};
 
-use crate::core::services::torrent::{BasicInfo, Info};
+use crate::core::torrent::services::{BasicInfo, Info};
 
 /// `Torrent` API resource.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -102,7 +102,7 @@ mod tests {
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 
     use super::Torrent;
-    use crate::core::services::torrent::{BasicInfo, Info};
+    use crate::core::torrent::services::{BasicInfo, Info};
     use crate::servers::apis::v1::context::torrent::resources::peer::Peer;
     use crate::servers::apis::v1::context::torrent::resources::torrent::ListItem;
 

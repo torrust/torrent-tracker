@@ -414,7 +414,7 @@ mod tests {
             use crate::core::announce_handler::tests::the_announce_handler::peer_ip;
             use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
             use crate::core::core_tests::{sample_info_hash, sample_peer};
-            use crate::core::services::initialize_database;
+            use crate::core::databases::setup::initialize_database;
             use crate::core::torrent::manager::TorrentsManager;
             use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
             use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;

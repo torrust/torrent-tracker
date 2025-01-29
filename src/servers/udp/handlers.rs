@@ -475,14 +475,14 @@ mod tests {
 
     use super::gen_remote_fingerprint;
     use crate::core::announce_handler::AnnounceHandler;
+    use crate::core::databases::setup::initialize_database;
     use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::{initialize_database, statistics};
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-    use crate::core::whitelist;
     use crate::core::whitelist::authorization::WhitelistAuthorization;
     use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::core::{statistics, whitelist};
     use crate::CurrentClock;
 
     struct CoreTrackerServices {
@@ -656,7 +656,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_the_same_transaction_id_as_the_connect_request() {
-            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -676,7 +676,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id() {
-            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -696,7 +696,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id_ipv6() {
-            let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -1001,7 +1001,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
@@ -1306,7 +1306,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = crate::core::services::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
@@ -1393,7 +1393,7 @@ mod tests {
                 use mockall::predicate::eq;
 
                 use crate::core::announce_handler::AnnounceHandler;
-                use crate::core::services::initialize_database;
+                use crate::core::databases::setup::initialize_database;
                 use crate::core::statistics;
                 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
                 use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -1494,7 +1494,7 @@ mod tests {
 
         use super::{gen_remote_fingerprint, TorrentPeerBuilder};
         use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::services::statistics;
+        use crate::core::statistics;
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;

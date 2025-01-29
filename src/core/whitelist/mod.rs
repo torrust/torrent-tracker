@@ -1,6 +1,7 @@
 pub mod authorization;
 pub mod manager;
 pub mod repository;
+pub mod setup;
 pub mod whitelist_tests;
 
 #[cfg(test)]

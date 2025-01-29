@@ -135,9 +135,9 @@ mod tests {
 
         use bittorrent_primitives::info_hash::InfoHash;
 
-        use crate::core::services::torrent::tests::sample_peer;
-        use crate::core::services::torrent::{get_torrent_info, Info};
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::core::torrent::services::tests::sample_peer;
+        use crate::core::torrent::services::{get_torrent_info, Info};
 
         #[tokio::test]
         async fn should_return_none_if_the_tracker_does_not_have_the_torrent() {
@@ -184,9 +184,9 @@ mod tests {
 
         use bittorrent_primitives::info_hash::InfoHash;
 
-        use crate::core::services::torrent::tests::sample_peer;
-        use crate::core::services::torrent::{get_torrents_page, BasicInfo, Pagination};
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::core::torrent::services::tests::sample_peer;
+        use crate::core::torrent::services::{get_torrents_page, BasicInfo, Pagination};
 
         #[tokio::test]
         async fn should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {

@@ -65,7 +65,8 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::services::{initialize_database, statistics};
+    use crate::core::databases::setup::initialize_database;
+    use crate::core::statistics;
     use crate::core::statistics::event::sender::Sender;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -137,7 +138,7 @@ mod tests {
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
         use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
         use crate::core::core_tests::sample_info_hash;
-        use crate::core::services::initialize_database;
+        use crate::core::databases::setup::initialize_database;
         use crate::core::statistics;
         use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;

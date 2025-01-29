@@ -13,8 +13,8 @@ use thiserror::Error;
 use torrust_tracker_primitives::pagination::Pagination;
 
 use super::responses::{torrent_info_response, torrent_list_response, torrent_not_known_response};
-use crate::core::services::torrent::{get_torrent_info, get_torrents, get_torrents_page};
 use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use crate::core::torrent::services::{get_torrent_info, get_torrents, get_torrents_page};
 use crate::servers::apis::v1::responses::invalid_info_hash_param_response;
 use crate::servers::apis::InfoHashParam;
 

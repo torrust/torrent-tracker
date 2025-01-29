@@ -46,6 +46,7 @@
 pub mod driver;
 pub mod error;
 pub mod mysql;
+pub mod setup;
 pub mod sqlite;
 
 use std::marker::PhantomData;
