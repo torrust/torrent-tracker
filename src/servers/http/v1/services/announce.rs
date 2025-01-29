@@ -11,12 +11,11 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
+use bittorrent_tracker_core::statistics;
+use bittorrent_tracker_core::statistics::event::sender::Sender;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
-
-use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::{self};
 
 /// The HTTP tracker `announce` service.
 ///
@@ -60,16 +59,15 @@ mod tests {
     use std::sync::Arc;
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
+    use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+    use bittorrent_tracker_core::databases::setup::initialize_database;
+    use bittorrent_tracker_core::statistics;
+    use bittorrent_tracker_core::statistics::event::sender::Sender;
+    use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use torrust_tracker_configuration::Core;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
-
-    use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::databases::setup::initialize_database;
-    use crate::core::statistics;
-    use crate::core::statistics::event::sender::Sender;
-    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
@@ -124,11 +122,29 @@ mod tests {
         }
     }
 
+    use bittorrent_tracker_core::statistics::event::Event;
+    use futures::future::BoxFuture;
+    use mockall::mock;
+    use tokio::sync::mpsc::error::SendError;
+
+    mock! {
+        StatsEventSender {}
+        impl Sender for StatsEventSender {
+             fn send_event(&self, event: Event) -> BoxFuture<'static,Option<Result<(),SendError<Event> > > > ;
+        }
+    }
+
     mod with_tracker_in_any_mode {
         use std::future;
         use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
         use std::sync::Arc;
 
+        use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
+        use bittorrent_tracker_core::core_tests::sample_info_hash;
+        use bittorrent_tracker_core::databases::setup::initialize_database;
+        use bittorrent_tracker_core::statistics;
+        use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::AnnounceData;
         use torrust_tracker_primitives::peer;
@@ -136,14 +152,10 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
-        use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-        use crate::core::core_tests::sample_info_hash;
-        use crate::core::databases::setup::initialize_database;
-        use crate::core::statistics;
-        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-        use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use crate::servers::http::v1::services::announce::invoke;
-        use crate::servers::http::v1::services::announce::tests::{initialize_core_tracker_services, sample_peer};
+        use crate::servers::http::v1::services::announce::tests::{
+            initialize_core_tracker_services, sample_peer, MockStatsEventSender,
+        };
 
         fn initialize_announce_handler() -> Arc<AnnounceHandler> {
             let config = configuration::ephemeral();
@@ -189,7 +201,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_announce_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp4Announce))
@@ -234,7 +246,7 @@ mod tests {
             // Tracker changes the peer IP to the tracker external IP when the peer is using the loopback IP.
 
             // Assert that the event sent is a TCP4 event
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp4Announce))
@@ -260,7 +272,7 @@ mod tests {
         #[tokio::test]
         async fn it_should_send_the_tcp_6_announce_event_when_the_peer_uses_ipv6_even_if_the_tracker_changes_the_peer_ip_to_ipv4()
         {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp6Announce))

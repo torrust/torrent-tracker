@@ -16,17 +16,18 @@ use bittorrent_http_protocol::v1::requests::announce::{Announce, Compact, Event}
 use bittorrent_http_protocol::v1::responses::{self};
 use bittorrent_http_protocol::v1::services::peer_ip_resolver;
 use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
+use bittorrent_tracker_core::authentication::service::AuthenticationService;
+use bittorrent_tracker_core::authentication::Key;
+use bittorrent_tracker_core::statistics::event::sender::Sender;
+use bittorrent_tracker_core::whitelist;
 use hyper::StatusCode;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
-use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-use crate::core::authentication::service::AuthenticationService;
-use crate::core::authentication::Key;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::whitelist;
+use super::common::auth::map_auth_error_to_error_response;
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
@@ -150,7 +151,7 @@ async fn handle_announce(
         match maybe_key {
             Some(key) => match authentication_service.authenticate(&key).await {
                 Ok(()) => (),
-                Err(error) => return Err(responses::error::Error::from(error)),
+                Err(error) => return Err(map_auth_error_to_error_response(&error)),
             },
             None => {
                 return Err(responses::error::Error::from(auth::Error::MissingAuthKey {
@@ -250,20 +251,19 @@ mod tests {
     use bittorrent_http_protocol::v1::requests::announce::Announce;
     use bittorrent_http_protocol::v1::responses;
     use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
+    use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+    use bittorrent_tracker_core::authentication::key::repository::in_memory::InMemoryKeyRepository;
+    use bittorrent_tracker_core::authentication::service::AuthenticationService;
+    use bittorrent_tracker_core::core_tests::sample_info_hash;
+    use bittorrent_tracker_core::databases::setup::initialize_database;
+    use bittorrent_tracker_core::statistics;
+    use bittorrent_tracker_core::statistics::event::sender::Sender;
+    use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
+    use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
-
-    use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
-    use crate::core::authentication::service::AuthenticationService;
-    use crate::core::core_tests::sample_info_hash;
-    use crate::core::databases::setup::initialize_database;
-    use crate::core::statistics;
-    use crate::core::statistics::event::sender::Sender;
-    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-    use crate::core::whitelist::authorization::WhitelistAuthorization;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
@@ -347,8 +347,9 @@ mod tests {
 
         use std::str::FromStr;
 
+        use bittorrent_tracker_core::authentication;
+
         use super::{initialize_private_tracker, sample_announce_request, sample_client_ip_sources};
-        use crate::core::authentication;
         use crate::servers::http::v1::handlers::announce::handle_announce;
         use crate::servers::http::v1::handlers::announce::tests::assert_error_response;
 

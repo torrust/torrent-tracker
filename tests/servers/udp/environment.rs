@@ -2,12 +2,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::databases::Database;
+use bittorrent_tracker_core::statistics::repository::Repository;
+use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_configuration::{Configuration, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::container::UdpTrackerContainer;
-use torrust_tracker_lib::core::databases::Database;
-use torrust_tracker_lib::core::statistics::repository::Repository;
-use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
 use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};

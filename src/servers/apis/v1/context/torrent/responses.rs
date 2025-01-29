@@ -1,10 +1,10 @@
 //! API responses for the [`torrent`](crate::servers::apis::v1::context::torrent)
 //! API context.
 use axum::response::{IntoResponse, Json, Response};
+use bittorrent_tracker_core::torrent::services::{BasicInfo, Info};
 use serde_json::json;
 
 use super::resources::torrent::{ListItem, Torrent};
-use crate::core::torrent::services::{BasicInfo, Info};
 
 /// `200` response that contains an array of
 /// [`ListItem`]

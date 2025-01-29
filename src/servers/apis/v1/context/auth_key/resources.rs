@@ -1,9 +1,8 @@
 //! API resources for the [`auth_key`](crate::servers::apis::v1::context::auth_key) API context.
 
+use bittorrent_tracker_core::authentication::{self, Key};
 use serde::{Deserialize, Serialize};
 use torrust_tracker_clock::conv::convert_from_iso_8601_to_timestamp;
-
-use crate::core::authentication::{self, Key};
 
 /// A resource that represents an authentication key.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -50,11 +49,11 @@ impl From<authentication::PeerKey> for AuthKey {
 mod tests {
     use std::time::Duration;
 
+    use bittorrent_tracker_core::authentication::{self, Key};
     use torrust_tracker_clock::clock::stopped::Stopped as _;
     use torrust_tracker_clock::clock::{self, Time};
 
     use super::AuthKey;
-    use crate::core::authentication::{self, Key};
     use crate::CurrentClock;
 
     struct TestTime {

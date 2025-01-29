@@ -4,9 +4,8 @@
 //! - `ListItem` is a list item resource on a torrent list. `ListItem` does
 //!   include a `peers` field but it is always `None` in the struct and `null` in
 //!   the JSON response.
+use bittorrent_tracker_core::torrent::services::{BasicInfo, Info};
 use serde::{Deserialize, Serialize};
-
-use crate::core::torrent::services::{BasicInfo, Info};
 
 /// `Torrent` API resource.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -99,10 +98,10 @@ mod tests {
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
+    use bittorrent_tracker_core::torrent::services::{BasicInfo, Info};
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
 
     use super::Torrent;
-    use crate::core::torrent::services::{BasicInfo, Info};
     use crate::servers::apis::v1::context::torrent::resources::peer::Peer;
     use crate::servers::apis::v1::context::torrent::resources::torrent::ListItem;
 

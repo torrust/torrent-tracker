@@ -1,4 +1,4 @@
-use torrust_tracker_lib::core::authentication::Key;
+use bittorrent_tracker_core::authentication::Key;
 
 #[derive(Clone, Debug)]
 pub struct ConnectionInfo {

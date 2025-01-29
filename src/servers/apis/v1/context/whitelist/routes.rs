@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use axum::routing::{delete, get, post};
 use axum::Router;
+use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 
 use super::handlers::{add_torrent_to_whitelist_handler, reload_whitelist_handler, remove_torrent_from_whitelist_handler};
-use crate::core::whitelist::manager::WhitelistManager;
 
 /// It adds the routes to the router for the [`whitelist`](crate::servers::apis::v1::context::whitelist) API context.
 pub fn add(prefix: &str, router: Router, whitelist_manager: &Arc<WhitelistManager>) -> Router {

@@ -4,9 +4,8 @@
 use std::panic::Location;
 
 use bittorrent_http_protocol::v1::responses;
+use bittorrent_tracker_core::authentication;
 use thiserror::Error;
-
-use crate::core::authentication;
 
 /// Authentication error.
 ///
@@ -31,10 +30,12 @@ impl From<Error> for responses::error::Error {
     }
 }
 
-impl From<authentication::Error> for responses::error::Error {
-    fn from(err: authentication::Error) -> Self {
-        responses::error::Error {
-            failure_reason: format!("Authentication error: {err}"),
-        }
+#[must_use]
+pub fn map_auth_error_to_error_response(err: &authentication::Error) -> responses::error::Error {
+    // code_review: this could not been implemented with the trait:
+    // impl From<authentication::Error> for responses::error::Error
+    // Consider moving the trait implementation to the http-protocol package.
+    responses::error::Error {
+        failure_reason: format!("Authentication error: {err}"),
     }
 }

@@ -6,11 +6,11 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::response::Response;
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 
 use super::responses::{
     failed_to_reload_whitelist_response, failed_to_remove_torrent_from_whitelist_response, failed_to_whitelist_torrent_response,
 };
-use crate::core::whitelist::manager::WhitelistManager;
 use crate::servers::apis::v1::responses::{invalid_info_hash_param_response, ok_response};
 use crate::servers::apis::InfoHashParam;
 

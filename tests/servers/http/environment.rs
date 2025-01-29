@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::authentication::handler::KeysHandler;
+use bittorrent_tracker_core::databases::Database;
+use bittorrent_tracker_core::statistics::repository::Repository;
+use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 use futures::executor::block_on;
 use torrust_tracker_configuration::Configuration;
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::container::HttpTrackerContainer;
-use torrust_tracker_lib::core::authentication::handler::KeysHandler;
-use torrust_tracker_lib::core::databases::Database;
-use torrust_tracker_lib::core::statistics::repository::Repository;
-use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrust_tracker_lib::core::whitelist::manager::WhitelistManager;
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_primitives::peer;

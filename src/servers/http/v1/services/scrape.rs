@@ -11,11 +11,10 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+use bittorrent_tracker_core::statistics::event::sender::Sender;
+use bittorrent_tracker_core::statistics::{self};
 use torrust_tracker_primitives::core::ScrapeData;
-
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::{self};
 
 /// The HTTP tracker `scrape` service.
 ///
@@ -77,17 +76,21 @@ mod tests {
 
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
+    use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+    use bittorrent_tracker_core::core_tests::sample_info_hash;
+    use bittorrent_tracker_core::databases::setup::initialize_database;
+    use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+    use bittorrent_tracker_core::statistics::event::sender::Sender;
+    use bittorrent_tracker_core::statistics::event::Event;
+    use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
+    use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use futures::future::BoxFuture;
+    use mockall::mock;
+    use tokio::sync::mpsc::error::SendError;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
-
-    use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::core_tests::sample_info_hash;
-    use crate::core::databases::setup::initialize_database;
-    use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-    use crate::core::whitelist::authorization::WhitelistAuthorization;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
 
     fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
@@ -133,27 +136,34 @@ mod tests {
         Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository))
     }
 
+    mock! {
+        StatsEventSender {}
+        impl Sender for StatsEventSender {
+             fn send_event(&self, event: Event) -> BoxFuture<'static,Option<Result<(),SendError<Event> > > > ;
+        }
+    }
+
     mod with_real_data {
 
         use std::future;
         use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
         use std::sync::Arc;
 
+        use bittorrent_tracker_core::announce_handler::PeersWanted;
+        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-        use crate::core::announce_handler::PeersWanted;
-        use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hash,
-            sample_info_hashes, sample_peer,
+            sample_info_hashes, sample_peer, MockStatsEventSender,
         };
 
         #[tokio::test]
         async fn it_should_return_the_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
@@ -183,7 +193,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_scrape_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp4Scrape))
@@ -201,7 +211,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_6_scrape_event_when_the_peer_uses_ipv6() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp6Scrape))
@@ -224,19 +234,20 @@ mod tests {
         use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
         use std::sync::Arc;
 
+        use bittorrent_tracker_core::announce_handler::PeersWanted;
+        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
         use torrust_tracker_primitives::core::ScrapeData;
 
-        use crate::core::announce_handler::PeersWanted;
-        use crate::core::statistics;
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
+            MockStatsEventSender,
         };
 
         #[tokio::test]
         async fn it_should_always_return_the_zeroed_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, _scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
@@ -258,7 +269,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_scrape_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp4Scrape))
@@ -274,7 +285,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_6_scrape_event_when_the_peer_uses_ipv6() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Tcp6Scrape))

@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use axum::Router;
+use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
 use super::handlers::{get_torrent_handler, get_torrents_handler};
-use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
 /// It adds the routes to the router for the [`torrent`](crate::servers::apis::v1::context::torrent) API context.
 pub fn add(prefix: &str, router: Router, in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>) -> Router {
