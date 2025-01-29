@@ -82,8 +82,8 @@ mod tests {
 
     use crate::core::announce_handler::AnnounceHandler;
     use crate::core::core_tests::sample_info_hash;
+    use crate::core::databases::setup::initialize_database;
     use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::services::initialize_database;
     use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use crate::core::whitelist::authorization::WhitelistAuthorization;

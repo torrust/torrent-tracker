@@ -246,7 +246,7 @@ mod tests {
         use crate::core::authentication::handler::KeysHandler;
         use crate::core::authentication::key::repository::in_memory::InMemoryKeyRepository;
         use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
-        use crate::core::services::initialize_database;
+        use crate::core::databases::setup::initialize_database;
 
         fn instantiate_keys_handler() -> KeysHandler {
             let config = configuration::ephemeral_private();

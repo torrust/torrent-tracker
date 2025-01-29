@@ -5,7 +5,8 @@ use torrust_tracker_configuration::Configuration;
 use super::authorization::WhitelistAuthorization;
 use super::manager::WhitelistManager;
 use super::repository::in_memory::InMemoryWhitelist;
-use crate::core::services::{initialize_database, initialize_whitelist_manager};
+use crate::core::databases::setup::initialize_database;
+use crate::core::services::initialize_whitelist_manager;
 
 #[must_use]
 pub fn initialize_whitelist_services(config: &Configuration) -> (Arc<WhitelistAuthorization>, Arc<WhitelistManager>) {

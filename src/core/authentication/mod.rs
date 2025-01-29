@@ -27,7 +27,7 @@ mod tests {
         use crate::core::authentication::key::repository::persisted::DatabaseKeyRepository;
         use crate::core::authentication::service;
         use crate::core::authentication::service::AuthenticationService;
-        use crate::core::services::initialize_database;
+        use crate::core::databases::setup::initialize_database;
 
         fn instantiate_keys_manager_and_authentication() -> (Arc<KeysHandler>, Arc<AuthenticationService>) {
             let config = configuration::ephemeral_private();
