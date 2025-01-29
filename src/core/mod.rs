@@ -344,10 +344,10 @@
 //!
 //! # Services
 //!
-//! Services are domain services on top of the core tracker. Right now there are two types of service:
+//! Services are domain services on top of the core tracker domain. Right now there are two types of service:
 //!
-//! - For statistics
-//! - For torrents
+//! - For statistics: [`crate::core::statistics::services`]
+//! - For torrents: [`crate::core::torrent::services`]
 //!
 //! Services usually format the data inside the tracker to make it easier to consume by other parts.
 //! They also decouple the internal data structure, used by the tracker, from the way we deliver that data to the consumers.
@@ -355,8 +355,6 @@
 //! without affecting the external consumers.
 //!
 //! Services can include extra features like pagination, for example.
-//!
-//! Refer to [`services`] module for more information about services.
 //!
 //! # Authentication
 //!
