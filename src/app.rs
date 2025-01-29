@@ -28,7 +28,7 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use crate::bootstrap::jobs::{health_check_api, http_tracker, torrent_cleanup, tracker_apis, udp_tracker};
-use crate::container::{AppContainer, UdpTrackerContainer};
+use crate::container::{AppContainer, HttpTrackerContainer, UdpTrackerContainer};
 use crate::servers;
 use crate::servers::registar::Registar;
 
@@ -80,6 +80,7 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
             } else {
                 let udp_tracker_config = Arc::new(udp_tracker_config.clone());
                 let udp_tracker_container = Arc::new(UdpTrackerContainer::from_app_container(&udp_tracker_config, app_container));
+
                 jobs.push(udp_tracker::start_job(udp_tracker_container, registar.give_form()).await);
             }
         }
@@ -90,18 +91,11 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
     // Start the HTTP blocks
     if let Some(http_trackers) = &config.http_trackers {
         for http_tracker_config in http_trackers {
-            if let Some(job) = http_tracker::start_job(
-                http_tracker_config,
-                Arc::new(config.core.clone()),
-                app_container.announce_handler.clone(),
-                app_container.scrape_handler.clone(),
-                app_container.authentication_service.clone(),
-                app_container.whitelist_authorization.clone(),
-                app_container.stats_event_sender.clone(),
-                registar.give_form(),
-                servers::http::Version::V1,
-            )
-            .await
+            let http_tracker_config = Arc::new(http_tracker_config.clone());
+            let http_tracker_container = Arc::new(HttpTrackerContainer::from_app_container(&http_tracker_config, app_container));
+
+            if let Some(job) =
+                http_tracker::start_job(http_tracker_container, registar.give_form(), servers::http::Version::V1).await
             {
                 jobs.push(job);
             };

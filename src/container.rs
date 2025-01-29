@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use torrust_tracker_configuration::{Core, UdpTracker};
+use torrust_tracker_configuration::{Core, HttpTracker, UdpTracker};
 
 use crate::core::announce_handler::AnnounceHandler;
 use crate::core::authentication::handler::KeysHandler;
@@ -55,6 +55,31 @@ impl UdpTrackerContainer {
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
             ban_service: app_container.ban_service.clone(),
+        }
+    }
+}
+
+pub struct HttpTrackerContainer {
+    pub core_config: Arc<Core>,
+    pub http_tracker_config: Arc<HttpTracker>,
+    pub announce_handler: Arc<AnnounceHandler>,
+    pub scrape_handler: Arc<ScrapeHandler>,
+    pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
+    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub authentication_service: Arc<AuthenticationService>,
+}
+
+impl HttpTrackerContainer {
+    #[must_use]
+    pub fn from_app_container(http_tracker_config: &Arc<HttpTracker>, app_container: &Arc<AppContainer>) -> Self {
+        Self {
+            http_tracker_config: http_tracker_config.clone(),
+            core_config: app_container.core_config.clone(),
+            announce_handler: app_container.announce_handler.clone(),
+            scrape_handler: app_container.scrape_handler.clone(),
+            whitelist_authorization: app_container.whitelist_authorization.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            authentication_service: app_container.authentication_service.clone(),
         }
     }
 }

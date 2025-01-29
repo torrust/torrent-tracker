@@ -449,7 +449,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let announce_policy = env.core_config.announce_policy;
+            let announce_policy = env.http_tracker_container.core_config.announce_policy;
 
             assert_announce_response(
                 response,
@@ -490,7 +490,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let announce_policy = env.core_config.announce_policy;
+            let announce_policy = env.http_tracker_container.core_config.announce_policy;
 
             // It should only contain the previously announced peer
             assert_announce_response(
@@ -543,7 +543,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let announce_policy = env.core_config.announce_policy;
+            let announce_policy = env.http_tracker_container.core_config.announce_policy;
 
             // The newly announced peer is not included on the response peer list,
             // but all the previously announced peers should be included regardless the IP version they are using.
@@ -872,7 +872,10 @@ mod for_all_config_modes {
             let peers = env.in_memory_torrent_repository.get_torrent_peers(&info_hash);
             let peer_addr = peers[0].peer_addr;
 
-            assert_eq!(peer_addr.ip(), env.core_config.net.external_ip.unwrap());
+            assert_eq!(
+                peer_addr.ip(),
+                env.http_tracker_container.core_config.net.external_ip.unwrap()
+            );
             assert_ne!(peer_addr.ip(), IpAddr::from_str("2.2.2.2").unwrap());
 
             env.stop().await;
@@ -914,7 +917,10 @@ mod for_all_config_modes {
             let peers = env.in_memory_torrent_repository.get_torrent_peers(&info_hash);
             let peer_addr = peers[0].peer_addr;
 
-            assert_eq!(peer_addr.ip(), env.core_config.net.external_ip.unwrap());
+            assert_eq!(
+                peer_addr.ip(),
+                env.http_tracker_container.core_config.net.external_ip.unwrap()
+            );
             assert_ne!(peer_addr.ip(), IpAddr::from_str("2.2.2.2").unwrap());
 
             env.stop().await;

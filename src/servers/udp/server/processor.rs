@@ -21,7 +21,6 @@ pub struct Processor {
 }
 
 impl Processor {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(socket: Arc<BoundSocket>, udp_tracker_container: Arc<UdpTrackerContainer>, cookie_lifetime: f64) -> Self {
         Self {
             socket,

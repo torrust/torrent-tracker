@@ -10,7 +10,7 @@ use axum::routing::get;
 use axum::{BoxError, Router};
 use axum_client_ip::SecureClientIpSource;
 use hyper::{Request, StatusCode};
-use torrust_tracker_configuration::{Core, DEFAULT_TIMEOUT};
+use torrust_tracker_configuration::DEFAULT_TIMEOUT;
 use tower::timeout::TimeoutLayer;
 use tower::ServiceBuilder;
 use tower_http::classify::ServerErrorsFailureClass;
@@ -22,11 +22,7 @@ use tower_http::LatencyUnit;
 use tracing::{instrument, Level, Span};
 
 use super::handlers::{announce, health_check, scrape};
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::authentication::service::AuthenticationService;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::whitelist;
+use crate::container::HttpTrackerContainer;
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::Latency;
 
@@ -34,25 +30,8 @@ use crate::servers::logging::Latency;
 ///
 /// > **NOTICE**: it's added a layer to get the client IP from the connection
 /// > info. The tracker could use the connection info to get the client IP.
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_pass_by_value)]
-#[instrument(skip(
-    announce_handler,
-    scrape_handler,
-    authentication_service,
-    whitelist_authorization,
-    stats_event_sender,
-    server_socket_addr
-))]
-pub fn router(
-    core_config: Arc<Core>,
-    announce_handler: Arc<AnnounceHandler>,
-    scrape_handler: Arc<ScrapeHandler>,
-    authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    server_socket_addr: SocketAddr,
-) -> Router {
+#[instrument(skip(http_tracker_container, server_socket_addr))]
+pub fn router(http_tracker_container: Arc<HttpTrackerContainer>, server_socket_addr: SocketAddr) -> Router {
     Router::new()
         // Health check
         .route("/health_check", get(health_check::handler))
@@ -60,40 +39,40 @@ pub fn router(
         .route(
             "/announce",
             get(announce::handle_without_key).with_state((
-                core_config.clone(),
-                announce_handler.clone(),
-                authentication_service.clone(),
-                whitelist_authorization.clone(),
-                stats_event_sender.clone(),
+                http_tracker_container.core_config.clone(),
+                http_tracker_container.announce_handler.clone(),
+                http_tracker_container.authentication_service.clone(),
+                http_tracker_container.whitelist_authorization.clone(),
+                http_tracker_container.stats_event_sender.clone(),
             )),
         )
         .route(
             "/announce/{key}",
             get(announce::handle_with_key).with_state((
-                core_config.clone(),
-                announce_handler.clone(),
-                authentication_service.clone(),
-                whitelist_authorization.clone(),
-                stats_event_sender.clone(),
+                http_tracker_container.core_config.clone(),
+                http_tracker_container.announce_handler.clone(),
+                http_tracker_container.authentication_service.clone(),
+                http_tracker_container.whitelist_authorization.clone(),
+                http_tracker_container.stats_event_sender.clone(),
             )),
         )
         // Scrape request
         .route(
             "/scrape",
             get(scrape::handle_without_key).with_state((
-                core_config.clone(),
-                scrape_handler.clone(),
-                authentication_service.clone(),
-                stats_event_sender.clone(),
+                http_tracker_container.core_config.clone(),
+                http_tracker_container.scrape_handler.clone(),
+                http_tracker_container.authentication_service.clone(),
+                http_tracker_container.stats_event_sender.clone(),
             )),
         )
         .route(
             "/scrape/{key}",
             get(scrape::handle_with_key).with_state((
-                core_config.clone(),
-                scrape_handler.clone(),
-                authentication_service.clone(),
-                stats_event_sender.clone(),
+                http_tracker_container.core_config.clone(),
+                http_tracker_container.scrape_handler.clone(),
+                http_tracker_container.authentication_service.clone(),
+                http_tracker_container.stats_event_sender.clone(),
             )),
         )
         // Add extension to get the client IP from the connection info

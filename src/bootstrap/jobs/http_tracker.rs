@@ -15,15 +15,10 @@ use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
 use tokio::task::JoinHandle;
-use torrust_tracker_configuration::{Core, HttpTracker};
 use tracing::instrument;
 
 use super::make_rust_tls;
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::authentication::service::AuthenticationService;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::{statistics, whitelist};
+use crate::container::HttpTrackerContainer;
 use crate::servers::http::server::{HttpServer, Launcher};
 use crate::servers::http::Version;
 use crate::servers::registar::ServiceRegistrationForm;
@@ -36,83 +31,33 @@ use crate::servers::registar::ServiceRegistrationForm;
 /// # Panics
 ///
 /// It would panic if the `config::HttpTracker` struct would contain inappropriate values.
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip(
-    config,
-    announce_handler,
-    scrape_handler,
-    authentication_service,
-    whitelist_authorization,
-    stats_event_sender,
-    form
-))]
+#[instrument(skip(http_tracker_container, form))]
 pub async fn start_job(
-    config: &HttpTracker,
-    core_config: Arc<Core>,
-    announce_handler: Arc<AnnounceHandler>,
-    scrape_handler: Arc<ScrapeHandler>,
-    authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    http_tracker_container: Arc<HttpTrackerContainer>,
     form: ServiceRegistrationForm,
     version: Version,
 ) -> Option<JoinHandle<()>> {
-    let socket = config.bind_address;
+    let socket = http_tracker_container.http_tracker_config.bind_address;
 
-    let tls = make_rust_tls(&config.tsl_config)
+    let tls = make_rust_tls(&http_tracker_container.http_tracker_config.tsl_config)
         .await
         .map(|tls| tls.expect("it should have a valid http tracker tls configuration"));
 
     match version {
-        Version::V1 => Some(
-            start_v1(
-                socket,
-                tls,
-                core_config.clone(),
-                announce_handler.clone(),
-                scrape_handler.clone(),
-                authentication_service.clone(),
-                whitelist_authorization.clone(),
-                stats_event_sender.clone(),
-                form,
-            )
-            .await,
-        ),
+        Version::V1 => Some(start_v1(socket, tls, http_tracker_container, form).await),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(
-    socket,
-    tls,
-    announce_handler,
-    scrape_handler,
-    whitelist_authorization,
-    stats_event_sender,
-    form
-))]
+#[instrument(skip(socket, tls, http_tracker_container, form))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
-    config: Arc<Core>,
-    announce_handler: Arc<AnnounceHandler>,
-    scrape_handler: Arc<ScrapeHandler>,
-    authentication_service: Arc<AuthenticationService>,
-    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+    http_tracker_container: Arc<HttpTrackerContainer>,
     form: ServiceRegistrationForm,
 ) -> JoinHandle<()> {
     let server = HttpServer::new(Launcher::new(socket, tls))
-        .start(
-            config,
-            announce_handler,
-            scrape_handler,
-            authentication_service,
-            whitelist_authorization,
-            stats_event_sender,
-            form,
-        )
+        .start(http_tracker_container, form)
         .await
         .expect("it should be able to start to the http tracker");
 
@@ -137,6 +82,7 @@ mod tests {
 
     use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::http_tracker::start_job;
+    use crate::container::HttpTrackerContainer;
     use crate::servers::http::Version;
     use crate::servers::registar::Registar;
 
@@ -144,26 +90,18 @@ mod tests {
     async fn it_should_start_http_tracker() {
         let cfg = Arc::new(ephemeral_public());
         let http_tracker = cfg.http_trackers.clone().expect("missing HTTP tracker configuration");
-        let config = &http_tracker[0];
+        let http_tracker_config = Arc::new(http_tracker[0].clone());
 
         initialize_global_services(&cfg);
 
-        let app_container = initialize_app_container(&cfg);
+        let app_container = Arc::new(initialize_app_container(&cfg));
+
+        let http_tracker_container = Arc::new(HttpTrackerContainer::from_app_container(&http_tracker_config, &app_container));
 
         let version = Version::V1;
 
-        start_job(
-            config,
-            Arc::new(cfg.core.clone()),
-            app_container.announce_handler,
-            app_container.scrape_handler,
-            app_container.authentication_service,
-            app_container.whitelist_authorization,
-            app_container.stats_event_sender,
-            Registar::default().give_form(),
-            version,
-        )
-        .await
-        .expect("it should be able to join to the http tracker start-job");
+        start_job(http_tracker_container, Registar::default().give_form(), version)
+            .await
+            .expect("it should be able to join to the http tracker start-job");
     }
 }
