@@ -24,4 +24,4 @@ tdyne-peer-id = "1"
 tdyne-peer-id-registry = "0"
 thiserror = "2"
 torrust-tracker-configuration = { version = "3.0.0-develop", path = "../configuration" }
-zerocopy = "0.7"
+zerocopy = "0.8"
