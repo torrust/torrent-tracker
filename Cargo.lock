@@ -592,6 +592,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "bittorrent-tracker-core"
+version = "3.0.0-develop"
+dependencies = [
+ "aquatic_udp_protocol",
+ "bittorrent-http-protocol",
+ "bittorrent-primitives",
+ "chrono",
+ "derive_more",
+ "futures",
+ "local-ip-address",
+ "mockall",
+ "r2d2",
+ "r2d2_mysql",
+ "r2d2_sqlite",
+ "rand",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tokio",
+ "torrust-tracker-api-client",
+ "torrust-tracker-clock",
+ "torrust-tracker-configuration",
+ "torrust-tracker-located-error",
+ "torrust-tracker-primitives",
+ "torrust-tracker-test-helpers",
+ "torrust-tracker-torrent-repository",
+ "tracing",
+]
+
+[[package]]
 name = "bitvec"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3931,6 +3961,7 @@ dependencies = [
  "bittorrent-http-protocol",
  "bittorrent-primitives",
  "bittorrent-tracker-client",
+ "bittorrent-tracker-core",
  "bloom",
  "blowfish",
  "camino",

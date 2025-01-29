@@ -14,9 +14,3 @@
 /// does not specifically mention this limit, but the limit is being used for
 /// both the UDP and HTTP trackers since it's applied at the domain level.
 pub const MAX_SCRAPE_TORRENTS: u8 = 74;
-
-/// HTTP tracker authentication key length.
-///
-/// For more information see function [`generate_key`](crate::core::authentication::key::generate_key) to generate the
-/// [`PeerKey`](crate::core::authentication::PeerKey).
-pub const AUTH_KEY_LENGTH: usize = 32;

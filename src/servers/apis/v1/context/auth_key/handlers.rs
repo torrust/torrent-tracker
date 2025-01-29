@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use axum::extract::{self, Path, State};
 use axum::response::Response;
+use bittorrent_tracker_core::authentication::handler::{AddKeyRequest, KeysHandler};
+use bittorrent_tracker_core::authentication::Key;
 use serde::Deserialize;
 
 use super::forms::AddKeyForm;
@@ -12,8 +14,6 @@ use super::responses::{
     auth_key_response, failed_to_delete_key_response, failed_to_generate_key_response, failed_to_reload_keys_response,
     invalid_auth_key_duration_response, invalid_auth_key_response,
 };
-use crate::core::authentication::handler::{AddKeyRequest, KeysHandler};
-use crate::core::authentication::Key;
 use crate::servers::apis::v1::context::auth_key::resources::AuthKey;
 use crate::servers::apis::v1::responses::{invalid_auth_key_param_response, ok_response};
 
@@ -43,11 +43,11 @@ pub async fn add_auth_key_handler(
     {
         Ok(auth_key) => auth_key_response(&AuthKey::from(auth_key)),
         Err(err) => match err {
-            crate::core::error::PeerKeyError::DurationOverflow { seconds_valid } => {
+            bittorrent_tracker_core::error::PeerKeyError::DurationOverflow { seconds_valid } => {
                 invalid_auth_key_duration_response(seconds_valid)
             }
-            crate::core::error::PeerKeyError::InvalidKey { key, source } => invalid_auth_key_response(&key, source),
-            crate::core::error::PeerKeyError::DatabaseError { source } => failed_to_generate_key_response(source),
+            bittorrent_tracker_core::error::PeerKeyError::InvalidKey { key, source } => invalid_auth_key_response(&key, source),
+            bittorrent_tracker_core::error::PeerKeyError::DatabaseError { source } => failed_to_generate_key_response(source),
         },
     }
 }

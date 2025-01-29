@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bittorrent_tracker_client::udp::client::check;
+use bittorrent_tracker_core::statistics;
 use derive_more::Constructor;
 use futures_util::StreamExt;
 use tokio::select;
@@ -13,7 +14,6 @@ use tracing::instrument;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
 use crate::container::UdpTrackerContainer;
-use crate::core::statistics;
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
 use crate::servers::signals::{shutdown_signal_with_message, Halted};

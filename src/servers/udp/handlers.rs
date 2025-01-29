@@ -11,6 +11,10 @@ use aquatic_udp_protocol::{
     ResponsePeer, ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics, TransactionId,
 };
 use bittorrent_primitives::info_hash::InfoHash;
+use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
+use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+use bittorrent_tracker_core::statistics::event::sender::Sender;
+use bittorrent_tracker_core::{statistics, whitelist};
 use torrust_tracker_clock::clock::Time as _;
 use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
@@ -20,10 +24,6 @@ use zerocopy::network_endian::I32;
 use super::connection_cookie::{check, make};
 use super::RawRequest;
 use crate::container::UdpTrackerContainer;
-use crate::core::announce_handler::{AnnounceHandler, PeersWanted};
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::{statistics, whitelist};
 use crate::servers::udp::error::Error;
 use crate::servers::udp::{peer_builder, UDP_TRACKER_LOG_TARGET};
 use crate::shared::bit_torrent::common::MAX_SCRAPE_TORRENTS;
@@ -468,21 +468,25 @@ mod tests {
     use std::sync::Arc;
 
     use aquatic_udp_protocol::{NumberOfBytes, PeerId};
+    use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+    use bittorrent_tracker_core::databases::setup::initialize_database;
+    use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+    use bittorrent_tracker_core::statistics::event::sender::Sender;
+    use bittorrent_tracker_core::statistics::event::Event;
+    use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
+    use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use bittorrent_tracker_core::{statistics, whitelist};
+    use futures::future::BoxFuture;
+    use mockall::mock;
+    use tokio::sync::mpsc::error::SendError;
     use torrust_tracker_clock::clock::Time;
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_primitives::peer;
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::core::announce_handler::AnnounceHandler;
-    use crate::core::databases::setup::initialize_database;
-    use crate::core::scrape_handler::ScrapeHandler;
-    use crate::core::statistics::event::sender::Sender;
-    use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-    use crate::core::whitelist::authorization::WhitelistAuthorization;
-    use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use crate::core::{statistics, whitelist};
     use crate::CurrentClock;
 
     struct CoreTrackerServices {
@@ -632,20 +636,28 @@ mod tests {
         }
     }
 
+    mock! {
+        StatsEventSender {}
+        impl Sender for StatsEventSender {
+             fn send_event(&self, event: Event) -> BoxFuture<'static,Option<Result<(),SendError<Event> > > > ;
+        }
+    }
+
     mod connect_request {
 
         use std::future;
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{ConnectRequest, ConnectResponse, Response, TransactionId};
+        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
 
         use super::{sample_ipv4_socket_address, sample_ipv6_remote_addr};
-        use crate::core::statistics;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_connect;
         use crate::servers::udp::handlers::tests::{
             sample_ipv4_remote_addr, sample_ipv4_remote_addr_fingerprint, sample_ipv6_remote_addr_fingerprint, sample_issue_time,
+            MockStatsEventSender,
         };
 
         fn sample_connect_request() -> ConnectRequest {
@@ -656,7 +668,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_the_same_transaction_id_as_the_connect_request() {
-            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -676,7 +688,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id() {
-            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -696,7 +708,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id_ipv6() {
-            let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -716,7 +728,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_upd4_connect_event_when_a_client_tries_to_connect_using_a_ip4_socket_address() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Udp4Connect))
@@ -738,7 +750,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_upd6_connect_event_when_a_client_tries_to_connect_using_a_ip6_socket_address() {
-            let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+            let mut stats_event_sender_mock = MockStatsEventSender::new();
             stats_event_sender_mock
                 .expect_send_event()
                 .with(eq(statistics::event::Event::Udp6Connect))
@@ -840,18 +852,18 @@ mod tests {
                 AnnounceInterval, AnnounceResponse, InfoHash as AquaticInfoHash, Ipv4AddrBytes, Ipv6AddrBytes, NumberOfPeers,
                 PeerId as AquaticPeerId, Response, ResponsePeer,
             };
+            use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+            use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+            use bittorrent_tracker_core::{statistics, whitelist};
             use mockall::predicate::eq;
             use torrust_tracker_configuration::Core;
 
-            use crate::core::announce_handler::AnnounceHandler;
-            use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-            use crate::core::{statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
                 gen_remote_fingerprint, initialize_core_tracker_services_for_default_tracker_configuration,
                 initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range, sample_ipv4_socket_address,
-                sample_issue_time, TorrentPeerBuilder,
+                sample_issue_time, MockStatsEventSender, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -1001,7 +1013,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
@@ -1046,7 +1058,7 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd4_announce_event() {
-                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                let mut stats_event_sender_mock = MockStatsEventSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
                     .with(eq(statistics::event::Event::Udp4Announce))
@@ -1141,18 +1153,18 @@ mod tests {
                 AnnounceInterval, AnnounceResponse, InfoHash as AquaticInfoHash, Ipv4AddrBytes, Ipv6AddrBytes, NumberOfPeers,
                 PeerId as AquaticPeerId, Response, ResponsePeer,
             };
+            use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+            use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+            use bittorrent_tracker_core::{statistics, whitelist};
             use mockall::predicate::eq;
             use torrust_tracker_configuration::Core;
 
-            use crate::core::announce_handler::AnnounceHandler;
-            use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-            use crate::core::{statistics, whitelist};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
                 gen_remote_fingerprint, initialize_core_tracker_services_for_default_tracker_configuration,
                 initialize_core_tracker_services_for_public_tracker, sample_cookie_valid_range, sample_ipv6_remote_addr,
-                sample_issue_time, TorrentPeerBuilder,
+                sample_issue_time, MockStatsEventSender, TorrentPeerBuilder,
             };
             use crate::servers::udp::handlers::{handle_announce, AnnounceResponseFixedData};
 
@@ -1306,7 +1318,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = crate::core::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
@@ -1354,7 +1366,7 @@ mod tests {
 
             #[tokio::test]
             async fn should_send_the_upd6_announce_event() {
-                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                let mut stats_event_sender_mock = MockStatsEventSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
                     .with(eq(statistics::event::Event::Udp6Announce))
@@ -1390,20 +1402,21 @@ mod tests {
                 use std::sync::Arc;
 
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
+                use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+                use bittorrent_tracker_core::databases::setup::initialize_database;
+                use bittorrent_tracker_core::statistics;
+                use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+                use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+                use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
+                use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
                 use mockall::predicate::eq;
 
-                use crate::core::announce_handler::AnnounceHandler;
-                use crate::core::databases::setup::initialize_database;
-                use crate::core::statistics;
-                use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-                use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-                use crate::core::whitelist::authorization::WhitelistAuthorization;
-                use crate::core::whitelist::repository::in_memory::InMemoryWhitelist;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
                 use crate::servers::udp::handlers::tests::{
-                    gen_remote_fingerprint, sample_cookie_valid_range, sample_issue_time, TrackerConfigurationBuilder,
+                    gen_remote_fingerprint, sample_cookie_valid_range, sample_issue_time, MockStatsEventSender,
+                    TrackerConfigurationBuilder,
                 };
 
                 #[tokio::test]
@@ -1417,7 +1430,7 @@ mod tests {
                     let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
                     let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 
-                    let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                    let mut stats_event_sender_mock = MockStatsEventSender::new();
                     stats_event_sender_mock
                         .expect_send_event()
                         .with(eq(statistics::event::Event::Udp6Announce))
@@ -1491,11 +1504,11 @@ mod tests {
             InfoHash, NumberOfDownloads, NumberOfPeers, PeerId, Response, ScrapeRequest, ScrapeResponse, TorrentScrapeStatistics,
             TransactionId,
         };
+        use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+        use bittorrent_tracker_core::statistics;
+        use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 
         use super::{gen_remote_fingerprint, TorrentPeerBuilder};
-        use crate::core::scrape_handler::ScrapeHandler;
-        use crate::core::statistics;
-        use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
         use crate::servers::udp::handlers::tests::{
@@ -1734,19 +1747,19 @@ mod tests {
             use std::future;
             use std::sync::Arc;
 
+            use bittorrent_tracker_core::statistics;
             use mockall::predicate::eq;
 
             use super::sample_scrape_request;
-            use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
                 initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,
-                sample_ipv4_remote_addr,
+                sample_ipv4_remote_addr, MockStatsEventSender,
             };
 
             #[tokio::test]
             async fn should_send_the_upd4_scrape_event() {
-                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                let mut stats_event_sender_mock = MockStatsEventSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
                     .with(eq(statistics::event::Event::Udp4Scrape))
@@ -1775,19 +1788,19 @@ mod tests {
             use std::future;
             use std::sync::Arc;
 
+            use bittorrent_tracker_core::statistics;
             use mockall::predicate::eq;
 
             use super::sample_scrape_request;
-            use crate::core::statistics;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
                 initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,
-                sample_ipv6_remote_addr,
+                sample_ipv6_remote_addr, MockStatsEventSender,
             };
 
             #[tokio::test]
             async fn should_send_the_upd6_scrape_event() {
-                let mut stats_event_sender_mock = statistics::event::sender::MockSender::new();
+                let mut stats_event_sender_mock = MockStatsEventSender::new();
                 stats_event_sender_mock
                     .expect_send_event()
                     .with(eq(statistics::event::Event::Udp6Scrape))

@@ -10,9 +10,9 @@ use std::sync::Arc;
 
 use axum::routing::{get, post};
 use axum::Router;
+use bittorrent_tracker_core::authentication::handler::KeysHandler;
 
 use super::handlers::{add_auth_key_handler, delete_auth_key_handler, generate_auth_key_handler, reload_keys_handler};
-use crate::core::authentication::handler::KeysHandler;
 
 /// It adds the routes to the router for the [`auth_key`](crate::servers::apis::v1::context::auth_key) API context.
 pub fn add(prefix: &str, router: Router, keys_handler: &Arc<KeysHandler>) -> Router {

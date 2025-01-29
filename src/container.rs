@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
+use bittorrent_tracker_core::announce_handler::AnnounceHandler;
+use bittorrent_tracker_core::authentication::handler::KeysHandler;
+use bittorrent_tracker_core::authentication::service::AuthenticationService;
+use bittorrent_tracker_core::databases::Database;
+use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
+use bittorrent_tracker_core::statistics::event::sender::Sender;
+use bittorrent_tracker_core::statistics::repository::Repository;
+use bittorrent_tracker_core::torrent::manager::TorrentsManager;
+use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+use bittorrent_tracker_core::whitelist;
+use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Core, HttpApi, HttpTracker, UdpTracker};
 
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::authentication::handler::KeysHandler;
-use crate::core::authentication::service::AuthenticationService;
-use crate::core::databases::Database;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::repository::Repository;
-use crate::core::torrent::manager::TorrentsManager;
-use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use crate::core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
-use crate::core::whitelist;
-use crate::core::whitelist::manager::WhitelistManager;
 use crate::servers::udp::server::banning::BanService;
 
 pub struct AppContainer {

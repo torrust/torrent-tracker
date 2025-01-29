@@ -42,6 +42,7 @@ axum-server = { version = "0", features = ["tls-rustls-no-provider"] }
 bittorrent-http-protocol = { version = "3.0.0-develop", path = "packages/http-protocol" }
 bittorrent-primitives = "0.1.0"
 bittorrent-tracker-client = { version = "3.0.0-develop", path = "packages/tracker-client" }
+bittorrent-tracker-core = { version = "3.0.0-develop", path = "packages/tracker-core" }
 bloom = "0.3.2"
 blowfish = "0"
 camino = { version = "1", features = ["serde", "serde1"] }
@@ -90,7 +91,17 @@ uuid = { version = "1", features = ["v4"] }
 zerocopy = "0.7"
 
 [package.metadata.cargo-machete]
-ignored = ["crossbeam-skiplist", "dashmap", "figment", "parking_lot", "serde_bytes"]
+ignored = [
+    "crossbeam-skiplist",
+    "dashmap",
+    "figment",
+    "parking_lot",
+    "r2d2",
+    "r2d2_mysql",
+    "r2d2_sqlite",
+    "serde_bytes",
+    "torrust-tracker-torrent-repository",
+]
 
 [dev-dependencies]
 local-ip-address = "0"
@@ -109,6 +120,7 @@ members = [
     "packages/torrent-repository",
     "packages/tracker-api-client",
     "packages/tracker-client",
+    "packages/tracker-core",
 ]
 
 [profile.dev]

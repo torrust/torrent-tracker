@@ -57,6 +57,7 @@ jobs:
         run: |
           cargo publish -p bittorrent-http-protocol
           cargo publish -p bittorrent-tracker-client
+          cargo publish -p bittorrent-tracker-core
           cargo publish -p torrust-tracker
           cargo publish -p torrust-tracker-api-client
           cargo publish -p torrust-tracker-client

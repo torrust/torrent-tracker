@@ -1,0 +1,43 @@
+[package]
+description = "A library with the core functionality needed to implement a BitTorrent tracker."
+keywords = ["api", "bittorrent", "core", "library", "tracker"]
+name = "bittorrent-tracker-core"
+readme = "README.md"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+aquatic_udp_protocol = "0"
+bittorrent-http-protocol = { version = "3.0.0-develop", path = "../http-protocol" }
+bittorrent-primitives = "0.1.0"
+chrono = { version = "0", default-features = false, features = ["clock"] }
+derive_more = { version = "1", features = ["as_ref", "constructor", "from"] }
+futures = "0"
+r2d2 = "0"
+r2d2_mysql = "25"
+r2d2_sqlite = { version = "0", features = ["bundled"] }
+rand = "0"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
+torrust-tracker-clock = { version = "3.0.0-develop", path = "../clock" }
+torrust-tracker-configuration = { version = "3.0.0-develop", path = "../configuration" }
+torrust-tracker-located-error = { version = "3.0.0-develop", path = "../located-error" }
+torrust-tracker-primitives = { version = "3.0.0-develop", path = "../primitives" }
+torrust-tracker-torrent-repository = { version = "3.0.0-develop", path = "../torrent-repository" }
+tracing = "0"
+
+[dev-dependencies]
+local-ip-address = "0"
+mockall = "0"
+torrust-tracker-api-client = { version = "3.0.0-develop", path = "../tracker-api-client" }
+torrust-tracker-test-helpers = { version = "3.0.0-develop", path = "../test-helpers" }
