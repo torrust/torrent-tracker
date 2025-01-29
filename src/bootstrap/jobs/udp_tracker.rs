@@ -8,17 +8,11 @@
 //! > for the configuration options.
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use torrust_tracker_configuration::{Core, UdpTracker};
 use tracing::instrument;
 
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::whitelist;
+use crate::container::UdpTrackerContainer;
 use crate::servers::registar::ServiceRegistrationForm;
-use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::spawner::Spawner;
 use crate::servers::udp::server::Server;
 use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
@@ -33,41 +27,14 @@ use crate::servers::udp::UDP_TRACKER_LOG_TARGET;
 /// It will panic if it is unable to start the UDP service.
 /// It will panic if the task did not finish successfully.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::async_yields_async)]
-#[instrument(skip(
-    config,
-    announce_handler,
-    scrape_handler,
-    whitelist_authorization,
-    stats_event_sender,
-    ban_service,
-    form
-))]
-pub async fn start_job(
-    core_config: Arc<Core>,
-    config: &UdpTracker,
-    announce_handler: Arc<AnnounceHandler>,
-    scrape_handler: Arc<ScrapeHandler>,
-    whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    ban_service: Arc<RwLock<BanService>>,
-    form: ServiceRegistrationForm,
-) -> JoinHandle<()> {
-    let bind_to = config.bind_address;
-    let cookie_lifetime = config.cookie_lifetime;
+#[instrument(skip(udp_tracker_container, form))]
+pub async fn start_job(udp_tracker_container: Arc<UdpTrackerContainer>, form: ServiceRegistrationForm) -> JoinHandle<()> {
+    let bind_to = udp_tracker_container.udp_tracker_config.bind_address;
+    let cookie_lifetime = udp_tracker_container.udp_tracker_config.cookie_lifetime;
 
     let server = Server::new(Spawner::new(bind_to))
-        .start(
-            core_config,
-            announce_handler,
-            scrape_handler,
-            whitelist_authorization,
-            stats_event_sender,
-            ban_service,
-            form,
-            cookie_lifetime,
-        )
+        .start(udp_tracker_container, form, cookie_lifetime)
         .await
         .expect("it should be able to start the udp tracker");
 

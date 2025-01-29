@@ -95,7 +95,7 @@ impl QueryBuilder {
     #[must_use]
     pub fn with_default_values() -> QueryBuilder {
         let default_announce_query = Query {
-            info_hash: InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap().0, // # DevSkim: ignore DS173237
+            info_hash: InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap().0, // DevSkim: ignore DS173237
             peer_addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 88)),
             downloaded: 0,
             uploaded: 0,

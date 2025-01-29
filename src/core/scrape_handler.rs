@@ -75,7 +75,7 @@ mod tests {
     async fn it_should_return_a_zeroed_swarm_metadata_for_the_requested_file_if_the_tracker_does_not_have_that_torrent() {
         let scrape_handler = scrape_handler();
 
-        let info_hashes = vec!["3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()]; // # DevSkim: ignore DS173237
+        let info_hashes = vec!["3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap()]; // DevSkim: ignore DS173237
 
         let scrape_data = scrape_handler.scrape(&info_hashes).await;
 
@@ -91,8 +91,8 @@ mod tests {
         let scrape_handler = scrape_handler();
 
         let info_hashes = vec![
-            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(), // # DevSkim: ignore DS173237
-            "99c82bb73505a3c0b453f9fa0e881d6e5a32a0c1".parse::<InfoHash>().unwrap(), // # DevSkim: ignore DS173237
+            "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(), // DevSkim: ignore DS173237
+            "99c82bb73505a3c0b453f9fa0e881d6e5a32a0c1".parse::<InfoHash>().unwrap(), // DevSkim: ignore DS173237
         ];
 
         let scrape_data = scrape_handler.scrape(&info_hashes).await;

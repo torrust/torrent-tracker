@@ -3,36 +3,26 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use futures::executor::block_on;
-use tokio::sync::RwLock;
 use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
-use torrust_tracker_configuration::{Configuration, HttpApi};
+use torrust_tracker_configuration::Configuration;
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
-use torrust_tracker_lib::core::authentication::handler::KeysHandler;
+use torrust_tracker_lib::container::HttpApiContainer;
 use torrust_tracker_lib::core::authentication::service::AuthenticationService;
 use torrust_tracker_lib::core::databases::Database;
-use torrust_tracker_lib::core::statistics::event::sender::Sender;
-use torrust_tracker_lib::core::statistics::repository::Repository;
-use torrust_tracker_lib::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use torrust_tracker_lib::core::whitelist::manager::WhitelistManager;
 use torrust_tracker_lib::servers::apis::server::{ApiServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
-use torrust_tracker_lib::servers::udp::server::banning::BanService;
 use torrust_tracker_primitives::peer;
 
 pub struct Environment<S>
 where
     S: std::fmt::Debug + std::fmt::Display,
 {
-    pub config: Arc<HttpApi>,
+    pub http_api_container: Arc<HttpApiContainer>,
+
     pub database: Arc<Box<dyn Database>>,
-    pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-    pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    pub stats_repository: Arc<Repository>,
-    pub whitelist_manager: Arc<WhitelistManager>,
-    pub ban_service: Arc<RwLock<BanService>>,
+
     pub registar: Registar,
     pub server: ApiServer<S>,
 }
@@ -43,7 +33,10 @@ where
 {
     /// Add a torrent to the tracker
     pub fn add_torrent_peer(&self, info_hash: &InfoHash, peer: &peer::Peer) {
-        let () = self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
+        let () = self
+            .http_api_container
+            .in_memory_torrent_repository
+            .upsert_peer(info_hash, peer);
     }
 }
 
@@ -53,55 +46,49 @@ impl Environment<Stopped> {
 
         let app_container = initialize_app_container(configuration);
 
-        let config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));
+        let http_api_config = Arc::new(configuration.http_api.clone().expect("missing API configuration"));
 
-        let bind_to = config.bind_address;
+        let bind_to = http_api_config.bind_address;
 
-        let tls = block_on(make_rust_tls(&config.tsl_config)).map(|tls| tls.expect("tls config failed"));
+        let tls = block_on(make_rust_tls(&http_api_config.tsl_config)).map(|tls| tls.expect("tls config failed"));
 
         let server = ApiServer::new(Launcher::new(bind_to, tls));
 
-        Self {
-            config,
-            database: app_container.database.clone(),
+        let http_api_container = Arc::new(HttpApiContainer {
+            http_api_config: http_api_config.clone(),
+            core_config: app_container.core_config.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             keys_handler: app_container.keys_handler.clone(),
-            authentication_service: app_container.authentication_service.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
-            stats_repository: app_container.stats_repository.clone(),
             whitelist_manager: app_container.whitelist_manager.clone(),
             ban_service: app_container.ban_service.clone(),
+            stats_event_sender: app_container.stats_event_sender.clone(),
+            stats_repository: app_container.stats_repository.clone(),
+        });
+
+        Self {
+            http_api_container,
+
+            database: app_container.database.clone(),
+            authentication_service: app_container.authentication_service.clone(),
+
             registar: Registar::default(),
             server,
         }
     }
 
     pub async fn start(self) -> Environment<Running> {
-        let access_tokens = Arc::new(self.config.access_tokens.clone());
+        let access_tokens = Arc::new(self.http_api_container.http_api_config.access_tokens.clone());
 
         Environment {
-            config: self.config,
+            http_api_container: self.http_api_container.clone(),
+
             database: self.database.clone(),
-            in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
-            keys_handler: self.keys_handler.clone(),
             authentication_service: self.authentication_service.clone(),
-            stats_event_sender: self.stats_event_sender.clone(),
-            stats_repository: self.stats_repository.clone(),
-            whitelist_manager: self.whitelist_manager.clone(),
-            ban_service: self.ban_service.clone(),
+
             registar: self.registar.clone(),
             server: self
                 .server
-                .start(
-                    self.in_memory_torrent_repository,
-                    self.keys_handler,
-                    self.whitelist_manager,
-                    self.stats_event_sender,
-                    self.stats_repository,
-                    self.ban_service,
-                    self.registar.give_form(),
-                    access_tokens,
-                )
+                .start(self.http_api_container, self.registar.give_form(), access_tokens)
                 .await
                 .unwrap(),
         }
@@ -115,15 +102,11 @@ impl Environment<Running> {
 
     pub async fn stop(self) -> Environment<Stopped> {
         Environment {
-            config: self.config,
+            http_api_container: self.http_api_container,
+
             database: self.database,
-            in_memory_torrent_repository: self.in_memory_torrent_repository,
-            keys_handler: self.keys_handler,
             authentication_service: self.authentication_service,
-            stats_event_sender: self.stats_event_sender,
-            stats_repository: self.stats_repository,
-            whitelist_manager: self.whitelist_manager,
-            ban_service: self.ban_service,
+
             registar: Registar::default(),
             server: self.server.stop().await.unwrap(),
         }
@@ -134,7 +117,7 @@ impl Environment<Running> {
 
         ConnectionInfo {
             origin,
-            api_token: self.config.access_tokens.get("admin").cloned(),
+            api_token: self.http_api_container.http_api_config.access_tokens.get("admin").cloned(),
         }
     }
 

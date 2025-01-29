@@ -90,7 +90,7 @@ pub struct QueryBuilder {
 impl Default for QueryBuilder {
     fn default() -> Self {
         let default_scrape_query = Query {
-            info_hash: [InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap().0].to_vec(), // # DevSkim: ignore DS173237
+            info_hash: [InfoHash::from_str("9c38422213e30bff212b30c360d26f9a02136422").unwrap().0].to_vec(), // DevSkim: ignore DS173237
         };
         Self {
             scrape_query: default_scrape_query,

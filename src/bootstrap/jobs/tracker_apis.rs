@@ -24,21 +24,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use torrust_tracker_configuration::{AccessTokens, HttpApi};
+use torrust_tracker_configuration::AccessTokens;
 use tracing::instrument;
 
 use super::make_rust_tls;
-use crate::core::authentication::handler::KeysHandler;
-use crate::core::statistics::event::sender::Sender;
-use crate::core::statistics::repository::Repository;
-use crate::core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use crate::core::whitelist::manager::WhitelistManager;
+use crate::container::HttpApiContainer;
 use crate::servers::apis::server::{ApiServer, Launcher};
 use crate::servers::apis::Version;
 use crate::servers::registar::ServiceRegistrationForm;
-use crate::servers::udp::server::banning::BanService;
 
 /// This is the message that the "launcher" spawned task sends to the main
 /// application process to notify the API server was successfully started.
@@ -60,90 +54,36 @@ pub struct ApiServerJobStarted();
 /// It would panic if unable to send the  `ApiServerJobStarted` notice.
 ///
 ///
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip(
-    config,
-    keys_handler,
-    whitelist_manager,
-    ban_service,
-    stats_event_sender,
-    stats_repository,
-    form
-))]
+#[instrument(skip(http_api_container, form))]
 pub async fn start_job(
-    config: &HttpApi,
-    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-    keys_handler: Arc<KeysHandler>,
-    whitelist_manager: Arc<WhitelistManager>,
-    ban_service: Arc<RwLock<BanService>>,
-    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    stats_repository: Arc<Repository>,
+    http_api_container: Arc<HttpApiContainer>,
     form: ServiceRegistrationForm,
     version: Version,
 ) -> Option<JoinHandle<()>> {
-    let bind_to = config.bind_address;
+    let bind_to = http_api_container.http_api_config.bind_address;
 
-    let tls = make_rust_tls(&config.tsl_config)
+    let tls = make_rust_tls(&http_api_container.http_api_config.tsl_config)
         .await
         .map(|tls| tls.expect("it should have a valid tracker api tls configuration"));
 
-    let access_tokens = Arc::new(config.access_tokens.clone());
+    let access_tokens = Arc::new(http_api_container.http_api_config.access_tokens.clone());
 
     match version {
-        Version::V1 => Some(
-            start_v1(
-                bind_to,
-                tls,
-                in_memory_torrent_repository.clone(),
-                keys_handler.clone(),
-                whitelist_manager.clone(),
-                ban_service.clone(),
-                stats_event_sender.clone(),
-                stats_repository.clone(),
-                form,
-                access_tokens,
-            )
-            .await,
-        ),
+        Version::V1 => Some(start_v1(bind_to, tls, http_api_container, form, access_tokens).await),
     }
 }
 
 #[allow(clippy::async_yields_async)]
-#[allow(clippy::too_many_arguments)]
-#[instrument(skip(
-    socket,
-    tls,
-    keys_handler,
-    whitelist_manager,
-    ban_service,
-    stats_event_sender,
-    stats_repository,
-    form,
-    access_tokens
-))]
+#[instrument(skip(socket, tls, http_api_container, form, access_tokens))]
 async fn start_v1(
     socket: SocketAddr,
     tls: Option<RustlsConfig>,
-    in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-    keys_handler: Arc<KeysHandler>,
-    whitelist_manager: Arc<WhitelistManager>,
-    ban_service: Arc<RwLock<BanService>>,
-    stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    stats_repository: Arc<Repository>,
+    http_api_container: Arc<HttpApiContainer>,
     form: ServiceRegistrationForm,
     access_tokens: Arc<AccessTokens>,
 ) -> JoinHandle<()> {
     let server = ApiServer::new(Launcher::new(socket, tls))
-        .start(
-            in_memory_torrent_repository,
-            keys_handler,
-            whitelist_manager,
-            stats_event_sender,
-            stats_repository,
-            ban_service,
-            form,
-            access_tokens,
-        )
+        .start(http_api_container, form, access_tokens)
         .await
         .expect("it should be able to start to the tracker api");
 
@@ -161,32 +101,25 @@ mod tests {
 
     use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::tracker_apis::start_job;
+    use crate::container::HttpApiContainer;
     use crate::servers::apis::Version;
     use crate::servers::registar::Registar;
 
     #[tokio::test]
     async fn it_should_start_http_tracker() {
         let cfg = Arc::new(ephemeral_public());
-        let config = &cfg.http_api.clone().unwrap();
+        let http_api_config = Arc::new(cfg.http_api.clone().unwrap());
 
         initialize_global_services(&cfg);
 
-        let app_container = initialize_app_container(&cfg);
+        let app_container = Arc::new(initialize_app_container(&cfg));
+
+        let http_api_container = Arc::new(HttpApiContainer::from_app_container(&http_api_config, &app_container));
 
         let version = Version::V1;
 
-        start_job(
-            config,
-            app_container.in_memory_torrent_repository,
-            app_container.keys_handler,
-            app_container.whitelist_manager,
-            app_container.ban_service,
-            app_container.stats_event_sender,
-            app_container.stats_repository,
-            Registar::default().give_form(),
-            version,
-        )
-        .await
-        .expect("it should be able to join to the tracker api start-job");
+        start_job(http_api_container, Registar::default().give_form(), version)
+            .await
+            .expect("it should be able to join to the tracker api start-job");
     }
 }

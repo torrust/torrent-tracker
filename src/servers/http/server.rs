@@ -7,15 +7,11 @@ use axum_server::Handle;
 use derive_more::Constructor;
 use futures::future::BoxFuture;
 use tokio::sync::oneshot::{Receiver, Sender};
-use torrust_tracker_configuration::Core;
 use tracing::instrument;
 
 use super::v1::routes::router;
 use crate::bootstrap::jobs::Started;
-use crate::core::announce_handler::AnnounceHandler;
-use crate::core::authentication::service::AuthenticationService;
-use crate::core::scrape_handler::ScrapeHandler;
-use crate::core::{statistics, whitelist};
+use crate::container::HttpTrackerContainer;
 use crate::servers::custom_axum_server::{self, TimeoutAcceptor};
 use crate::servers::http::HTTP_TRACKER_LOG_TARGET;
 use crate::servers::logging::STARTED_ON;
@@ -46,25 +42,10 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    #[allow(clippy::too_many_arguments)]
-    #[instrument(skip(
-        self,
-        announce_handler,
-        scrape_handler,
-        authentication_service,
-        whitelist_authorization,
-        stats_event_sender,
-        tx_start,
-        rx_halt
-    ))]
+    #[instrument(skip(self, http_tracker_container, tx_start, rx_halt))]
     fn start(
         &self,
-        config: Arc<Core>,
-        announce_handler: Arc<AnnounceHandler>,
-        scrape_handler: Arc<ScrapeHandler>,
-        authentication_service: Arc<AuthenticationService>,
-        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        http_tracker_container: Arc<HttpTrackerContainer>,
         tx_start: Sender<Started>,
         rx_halt: Receiver<Halted>,
     ) -> BoxFuture<'static, ()> {
@@ -84,15 +65,7 @@ impl Launcher {
 
         tracing::info!(target: HTTP_TRACKER_LOG_TARGET, "Starting on: {protocol}://{}", address);
 
-        let app = router(
-            config,
-            announce_handler,
-            scrape_handler,
-            authentication_service,
-            whitelist_authorization,
-            stats_event_sender,
-            address,
-        );
+        let app = router(http_tracker_container, address);
 
         let running = Box::pin(async {
             match tls {
@@ -185,15 +158,9 @@ impl HttpServer<Stopped> {
     ///
     /// It would panic spawned HTTP server launcher cannot send the bound `SocketAddr`
     /// back to the main thread.
-    #[allow(clippy::too_many_arguments)]
     pub async fn start(
         self,
-        core_config: Arc<Core>,
-        announce_handler: Arc<AnnounceHandler>,
-        scrape_handler: Arc<ScrapeHandler>,
-        authentication_service: Arc<AuthenticationService>,
-        whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-        stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>>,
+        http_tracker_container: Arc<HttpTrackerContainer>,
         form: ServiceRegistrationForm,
     ) -> Result<HttpServer<Running>, Error> {
         let (tx_start, rx_start) = tokio::sync::oneshot::channel::<Started>();
@@ -202,16 +169,7 @@ impl HttpServer<Stopped> {
         let launcher = self.state.launcher;
 
         let task = tokio::spawn(async move {
-            let server = launcher.start(
-                core_config,
-                announce_handler,
-                scrape_handler,
-                authentication_service,
-                whitelist_authorization,
-                stats_event_sender,
-                tx_start,
-                rx_halt,
-            );
+            let server = launcher.start(http_tracker_container, tx_start, rx_halt);
 
             server.await;
 
@@ -284,6 +242,7 @@ mod tests {
 
     use crate::bootstrap::app::{initialize_app_container, initialize_global_services};
     use crate::bootstrap::jobs::make_rust_tls;
+    use crate::container::HttpTrackerContainer;
     use crate::servers::http::server::{HttpServer, Launcher};
     use crate::servers::registar::Registar;
 
@@ -293,30 +252,24 @@ mod tests {
 
         initialize_global_services(&cfg);
 
-        let app_container = initialize_app_container(&cfg);
+        let app_container = Arc::new(initialize_app_container(&cfg));
 
         let http_trackers = cfg.http_trackers.clone().expect("missing HTTP trackers configuration");
-        let config = &http_trackers[0];
+        let http_tracker_config = &http_trackers[0];
+        let bind_to = http_tracker_config.bind_address;
 
-        let bind_to = config.bind_address;
-
-        let tls = make_rust_tls(&config.tsl_config)
+        let tls = make_rust_tls(&http_tracker_config.tsl_config)
             .await
             .map(|tls| tls.expect("tls config failed"));
 
-        let register = &Registar::default();
+        let http_tracker_config = Arc::new(http_tracker_config.clone());
+        let http_tracker_container = Arc::new(HttpTrackerContainer::from_app_container(&http_tracker_config, &app_container));
 
+        let register = &Registar::default();
         let stopped = HttpServer::new(Launcher::new(bind_to, tls));
+
         let started = stopped
-            .start(
-                Arc::new(cfg.core.clone()),
-                app_container.announce_handler,
-                app_container.scrape_handler,
-                app_container.authentication_service,
-                app_container.whitelist_authorization,
-                app_container.stats_event_sender,
-                register.give_form(),
-            )
+            .start(http_tracker_container, register.give_form())
             .await
             .expect("it should start the server");
         let stopped = started.stop().await.expect("it should stop the server");

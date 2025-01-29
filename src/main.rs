@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use torrust_tracker_lib::{app, bootstrap};
 
 #[tokio::main]
 async fn main() {
     let (config, app_container) = bootstrap::app::setup();
+
+    let app_container = Arc::new(app_container);
 
     let jobs = app::start(&config, &app_container).await;
 

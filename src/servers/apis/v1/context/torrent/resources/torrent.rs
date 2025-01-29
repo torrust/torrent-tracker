@@ -122,14 +122,14 @@ mod tests {
     fn torrent_resource_should_be_converted_from_torrent_info() {
         assert_eq!(
             Torrent::from(Info {
-                info_hash: InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(),
+                info_hash: InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(), // DevSkim: ignore DS173237
                 seeders: 1,
                 completed: 2,
                 leechers: 3,
                 peers: Some(vec![sample_peer()]),
             }),
             Torrent {
-                info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(),
+                info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(), // DevSkim: ignore DS173237
                 seeders: 1,
                 completed: 2,
                 leechers: 3,
@@ -142,13 +142,13 @@ mod tests {
     fn torrent_resource_list_item_should_be_converted_from_the_basic_torrent_info() {
         assert_eq!(
             ListItem::from(BasicInfo {
-                info_hash: InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(),
+                info_hash: InfoHash::from_str("9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d").unwrap(), // DevSkim: ignore DS173237
                 seeders: 1,
                 completed: 2,
                 leechers: 3,
             }),
             ListItem {
-                info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(),
+                info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(), // DevSkim: ignore DS173237
                 seeders: 1,
                 completed: 2,
                 leechers: 3,

@@ -15,7 +15,7 @@ use super::handlers::{add_auth_key_handler, delete_auth_key_handler, generate_au
 use crate::core::authentication::handler::KeysHandler;
 
 /// It adds the routes to the router for the [`auth_key`](crate::servers::apis::v1::context::auth_key) API context.
-pub fn add(prefix: &str, router: Router, keys_handler: Arc<KeysHandler>) -> Router {
+pub fn add(prefix: &str, router: Router, keys_handler: &Arc<KeysHandler>) -> Router {
     // Keys
     router
         .route(
@@ -38,5 +38,8 @@ pub fn add(prefix: &str, router: Router, keys_handler: Arc<KeysHandler>) -> Rout
             &format!("{prefix}/keys/reload"),
             get(reload_keys_handler).with_state(keys_handler.clone()),
         )
-        .route(&format!("{prefix}/keys"), post(add_auth_key_handler).with_state(keys_handler))
+        .route(
+            &format!("{prefix}/keys"),
+            post(add_auth_key_handler).with_state(keys_handler.clone()),
+        )
 }
