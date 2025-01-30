@@ -82,10 +82,7 @@ impl<'a> BRefAccess for BencodeMut<'a> {
     fn str(&self) -> Option<&str> {
         let bytes = self.bytes()?;
 
-        match str::from_utf8(bytes) {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        }
+        str::from_utf8(bytes).ok()
     }
 
     fn int(&self) -> Option<i64> {

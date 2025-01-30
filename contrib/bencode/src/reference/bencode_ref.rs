@@ -107,10 +107,7 @@ impl<'a> BRefAccessExt<'a> for BencodeRef<'a> {
     fn str_ext(&self) -> Option<&'a str> {
         let bytes = self.bytes_ext()?;
 
-        match str::from_utf8(bytes) {
-            Ok(n) => Some(n),
-            Err(_) => None,
-        }
+        str::from_utf8(bytes).ok()
     }
 
     fn bytes_ext(&self) -> Option<&'a [u8]> {

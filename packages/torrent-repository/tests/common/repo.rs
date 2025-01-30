@@ -232,7 +232,7 @@ impl Repo {
             Repo::DashMapMutexStd(repo) => {
                 repo.torrents.insert(*info_hash, torrent.into());
             }
-        };
+        }
         self.get(info_hash).await
     }
 }

@@ -45,8 +45,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use derive_more::Display;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use torrust_tracker_clock::clock::Time;
@@ -81,7 +81,7 @@ pub fn generate_permanent_key() -> PeerKey {
 /// * `lifetime`: if `None` the key will be permanent.
 #[must_use]
 pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
-    let random_id: String = thread_rng()
+    let random_id: String = rng()
         .sample_iter(&Alphanumeric)
         .take(AUTH_KEY_LENGTH)
         .map(char::from)

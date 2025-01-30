@@ -153,7 +153,7 @@ pub fn ephemeral_ipv6() -> Configuration {
 
     if let Some(ref mut http_api) = cfg.http_api {
         http_api.bind_address.clone_from(&ipv6);
-    };
+    }
 
     if let Some(ref mut http_trackers) = cfg.http_trackers {
         http_trackers[0].bind_address.clone_from(&ipv6);

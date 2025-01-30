@@ -22,11 +22,11 @@ use crate::servers::apis::v1::responses::{invalid_auth_key_param_response, ok_re
 /// It returns these types of responses:
 ///
 /// - `200` with a json [`AuthKey`]
-///    resource. If the key was generated successfully.
+///   resource. If the key was generated successfully.
 /// - `400` with an error if the key couldn't been added because of an invalid
-///    request.
+///   request.
 /// - `500` with serialized error in debug format. If the key couldn't be
-///    generated.
+///   generated.
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#generate-a-new-authentication-key)
 /// for more information about this endpoint.
@@ -57,9 +57,9 @@ pub async fn add_auth_key_handler(
 /// It returns two types of responses:
 ///
 /// - `200` with an json [`AuthKey`]
-///    resource. If the key was generated successfully.
+///   resource. If the key was generated successfully.
 /// - `500` with serialized error in debug format. If the key couldn't be
-///    generated.
+///   generated.
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#generate-a-new-authentication-key)
 /// for more information about this endpoint.
@@ -99,9 +99,9 @@ pub struct KeyParam(String);
 /// It returns two types of responses:
 ///
 /// - `200` with an json [`ActionStatus::Ok`](crate::servers::apis::v1::responses::ActionStatus::Ok)
-///    response. If the key was deleted successfully.
+///   response. If the key was deleted successfully.
 /// - `500` with serialized error in debug format. If the key couldn't be
-///    deleted.
+///   deleted.
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#delete-an-authentication-key)
 /// for more information about this endpoint.
@@ -124,9 +124,9 @@ pub async fn delete_auth_key_handler(
 /// It returns two types of responses:
 ///
 /// - `200` with an json [`ActionStatus::Ok`](crate::servers::apis::v1::responses::ActionStatus::Ok)
-///    response. If the keys were successfully reloaded.
+///   response. If the keys were successfully reloaded.
 /// - `500` with serialized error in debug format. If the they couldn't be
-///    reloaded.
+///   reloaded.
 ///
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#reload-authentication-keys)
 /// for more information about this endpoint.

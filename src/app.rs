@@ -98,7 +98,7 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
                 http_tracker::start_job(http_tracker_container, registar.give_form(), servers::http::Version::V1).await
             {
                 jobs.push(job);
-            };
+            }
         }
     } else {
         tracing::info!("No HTTP blocks in configuration");
@@ -111,7 +111,7 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
 
         if let Some(job) = tracker_apis::start_job(http_api_container, registar.give_form(), servers::apis::Version::V1).await {
             jobs.push(job);
-        };
+        }
     } else {
         tracing::info!("No API block in configuration");
     }

@@ -25,7 +25,7 @@ async fn send_connection_request(transaction_id: TransactionId, client: &UdpTrac
     match client.send(connect_request.into()).await {
         Ok(_) => (),
         Err(err) => panic!("{err}"),
-    };
+    }
 
     let response = match client.receive().await {
         Ok(response) => response,
@@ -52,7 +52,7 @@ async fn should_return_a_bad_request_response_when_the_client_sends_an_empty_req
     match client.client.send(&empty_udp_request()).await {
         Ok(_) => (),
         Err(err) => panic!("{err}"),
-    };
+    }
 
     let response = match client.client.receive().await {
         Ok(response) => response,
@@ -94,7 +94,7 @@ mod receiving_a_connection_request {
         match client.send(connect_request.into()).await {
             Ok(_) => (),
             Err(err) => panic!("{err}"),
-        };
+        }
 
         let response = match client.receive().await {
             Ok(response) => response,
@@ -146,7 +146,7 @@ mod receiving_an_announce_request {
         match client.send(announce_request.into()).await {
             Ok(_) => (),
             Err(err) => panic!("{err}"),
-        };
+        }
 
         match client.receive().await {
             Ok(response) => response,
@@ -276,7 +276,7 @@ mod receiving_an_announce_request {
         match client.send(announce_request.into()).await {
             Ok(_) => (),
             Err(err) => panic!("{err}"),
-        };
+        }
 
         assert!(client.receive().await.is_err());
 
@@ -333,7 +333,7 @@ mod receiving_an_scrape_request {
         match client.send(scrape_request.into()).await {
             Ok(_) => (),
             Err(err) => panic!("{err}"),
-        };
+        }
 
         let response = match client.receive().await {
             Ok(response) => response,
