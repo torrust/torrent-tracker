@@ -76,7 +76,7 @@ impl RunningServices {
 
             if !line.contains(INFO_THRESHOLD) {
                 continue;
-            };
+            }
 
             if line.contains(UDP_TRACKER_LOG_TARGET) {
                 if let Some(captures) = udp_re.captures(&clean_line) {

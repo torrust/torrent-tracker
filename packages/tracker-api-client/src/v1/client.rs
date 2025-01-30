@@ -67,7 +67,7 @@ impl Client {
 
         if let Some(token) = &self.connection_info.api_token {
             query.add_param(QueryParam::new("token", token));
-        };
+        }
 
         self.get_request_with_query(path, query, headers).await
     }

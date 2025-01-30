@@ -213,7 +213,7 @@ impl Launcher {
                         stats_event_sender
                             .send_event(statistics::event::Event::UdpRequestAborted)
                             .await;
-                    };
+                    }
                 }
             } else {
                 tokio::task::yield_now().await;

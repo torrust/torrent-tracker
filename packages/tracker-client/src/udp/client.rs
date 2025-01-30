@@ -243,7 +243,7 @@ pub async fn check(remote_addr: &SocketAddr) -> Result<String, String> {
             match client.send(connect_request.into()).await {
                 Ok(_) => (),
                 Err(e) => tracing::debug!("Error: {e:?}."),
-            };
+            }
 
             let process = move |response| {
                 if matches!(response, Response::Connect(_connect_response)) {
