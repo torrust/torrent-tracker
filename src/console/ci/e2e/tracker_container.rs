@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::distributions::Alphanumeric;
+use rand::distr::Alphanumeric;
 use rand::Rng;
 
 use super::docker::{RunOptions, RunningContainer};
@@ -113,11 +113,7 @@ impl TrackerContainer {
     }
 
     fn generate_random_container_name(prefix: &str) -> String {
-        let rand_string: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(20)
-            .map(char::from)
-            .collect();
+        let rand_string: String = rand::rng().sample_iter(&Alphanumeric).take(20).map(char::from).collect();
 
         format!("{prefix}{rand_string}")
     }
