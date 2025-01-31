@@ -100,8 +100,8 @@ pub struct HttpApiContainer {
     pub keys_handler: Arc<KeysHandler>,
     pub whitelist_manager: Arc<WhitelistManager>,
     pub ban_service: Arc<RwLock<BanService>>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    pub stats_repository: Arc<Repository>,
+    pub http_stats_repository: Arc<http_tracker_core::statistics::repository::Repository>,
+    pub udp_stats_repository: Arc<udp_tracker_core::statistics::repository::Repository>,
 }
 
 impl HttpApiContainer {
@@ -114,8 +114,8 @@ impl HttpApiContainer {
             keys_handler: app_container.keys_handler.clone(),
             whitelist_manager: app_container.whitelist_manager.clone(),
             ban_service: app_container.ban_service.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
-            stats_repository: app_container.stats_repository.clone(),
+            http_stats_repository: app_container.http_stats_repository.clone(),
+            udp_stats_repository: app_container.udp_stats_repository.clone(),
         }
     }
 }

@@ -6,13 +6,12 @@ use axum::extract::State;
 use axum::response::Response;
 use axum_extra::extract::Query;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
-use packages::statistics::repository::Repository;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use super::responses::{metrics_response, stats_response};
-use crate::packages;
-use crate::packages::statistics::services::get_metrics;
+use crate::packages::tracker_api_core::statistics::services::get_metrics;
+use crate::packages::{http_tracker_core, udp_tracker_core};
 use crate::servers::udp::server::banning::BanService;
 
 #[derive(Deserialize, Debug, Default)]
@@ -41,10 +40,15 @@ pub struct QueryParams {
 /// for more information about this endpoint.
 #[allow(clippy::type_complexity)]
 pub async fn get_stats_handler(
-    State(state): State<(Arc<InMemoryTorrentRepository>, Arc<RwLock<BanService>>, Arc<Repository>)>,
+    State(state): State<(
+        Arc<InMemoryTorrentRepository>,
+        Arc<RwLock<BanService>>,
+        Arc<http_tracker_core::statistics::repository::Repository>,
+        Arc<udp_tracker_core::statistics::repository::Repository>,
+    )>,
     params: Query<QueryParams>,
 ) -> Response {
-    let metrics = get_metrics(state.0.clone(), state.1.clone(), state.2.clone()).await;
+    let metrics = get_metrics(state.0.clone(), state.1.clone(), state.2.clone(), state.3.clone()).await;
 
     match params.0.format {
         Some(format) => match format {
