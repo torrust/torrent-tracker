@@ -76,8 +76,8 @@ mod tests {
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::packages::http_tracker_core::statistics;
     use crate::packages::http_tracker_core::statistics::services::{get_metrics, TrackerMetrics};
+    use crate::packages::http_tracker_core::{self, statistics};
 
     pub fn tracker_configuration() -> Configuration {
         configuration::ephemeral()
@@ -88,10 +88,12 @@ mod tests {
         let config = tracker_configuration();
 
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
-        let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-        let stats_repository = Arc::new(stats_repository);
 
-        let tracker_metrics = get_metrics(in_memory_torrent_repository.clone(), stats_repository.clone()).await;
+        let (_http_stats_event_sender, http_stats_repository) =
+            http_tracker_core::statistics::setup::factory(config.core.tracker_usage_statistics);
+        let http_stats_repository = Arc::new(http_stats_repository);
+
+        let tracker_metrics = get_metrics(in_memory_torrent_repository.clone(), http_stats_repository.clone()).await;
 
         assert_eq!(
             tracker_metrics,

@@ -21,7 +21,6 @@ use bittorrent_tracker_core::authentication::service::AuthenticationService;
 use bittorrent_tracker_core::authentication::Key;
 use bittorrent_tracker_core::whitelist;
 use hyper::StatusCode;
-use packages::statistics::event::sender::Sender;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::core::AnnounceData;
@@ -34,7 +33,7 @@ use crate::servers::http::v1::extractors::authentication_key::Extract as Extract
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
 use crate::servers::http::v1::handlers::common::auth;
 use crate::servers::http::v1::services::{self};
-use crate::{packages, CurrentClock};
+use crate::CurrentClock;
 
 /// It handles the `announce` request when the HTTP tracker does not require
 /// authentication (no PATH `key` parameter required).
@@ -46,7 +45,6 @@ pub async fn handle_without_key(
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::WhitelistAuthorization>,
-        Arc<Option<Box<dyn Sender>>>,
         Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     )>,
     ExtractRequest(announce_request): ExtractRequest,
@@ -60,7 +58,6 @@ pub async fn handle_without_key(
         &state.2,
         &state.3,
         &state.4,
-        &state.5,
         &announce_request,
         &client_ip_sources,
         None,
@@ -78,7 +75,6 @@ pub async fn handle_with_key(
         Arc<AnnounceHandler>,
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::WhitelistAuthorization>,
-        Arc<Option<Box<dyn Sender>>>,
         Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     )>,
     ExtractRequest(announce_request): ExtractRequest,
@@ -93,7 +89,6 @@ pub async fn handle_with_key(
         &state.2,
         &state.3,
         &state.4,
-        &state.5,
         &announce_request,
         &client_ip_sources,
         Some(key),
@@ -111,7 +106,6 @@ async fn handle(
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
@@ -122,7 +116,6 @@ async fn handle(
         announce_handler,
         authentication_service,
         whitelist_authorization,
-        opt_stats_event_sender,
         opt_http_stats_event_sender,
         announce_request,
         client_ip_sources,
@@ -148,7 +141,6 @@ async fn handle_announce(
     announce_handler: &Arc<AnnounceHandler>,
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
@@ -188,7 +180,6 @@ async fn handle_announce(
 
     let announce_data = services::announce::invoke(
         announce_handler.clone(),
-        opt_stats_event_sender.clone(),
         opt_http_stats_event_sender.clone(),
         announce_request.info_hash,
         &mut peer,
@@ -269,17 +260,14 @@ mod tests {
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use packages::statistics;
-    use packages::statistics::event::sender::Sender;
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::packages::{self, http_tracker_core};
+    use crate::packages::http_tracker_core;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
         pub announce_handler: Arc<AnnounceHandler>,
-        pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
         pub whitelist_authorization: Arc<WhitelistAuthorization>,
         pub authentication_service: Arc<AuthenticationService>,
     }
@@ -319,9 +307,6 @@ mod tests {
             &db_torrent_repository,
         ));
 
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
-
         // HTTP stats
         let (http_stats_event_sender, http_stats_repository) =
             http_tracker_core::statistics::setup::factory(config.core.tracker_usage_statistics);
@@ -332,7 +317,6 @@ mod tests {
             CoreTrackerServices {
                 core_config,
                 announce_handler,
-                stats_event_sender,
                 whitelist_authorization,
                 authentication_service,
             },
@@ -389,7 +373,6 @@ mod tests {
                 &core_tracker_services.announce_handler,
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
-                &core_tracker_services.stats_event_sender,
                 &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
@@ -417,7 +400,6 @@ mod tests {
                 &core_tracker_services.announce_handler,
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
-                &core_tracker_services.stats_event_sender,
                 &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
@@ -447,7 +429,6 @@ mod tests {
                 &core_tracker_services.announce_handler,
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
-                &core_tracker_services.stats_event_sender,
                 &http_core_tracker_services.http_stats_event_sender,
                 &announce_request,
                 &sample_client_ip_sources(),
@@ -488,7 +469,6 @@ mod tests {
                 &core_tracker_services.announce_handler,
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
-                &core_tracker_services.stats_event_sender,
                 &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,
@@ -526,7 +506,6 @@ mod tests {
                 &core_tracker_services.announce_handler,
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
-                &core_tracker_services.stats_event_sender,
                 &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,

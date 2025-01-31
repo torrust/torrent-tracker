@@ -2,6 +2,5 @@
 //!
 //! It will be moved to the directory `packages`.
 pub mod http_tracker_core;
-pub mod statistics;
 pub mod tracker_api_core;
 pub mod udp_tracker_core;

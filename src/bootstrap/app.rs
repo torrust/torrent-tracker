@@ -26,7 +26,6 @@ use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentT
 use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
 use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
 use bittorrent_tracker_core::whitelist::setup::initialize_whitelist_manager;
-use packages::statistics;
 use tokio::sync::RwLock;
 use torrust_tracker_clock::static_time;
 use torrust_tracker_configuration::validator::Validator;
@@ -34,13 +33,13 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use super::config::initialize_configuration;
+use crate::bootstrap;
 use crate::container::AppContainer;
 use crate::packages::{http_tracker_core, udp_tracker_core};
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
 use crate::shared::crypto::keys::{self, Keeper as _};
-use crate::{bootstrap, packages};
 
 /// It loads the configuration from the environment and builds app container.
 ///
@@ -91,10 +90,6 @@ pub fn initialize_global_services(configuration: &Configuration) {
 #[instrument(skip())]
 pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let core_config = Arc::new(configuration.core.clone());
-
-    let (stats_event_sender, stats_repository) = statistics::setup::factory(configuration.core.tracker_usage_statistics);
-    let stats_event_sender = Arc::new(stats_event_sender);
-    let stats_repository = Arc::new(stats_repository);
 
     // HTTP stats
     let (http_stats_event_sender, http_stats_repository) =
@@ -148,10 +143,8 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         authentication_service,
         whitelist_authorization,
         ban_service,
-        stats_event_sender,
         http_stats_event_sender,
         udp_stats_event_sender,
-        stats_repository,
         http_stats_repository,
         udp_stats_repository,
         whitelist_manager,

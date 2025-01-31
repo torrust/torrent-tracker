@@ -5,18 +5,16 @@
 //! It delegates the `scrape` logic to the [`ScrapeHandler`] and it returns the
 //! [`ScrapeData`].
 //!
-//! It also sends an [`statistics::event::Event`]
+//! It also sends an [`http_tracker_core::statistics::event::Event`]
 //! because events are specific for the HTTP tracker.
 use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use packages::statistics::event::sender::Sender;
-use packages::statistics::{self};
 use torrust_tracker_primitives::core::ScrapeData;
 
-use crate::packages::{self, http_tracker_core};
+use crate::packages::http_tracker_core;
 
 /// The HTTP tracker `scrape` service.
 ///
@@ -30,14 +28,13 @@ use crate::packages::{self, http_tracker_core};
 /// > each `scrape` request.
 pub async fn invoke(
     scrape_handler: &Arc<ScrapeHandler>,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     info_hashes: &Vec<InfoHash>,
     original_peer_ip: &IpAddr,
 ) -> ScrapeData {
     let scrape_data = scrape_handler.scrape(info_hashes).await;
 
-    send_scrape_event(original_peer_ip, opt_stats_event_sender, opt_http_stats_event_sender).await;
+    send_scrape_event(original_peer_ip, opt_http_stats_event_sender).await;
 
     scrape_data
 }
@@ -49,32 +46,19 @@ pub async fn invoke(
 ///
 /// > **NOTICE**: tracker statistics are not updated in this case.
 pub async fn fake(
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     info_hashes: &Vec<InfoHash>,
     original_peer_ip: &IpAddr,
 ) -> ScrapeData {
-    send_scrape_event(original_peer_ip, opt_stats_event_sender, opt_http_stats_event_sender).await;
+    send_scrape_event(original_peer_ip, opt_http_stats_event_sender).await;
 
     ScrapeData::zeroed(info_hashes)
 }
 
 async fn send_scrape_event(
     original_peer_ip: &IpAddr,
-    opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
     opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
 ) {
-    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
-        match original_peer_ip {
-            IpAddr::V4(_) => {
-                stats_event_sender.send_event(statistics::event::Event::Tcp4Scrape).await;
-            }
-            IpAddr::V6(_) => {
-                stats_event_sender.send_event(statistics::event::Event::Tcp6Scrape).await;
-            }
-        }
-    }
-
     if let Some(http_stats_event_sender) = opt_http_stats_event_sender.as_deref() {
         match original_peer_ip {
             IpAddr::V4(_) => {
@@ -109,13 +93,11 @@ mod tests {
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
     use futures::future::BoxFuture;
     use mockall::mock;
-    use packages::statistics::event::sender::Sender;
-    use packages::statistics::event::Event;
     use tokio::sync::mpsc::error::SendError;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::packages::{self, http_tracker_core};
+    use crate::packages::http_tracker_core;
 
     fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
@@ -162,13 +144,6 @@ mod tests {
     }
 
     mock! {
-        StatsEventSender {}
-        impl Sender for StatsEventSender {
-             fn send_event(&self, event: Event) -> BoxFuture<'static,Option<Result<(),SendError<Event> > > > ;
-        }
-    }
-
-    mock! {
         HttpStatsEventSender {}
         impl http_tracker_core::statistics::event::sender::Sender for HttpStatsEventSender {
              fn send_event(&self, event: http_tracker_core::statistics::event::Event) -> BoxFuture<'static,Option<Result<(),SendError<http_tracker_core::statistics::event::Event> > > > ;
@@ -183,7 +158,6 @@ mod tests {
 
         use bittorrent_tracker_core::announce_handler::PeersWanted;
         use mockall::predicate::eq;
-        use packages::statistics;
         use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
@@ -191,14 +165,11 @@ mod tests {
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hash,
-            sample_info_hashes, sample_peer, MockHttpStatsEventSender, MockStatsEventSender,
+            sample_info_hashes, sample_peer, MockHttpStatsEventSender,
         };
 
         #[tokio::test]
         async fn it_should_return_the_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
-            let stats_event_sender = Arc::new(stats_event_sender);
-
             let (http_stats_event_sender, _http_stats_repository) =
                 packages::http_tracker_core::statistics::setup::factory(false);
             let http_stats_event_sender = Arc::new(http_stats_event_sender);
@@ -213,14 +184,7 @@ mod tests {
             let original_peer_ip = peer.ip();
             announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
 
-            let scrape_data = invoke(
-                &scrape_handler,
-                &stats_event_sender,
-                &http_stats_event_sender,
-                &info_hashes,
-                &original_peer_ip,
-            )
-            .await;
+            let scrape_data = invoke(&scrape_handler, &http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 
             let mut expected_scrape_data = ScrapeData::empty();
             expected_scrape_data.add_file(
@@ -237,15 +201,6 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_scrape_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
-                .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp4Scrape))
-                .times(1)
-                .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
-
             let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
             http_stats_event_sender_mock
                 .expect_send_event()
@@ -259,27 +214,11 @@ mod tests {
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
-            invoke(
-                &scrape_handler,
-                &stats_event_sender,
-                &http_stats_event_sender,
-                &sample_info_hashes(),
-                &peer_ip,
-            )
-            .await;
+            invoke(&scrape_handler, &http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
 
         #[tokio::test]
         async fn it_should_send_the_tcp_6_scrape_event_when_the_peer_uses_ipv6() {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
-                .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp6Scrape))
-                .times(1)
-                .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
-
             let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
             http_stats_event_sender_mock
                 .expect_send_event()
@@ -293,14 +232,7 @@ mod tests {
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 
-            invoke(
-                &scrape_handler,
-                &stats_event_sender,
-                &http_stats_event_sender,
-                &sample_info_hashes(),
-                &peer_ip,
-            )
-            .await;
+            invoke(&scrape_handler, &http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
     }
 
@@ -312,21 +244,17 @@ mod tests {
 
         use bittorrent_tracker_core::announce_handler::PeersWanted;
         use mockall::predicate::eq;
-        use packages::statistics;
         use torrust_tracker_primitives::core::ScrapeData;
 
         use crate::packages::{self, http_tracker_core};
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
-            MockHttpStatsEventSender, MockStatsEventSender,
+            MockHttpStatsEventSender,
         };
 
         #[tokio::test]
         async fn it_should_always_return_the_zeroed_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
-            let stats_event_sender = Arc::new(stats_event_sender);
-
             let (http_stats_event_sender, _http_stats_repository) =
                 packages::http_tracker_core::statistics::setup::factory(false);
             let http_stats_event_sender = Arc::new(http_stats_event_sender);
@@ -341,7 +269,7 @@ mod tests {
             let original_peer_ip = peer.ip();
             announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
 
-            let scrape_data = fake(&stats_event_sender, &http_stats_event_sender, &info_hashes, &original_peer_ip).await;
+            let scrape_data = fake(&http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 
             let expected_scrape_data = ScrapeData::zeroed(&info_hashes);
 
@@ -350,15 +278,6 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_scrape_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
-                .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp4Scrape))
-                .times(1)
-                .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
-
             let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
             http_stats_event_sender_mock
                 .expect_send_event()
@@ -370,20 +289,11 @@ mod tests {
 
             let peer_ip = IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1));
 
-            fake(&stats_event_sender, &http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
+            fake(&http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
 
         #[tokio::test]
         async fn it_should_send_the_tcp_6_scrape_event_when_the_peer_uses_ipv6() {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
-                .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp6Scrape))
-                .times(1)
-                .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
-
             let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
             http_stats_event_sender_mock
                 .expect_send_event()
@@ -395,7 +305,7 @@ mod tests {
 
             let peer_ip = IpAddr::V6(Ipv6Addr::new(0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969, 0x6969));
 
-            fake(&stats_event_sender, &http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
+            fake(&http_stats_event_sender, &sample_info_hashes(), &peer_ip).await;
         }
     }
 }
