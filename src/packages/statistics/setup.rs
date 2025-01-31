@@ -1,14 +1,14 @@
 //! Setup for the tracker statistics.
 //!
 //! The [`factory`] function builds the structs needed for handling the tracker metrics.
-use crate::statistics;
+use crate::packages::statistics;
 
 /// It builds the structs needed for handling the tracker metrics.
 ///
 /// It returns:
 ///
-/// - An statistics event [`Sender`](crate::core::statistics::event::sender::Sender) that allows you to send events related to statistics.
-/// - An statistics [`Repository`](crate::core::statistics::repository::Repository) which is an in-memory repository for the tracker metrics.
+/// - An statistics event [`Sender`](crate::packages::statistics::event::sender::Sender) that allows you to send events related to statistics.
+/// - An statistics [`Repository`](crate::packages::statistics::repository::Repository) which is an in-memory repository for the tracker metrics.
 ///
 /// When the input argument `tracker_usage_statistics`is false the setup does not run the event listeners, consequently the statistics
 /// events are sent are received but not dispatched to the handler.

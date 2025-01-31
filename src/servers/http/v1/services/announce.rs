@@ -12,10 +12,12 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
-use bittorrent_tracker_core::statistics;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
+use packages::statistics;
+use packages::statistics::event::sender::Sender;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
+
+use crate::packages;
 
 /// The HTTP tracker `announce` service.
 ///
@@ -61,10 +63,10 @@ mod tests {
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_tracker_core::announce_handler::AnnounceHandler;
     use bittorrent_tracker_core::databases::setup::initialize_database;
-    use bittorrent_tracker_core::statistics;
-    use bittorrent_tracker_core::statistics::event::sender::Sender;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use packages::statistics;
+    use packages::statistics::event::sender::Sender;
     use torrust_tracker_configuration::Core;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
@@ -122,10 +124,12 @@ mod tests {
         }
     }
 
-    use bittorrent_tracker_core::statistics::event::Event;
     use futures::future::BoxFuture;
     use mockall::mock;
+    use packages::statistics::event::Event;
     use tokio::sync::mpsc::error::SendError;
+
+    use crate::packages;
 
     mock! {
         StatsEventSender {}
@@ -142,16 +146,17 @@ mod tests {
         use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
         use bittorrent_tracker_core::core_tests::sample_info_hash;
         use bittorrent_tracker_core::databases::setup::initialize_database;
-        use bittorrent_tracker_core::statistics;
         use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use mockall::predicate::eq;
+        use packages::statistics;
         use torrust_tracker_primitives::core::AnnounceData;
         use torrust_tracker_primitives::peer;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
+        use crate::packages;
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{
             initialize_core_tracker_services, sample_peer, MockStatsEventSender,

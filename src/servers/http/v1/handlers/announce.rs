@@ -19,9 +19,9 @@ use bittorrent_http_protocol::v1::services::peer_ip_resolver::ClientIpSources;
 use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
 use bittorrent_tracker_core::authentication::service::AuthenticationService;
 use bittorrent_tracker_core::authentication::Key;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
 use bittorrent_tracker_core::whitelist;
 use hyper::StatusCode;
+use packages::statistics::event::sender::Sender;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::core::AnnounceData;
@@ -33,7 +33,7 @@ use crate::servers::http::v1::extractors::authentication_key::Extract as Extract
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
 use crate::servers::http::v1::handlers::common::auth;
 use crate::servers::http::v1::services::{self};
-use crate::CurrentClock;
+use crate::{packages, CurrentClock};
 
 /// It handles the `announce` request when the HTTP tracker does not require
 /// authentication (no PATH `key` parameter required).
@@ -256,14 +256,16 @@ mod tests {
     use bittorrent_tracker_core::authentication::service::AuthenticationService;
     use bittorrent_tracker_core::core_tests::sample_info_hash;
     use bittorrent_tracker_core::databases::setup::initialize_database;
-    use bittorrent_tracker_core::statistics;
-    use bittorrent_tracker_core::statistics::event::sender::Sender;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use packages::statistics;
+    use packages::statistics::event::sender::Sender;
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
+
+    use crate::packages;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,

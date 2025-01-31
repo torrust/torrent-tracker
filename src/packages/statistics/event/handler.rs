@@ -1,5 +1,5 @@
-use crate::statistics::event::{Event, UdpResponseKind};
-use crate::statistics::repository::Repository;
+use crate::packages::statistics::event::{Event, UdpResponseKind};
+use crate::packages::statistics::repository::Repository;
 
 pub async fn handle_event(event: Event, stats_repository: &Repository) {
     match event {
@@ -102,9 +102,9 @@ pub async fn handle_event(event: Event, stats_repository: &Repository) {
 
 #[cfg(test)]
 mod tests {
-    use crate::statistics::event::handler::handle_event;
-    use crate::statistics::event::Event;
-    use crate::statistics::repository::Repository;
+    use crate::packages::statistics::event::handler::handle_event;
+    use crate::packages::statistics::event::Event;
+    use crate::packages::statistics::repository::Repository;
 
     #[tokio::test]
     async fn should_increase_the_tcp4_announces_counter_when_it_receives_a_tcp4_announce_event() {

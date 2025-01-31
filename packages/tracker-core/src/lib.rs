@@ -346,7 +346,7 @@
 //!
 //! Services are domain services on top of the core tracker domain. Right now there are two types of service:
 //!
-//! - For statistics: [`crate::core::statistics::services`]
+//! - For statistics: [`crate::packages::statistics::services`]
 //! - For torrents: [`crate::core::torrent::services`]
 //!
 //! Services usually format the data inside the tracker to make it easier to consume by other parts.
@@ -442,7 +442,6 @@ pub mod authentication;
 pub mod databases;
 pub mod error;
 pub mod scrape_handler;
-pub mod statistics;
 pub mod torrent;
 pub mod whitelist;
 

@@ -13,8 +13,8 @@ use aquatic_udp_protocol::{
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
-use bittorrent_tracker_core::{statistics, whitelist};
+use bittorrent_tracker_core::whitelist;
+use packages::statistics::event::sender::Sender;
 use torrust_tracker_clock::clock::Time as _;
 use torrust_tracker_configuration::Core;
 use tracing::{instrument, Level};
@@ -24,10 +24,11 @@ use zerocopy::network_endian::I32;
 use super::connection_cookie::{check, make};
 use super::RawRequest;
 use crate::container::UdpTrackerContainer;
+use crate::packages::statistics;
 use crate::servers::udp::error::Error;
 use crate::servers::udp::{peer_builder, UDP_TRACKER_LOG_TARGET};
 use crate::shared::bit_torrent::common::MAX_SCRAPE_TORRENTS;
-use crate::CurrentClock;
+use crate::{packages, CurrentClock};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct CookieTimeValues {
@@ -471,15 +472,15 @@ mod tests {
     use bittorrent_tracker_core::announce_handler::AnnounceHandler;
     use bittorrent_tracker_core::databases::setup::initialize_database;
     use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-    use bittorrent_tracker_core::statistics::event::sender::Sender;
-    use bittorrent_tracker_core::statistics::event::Event;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
+    use bittorrent_tracker_core::whitelist;
     use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
-    use bittorrent_tracker_core::{statistics, whitelist};
     use futures::future::BoxFuture;
     use mockall::mock;
+    use packages::statistics::event::sender::Sender;
+    use packages::statistics::event::Event;
     use tokio::sync::mpsc::error::SendError;
     use torrust_tracker_clock::clock::Time;
     use torrust_tracker_configuration::{Configuration, Core};
@@ -487,7 +488,8 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use super::gen_remote_fingerprint;
-    use crate::CurrentClock;
+    use crate::packages::statistics;
+    use crate::{packages, CurrentClock};
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
@@ -649,10 +651,11 @@ mod tests {
         use std::sync::Arc;
 
         use aquatic_udp_protocol::{ConnectRequest, ConnectResponse, Response, TransactionId};
-        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
+        use packages::statistics;
 
         use super::{sample_ipv4_socket_address, sample_ipv6_remote_addr};
+        use crate::packages;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_connect;
         use crate::servers::udp::handlers::tests::{
@@ -668,7 +671,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_the_same_transaction_id_as_the_connect_request() {
-            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -688,7 +691,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id() {
-            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -708,7 +711,7 @@ mod tests {
 
         #[tokio::test]
         async fn a_connect_response_should_contain_a_new_connection_id_ipv6() {
-            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let request = ConnectRequest {
@@ -854,10 +857,11 @@ mod tests {
             };
             use bittorrent_tracker_core::announce_handler::AnnounceHandler;
             use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
-            use bittorrent_tracker_core::{statistics, whitelist};
+            use bittorrent_tracker_core::whitelist;
             use mockall::predicate::eq;
             use torrust_tracker_configuration::Core;
 
+            use crate::packages::{self, statistics};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
@@ -1013,7 +1017,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8080);
@@ -1155,10 +1159,11 @@ mod tests {
             };
             use bittorrent_tracker_core::announce_handler::AnnounceHandler;
             use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
-            use bittorrent_tracker_core::{statistics, whitelist};
+            use bittorrent_tracker_core::whitelist;
             use mockall::predicate::eq;
             use torrust_tracker_configuration::Core;
 
+            use crate::packages::{self, statistics};
             use crate::servers::udp::connection_cookie::make;
             use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
             use crate::servers::udp::handlers::tests::{
@@ -1318,7 +1323,7 @@ mod tests {
                 announce_handler: Arc<AnnounceHandler>,
                 whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
             ) -> Response {
-                let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+                let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
                 let stats_event_sender = Arc::new(stats_event_sender);
 
                 let client_ip_v4 = Ipv4Addr::new(126, 0, 0, 1);
@@ -1404,13 +1409,14 @@ mod tests {
                 use aquatic_udp_protocol::{InfoHash as AquaticInfoHash, PeerId as AquaticPeerId};
                 use bittorrent_tracker_core::announce_handler::AnnounceHandler;
                 use bittorrent_tracker_core::databases::setup::initialize_database;
-                use bittorrent_tracker_core::statistics;
                 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
                 use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
                 use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
                 use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
                 use mockall::predicate::eq;
+                use packages::statistics;
 
+                use crate::packages;
                 use crate::servers::udp::connection_cookie::make;
                 use crate::servers::udp::handlers::handle_announce;
                 use crate::servers::udp::handlers::tests::announce_request::AnnounceRequestBuilder;
@@ -1505,10 +1511,11 @@ mod tests {
             TransactionId,
         };
         use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-        use bittorrent_tracker_core::statistics;
         use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use packages::statistics;
 
         use super::{gen_remote_fingerprint, TorrentPeerBuilder};
+        use crate::packages;
         use crate::servers::udp::connection_cookie::make;
         use crate::servers::udp::handlers::handle_scrape;
         use crate::servers::udp::handlers::tests::{
@@ -1747,10 +1754,11 @@ mod tests {
             use std::future;
             use std::sync::Arc;
 
-            use bittorrent_tracker_core::statistics;
             use mockall::predicate::eq;
+            use packages::statistics;
 
             use super::sample_scrape_request;
+            use crate::packages;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
                 initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,
@@ -1788,10 +1796,11 @@ mod tests {
             use std::future;
             use std::sync::Arc;
 
-            use bittorrent_tracker_core::statistics;
             use mockall::predicate::eq;
+            use packages::statistics;
 
             use super::sample_scrape_request;
+            use crate::packages;
             use crate::servers::udp::handlers::handle_scrape;
             use crate::servers::udp::handlers::tests::{
                 initialize_core_tracker_services_for_default_tracker_configuration, sample_cookie_valid_range,

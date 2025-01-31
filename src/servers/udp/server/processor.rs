@@ -4,13 +4,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use aquatic_udp_protocol::Response;
-use bittorrent_tracker_core::statistics;
-use bittorrent_tracker_core::statistics::event::UdpResponseKind;
+use packages::statistics;
+use packages::statistics::event::UdpResponseKind;
 use tokio::time::Instant;
 use tracing::{instrument, Level};
 
 use super::bound_socket::BoundSocket;
 use crate::container::UdpTrackerContainer;
+use crate::packages;
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 

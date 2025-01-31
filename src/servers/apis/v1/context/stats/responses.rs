@@ -3,7 +3,7 @@
 use axum::response::{IntoResponse, Json, Response};
 
 use super::resources::Stats;
-use crate::core::statistics::services::TrackerMetrics;
+use crate::packages::statistics::services::TrackerMetrics;
 
 /// `200` response that contains the [`Stats`] resource as json.
 #[must_use]

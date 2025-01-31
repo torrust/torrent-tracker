@@ -20,13 +20,13 @@ use bittorrent_tracker_core::authentication::key::repository::persisted::Databas
 use bittorrent_tracker_core::authentication::service;
 use bittorrent_tracker_core::databases::setup::initialize_database;
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use bittorrent_tracker_core::statistics;
 use bittorrent_tracker_core::torrent::manager::TorrentsManager;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
 use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
 use bittorrent_tracker_core::whitelist::setup::initialize_whitelist_manager;
+use packages::statistics;
 use tokio::sync::RwLock;
 use torrust_tracker_clock::static_time;
 use torrust_tracker_configuration::validator::Validator;
@@ -34,12 +34,12 @@ use torrust_tracker_configuration::Configuration;
 use tracing::instrument;
 
 use super::config::initialize_configuration;
-use crate::bootstrap;
 use crate::container::AppContainer;
 use crate::servers::udp::server::banning::BanService;
 use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 use crate::shared::crypto::ephemeral_instance_keys;
 use crate::shared::crypto::keys::{self, Keeper as _};
+use crate::{bootstrap, packages};
 
 /// It loads the configuration from the environment and builds app container.
 ///

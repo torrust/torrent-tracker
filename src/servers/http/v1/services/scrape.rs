@@ -12,9 +12,11 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
-use bittorrent_tracker_core::statistics::{self};
+use packages::statistics::event::sender::Sender;
+use packages::statistics::{self};
 use torrust_tracker_primitives::core::ScrapeData;
+
+use crate::packages;
 
 /// The HTTP tracker `scrape` service.
 ///
@@ -80,17 +82,19 @@ mod tests {
     use bittorrent_tracker_core::core_tests::sample_info_hash;
     use bittorrent_tracker_core::databases::setup::initialize_database;
     use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-    use bittorrent_tracker_core::statistics::event::sender::Sender;
-    use bittorrent_tracker_core::statistics::event::Event;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
     use futures::future::BoxFuture;
     use mockall::mock;
+    use packages::statistics::event::sender::Sender;
+    use packages::statistics::event::Event;
     use tokio::sync::mpsc::error::SendError;
     use torrust_tracker_primitives::{peer, DurationSinceUnixEpoch};
     use torrust_tracker_test_helpers::configuration;
+
+    use crate::packages;
 
     fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
@@ -150,11 +154,12 @@ mod tests {
         use std::sync::Arc;
 
         use bittorrent_tracker_core::announce_handler::PeersWanted;
-        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
+        use packages::statistics;
         use torrust_tracker_primitives::core::ScrapeData;
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
+        use crate::packages;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hash,
@@ -163,7 +168,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();
@@ -235,10 +240,11 @@ mod tests {
         use std::sync::Arc;
 
         use bittorrent_tracker_core::announce_handler::PeersWanted;
-        use bittorrent_tracker_core::statistics;
         use mockall::predicate::eq;
+        use packages::statistics;
         use torrust_tracker_primitives::core::ScrapeData;
 
+        use crate::packages;
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
             initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
@@ -247,7 +253,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_always_return_the_zeroed_scrape_data_for_a_torrent() {
-            let (stats_event_sender, _stats_repository) = bittorrent_tracker_core::statistics::setup::factory(false);
+            let (stats_event_sender, _stats_repository) = packages::statistics::setup::factory(false);
             let stats_event_sender = Arc::new(stats_event_sender);
 
             let (announce_handler, _scrape_handler) = initialize_announce_and_scrape_handlers_for_public_tracker();

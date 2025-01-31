@@ -15,11 +15,12 @@ use bittorrent_http_protocol::v1::services::peer_ip_resolver::{self, ClientIpSou
 use bittorrent_tracker_core::authentication::service::AuthenticationService;
 use bittorrent_tracker_core::authentication::Key;
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
 use hyper::StatusCode;
+use packages::statistics::event::sender::Sender;
 use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::core::ScrapeData;
 
+use crate::packages;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
 use crate::servers::http::v1::extractors::scrape_request::ExtractRequest;
@@ -174,12 +175,14 @@ mod tests {
     use bittorrent_tracker_core::authentication::key::repository::in_memory::InMemoryKeyRepository;
     use bittorrent_tracker_core::authentication::service::AuthenticationService;
     use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-    use bittorrent_tracker_core::statistics;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::whitelist::authorization::WhitelistAuthorization;
     use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use packages::statistics;
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
+
+    use crate::packages;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,

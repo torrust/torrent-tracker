@@ -5,13 +5,14 @@ use std::sync::Arc;
 use axum::extract::State;
 use axum::response::Response;
 use axum_extra::extract::Query;
-use bittorrent_tracker_core::statistics::repository::Repository;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use packages::statistics::repository::Repository;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use super::responses::{metrics_response, stats_response};
-use crate::core::statistics::services::get_metrics;
+use crate::packages;
+use crate::packages::statistics::services::get_metrics;
 use crate::servers::udp::server::banning::BanService;
 
 #[derive(Deserialize, Debug, Default)]
