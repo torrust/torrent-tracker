@@ -71,6 +71,7 @@ pub struct HttpTrackerContainer {
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     pub authentication_service: Arc<AuthenticationService>,
 }
 
@@ -84,6 +85,7 @@ impl HttpTrackerContainer {
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
+            http_stats_event_sender: app_container.http_stats_event_sender.clone(),
             authentication_service: app_container.authentication_service.clone(),
         }
     }

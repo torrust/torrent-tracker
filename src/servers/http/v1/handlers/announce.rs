@@ -28,6 +28,7 @@ use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
 
 use super::common::auth::map_auth_error_to_error_response;
+use crate::packages::http_tracker_core;
 use crate::servers::http::v1::extractors::announce_request::ExtractRequest;
 use crate::servers::http::v1::extractors::authentication_key::Extract as ExtractKey;
 use crate::servers::http::v1::extractors::client_ip_sources::Extract as ExtractClientIpSources;
@@ -46,6 +47,7 @@ pub async fn handle_without_key(
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::WhitelistAuthorization>,
         Arc<Option<Box<dyn Sender>>>,
+        Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     )>,
     ExtractRequest(announce_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
@@ -58,6 +60,7 @@ pub async fn handle_without_key(
         &state.2,
         &state.3,
         &state.4,
+        &state.5,
         &announce_request,
         &client_ip_sources,
         None,
@@ -76,6 +79,7 @@ pub async fn handle_with_key(
         Arc<AuthenticationService>,
         Arc<whitelist::authorization::WhitelistAuthorization>,
         Arc<Option<Box<dyn Sender>>>,
+        Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     )>,
     ExtractRequest(announce_request): ExtractRequest,
     ExtractClientIpSources(client_ip_sources): ExtractClientIpSources,
@@ -89,6 +93,7 @@ pub async fn handle_with_key(
         &state.2,
         &state.3,
         &state.4,
+        &state.5,
         &announce_request,
         &client_ip_sources,
         Some(key),
@@ -107,6 +112,7 @@ async fn handle(
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
+    opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
     maybe_key: Option<Key>,
@@ -117,6 +123,7 @@ async fn handle(
         authentication_service,
         whitelist_authorization,
         opt_stats_event_sender,
+        opt_http_stats_event_sender,
         announce_request,
         client_ip_sources,
         maybe_key,
@@ -142,6 +149,7 @@ async fn handle_announce(
     authentication_service: &Arc<AuthenticationService>,
     whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
     opt_stats_event_sender: &Arc<Option<Box<dyn Sender>>>,
+    opt_http_stats_event_sender: &Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     announce_request: &Announce,
     client_ip_sources: &ClientIpSources,
     maybe_key: Option<Key>,
@@ -181,6 +189,7 @@ async fn handle_announce(
     let announce_data = services::announce::invoke(
         announce_handler.clone(),
         opt_stats_event_sender.clone(),
+        opt_http_stats_event_sender.clone(),
         announce_request.info_hash,
         &mut peer,
         &peers_wanted,
@@ -265,7 +274,7 @@ mod tests {
     use torrust_tracker_configuration::{Configuration, Core};
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::packages;
+    use crate::packages::{self, http_tracker_core};
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
@@ -275,23 +284,27 @@ mod tests {
         pub authentication_service: Arc<AuthenticationService>,
     }
 
-    fn initialize_private_tracker() -> CoreTrackerServices {
+    struct CoreHttpTrackerServices {
+        pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
+    }
+
+    fn initialize_private_tracker() -> (CoreTrackerServices, CoreHttpTrackerServices) {
         initialize_core_tracker_services(&configuration::ephemeral_private())
     }
 
-    fn initialize_listed_tracker() -> CoreTrackerServices {
+    fn initialize_listed_tracker() -> (CoreTrackerServices, CoreHttpTrackerServices) {
         initialize_core_tracker_services(&configuration::ephemeral_listed())
     }
 
-    fn initialize_tracker_on_reverse_proxy() -> CoreTrackerServices {
+    fn initialize_tracker_on_reverse_proxy() -> (CoreTrackerServices, CoreHttpTrackerServices) {
         initialize_core_tracker_services(&configuration::ephemeral_with_reverse_proxy())
     }
 
-    fn initialize_tracker_not_on_reverse_proxy() -> CoreTrackerServices {
+    fn initialize_tracker_not_on_reverse_proxy() -> (CoreTrackerServices, CoreHttpTrackerServices) {
         initialize_core_tracker_services(&configuration::ephemeral_without_reverse_proxy())
     }
 
-    fn initialize_core_tracker_services(config: &Configuration) -> CoreTrackerServices {
+    fn initialize_core_tracker_services(config: &Configuration) -> (CoreTrackerServices, CoreHttpTrackerServices) {
         let core_config = Arc::new(config.core.clone());
         let database = initialize_database(config);
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
@@ -300,21 +313,31 @@ mod tests {
         let authentication_service = Arc::new(AuthenticationService::new(&config.core, &in_memory_key_repository));
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
         let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
 
-        CoreTrackerServices {
-            core_config,
-            announce_handler,
-            stats_event_sender,
-            whitelist_authorization,
-            authentication_service,
-        }
+        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
+        let stats_event_sender = Arc::new(stats_event_sender);
+
+        // HTTP stats
+        let (http_stats_event_sender, http_stats_repository) =
+            http_tracker_core::statistics::setup::factory(config.core.tracker_usage_statistics);
+        let http_stats_event_sender = Arc::new(http_stats_event_sender);
+        let _http_stats_repository = Arc::new(http_stats_repository);
+
+        (
+            CoreTrackerServices {
+                core_config,
+                announce_handler,
+                stats_event_sender,
+                whitelist_authorization,
+                authentication_service,
+            },
+            CoreHttpTrackerServices { http_stats_event_sender },
+        )
     }
 
     fn sample_announce_request() -> Announce {
@@ -357,7 +380,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_missing() {
-            let core_tracker_services = initialize_private_tracker();
+            let (core_tracker_services, http_core_tracker_services) = initialize_private_tracker();
 
             let maybe_key = None;
 
@@ -367,6 +390,7 @@ mod tests {
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
                 &core_tracker_services.stats_event_sender,
+                &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
                 maybe_key,
@@ -382,7 +406,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_authentication_key_is_invalid() {
-            let core_tracker_services = initialize_private_tracker();
+            let (core_tracker_services, http_core_tracker_services) = initialize_private_tracker();
 
             let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
 
@@ -394,6 +418,7 @@ mod tests {
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
                 &core_tracker_services.stats_event_sender,
+                &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &sample_client_ip_sources(),
                 maybe_key,
@@ -413,7 +438,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_announced_torrent_is_not_whitelisted() {
-            let core_tracker_services = initialize_listed_tracker();
+            let (core_tracker_services, http_core_tracker_services) = initialize_listed_tracker();
 
             let announce_request = sample_announce_request();
 
@@ -423,6 +448,7 @@ mod tests {
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
                 &core_tracker_services.stats_event_sender,
+                &http_core_tracker_services.http_stats_event_sender,
                 &announce_request,
                 &sample_client_ip_sources(),
                 None,
@@ -450,7 +476,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_right_most_x_forwarded_for_header_ip_is_not_available() {
-            let core_tracker_services = initialize_tracker_on_reverse_proxy();
+            let (core_tracker_services, http_core_tracker_services) = initialize_tracker_on_reverse_proxy();
 
             let client_ip_sources = ClientIpSources {
                 right_most_x_forwarded_for: None,
@@ -463,6 +489,7 @@ mod tests {
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
                 &core_tracker_services.stats_event_sender,
+                &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,
                 None,
@@ -487,7 +514,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_fail_when_the_client_ip_from_the_connection_info_is_not_available() {
-            let core_tracker_services = initialize_tracker_not_on_reverse_proxy();
+            let (core_tracker_services, http_core_tracker_services) = initialize_tracker_not_on_reverse_proxy();
 
             let client_ip_sources = ClientIpSources {
                 right_most_x_forwarded_for: None,
@@ -500,6 +527,7 @@ mod tests {
                 &core_tracker_services.authentication_service,
                 &core_tracker_services.whitelist_authorization,
                 &core_tracker_services.stats_event_sender,
+                &http_core_tracker_services.http_stats_event_sender,
                 &sample_announce_request(),
                 &client_ip_sources,
                 None,
