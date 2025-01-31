@@ -14,7 +14,7 @@ use tracing::instrument;
 use super::request_buffer::ActiveRequests;
 use crate::bootstrap::jobs::Started;
 use crate::container::UdpTrackerContainer;
-use crate::packages;
+use crate::packages::{self, udp_tracker_core};
 use crate::servers::logging::STARTED_ON;
 use crate::servers::registar::ServiceHealthCheckJob;
 use crate::servers::signals::{shutdown_signal_with_message, Halted};
@@ -174,12 +174,33 @@ impl Launcher {
                     }
                 }
 
+                if let Some(udp_stats_event_sender) = udp_tracker_container.udp_stats_event_sender.as_deref() {
+                    match req.from.ip() {
+                        IpAddr::V4(_) => {
+                            udp_stats_event_sender
+                                .send_event(udp_tracker_core::statistics::event::Event::Udp4Request)
+                                .await;
+                        }
+                        IpAddr::V6(_) => {
+                            udp_stats_event_sender
+                                .send_event(udp_tracker_core::statistics::event::Event::Udp6Request)
+                                .await;
+                        }
+                    }
+                }
+
                 if udp_tracker_container.ban_service.read().await.is_banned(&req.from.ip()) {
                     tracing::debug!(target: UDP_TRACKER_LOG_TARGET, local_addr,  "Udp::run_udp_server::loop continue: (banned ip)");
 
                     if let Some(stats_event_sender) = udp_tracker_container.stats_event_sender.as_deref() {
                         stats_event_sender
                             .send_event(statistics::event::Event::UdpRequestBanned)
+                            .await;
+                    }
+
+                    if let Some(udp_stats_event_sender) = udp_tracker_container.udp_stats_event_sender.as_deref() {
+                        udp_stats_event_sender
+                            .send_event(udp_tracker_core::statistics::event::Event::UdpRequestBanned)
                             .await;
                     }
 
@@ -213,6 +234,12 @@ impl Launcher {
                     if let Some(stats_event_sender) = udp_tracker_container.stats_event_sender.as_deref() {
                         stats_event_sender
                             .send_event(statistics::event::Event::UdpRequestAborted)
+                            .await;
+                    }
+
+                    if let Some(udp_stats_event_sender) = udp_tracker_container.udp_stats_event_sender.as_deref() {
+                        udp_stats_event_sender
+                            .send_event(udp_tracker_core::statistics::event::Event::UdpRequestAborted)
                             .await;
                     }
                 }

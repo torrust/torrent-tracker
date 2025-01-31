@@ -62,6 +62,7 @@ impl Environment<Stopped> {
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
+            udp_stats_event_sender: app_container.udp_stats_event_sender.clone(),
             ban_service: app_container.ban_service.clone(),
         });
 

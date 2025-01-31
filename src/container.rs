@@ -46,6 +46,7 @@ pub struct UdpTrackerContainer {
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub udp_stats_event_sender: Arc<Option<Box<dyn udp_tracker_core::statistics::event::sender::Sender>>>,
     pub ban_service: Arc<RwLock<BanService>>,
 }
 
@@ -59,6 +60,7 @@ impl UdpTrackerContainer {
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
             stats_event_sender: app_container.stats_event_sender.clone(),
+            udp_stats_event_sender: app_container.udp_stats_event_sender.clone(),
             ban_service: app_container.ban_service.clone(),
         }
     }
