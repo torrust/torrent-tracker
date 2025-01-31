@@ -680,7 +680,7 @@ mod for_all_config_modes {
                 .announce(&QueryBuilder::default().query())
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp4_connections_handled, 1);
 
@@ -706,7 +706,7 @@ mod for_all_config_modes {
                 .announce(&QueryBuilder::default().query())
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp6_connections_handled, 1);
 
@@ -731,7 +731,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp6_connections_handled, 0);
 
@@ -750,7 +750,7 @@ mod for_all_config_modes {
                 .announce(&QueryBuilder::default().query())
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp4_announces_handled, 1);
 
@@ -776,7 +776,7 @@ mod for_all_config_modes {
                 .announce(&QueryBuilder::default().query())
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp6_announces_handled, 1);
 
@@ -801,7 +801,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp6_announces_handled, 0);
 
@@ -1173,7 +1173,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp4_scrapes_handled, 1);
 
@@ -1205,7 +1205,7 @@ mod for_all_config_modes {
                 )
                 .await;
 
-            let stats = env.stats_repository.get_stats().await;
+            let stats = env.http_stats_repository.get_stats().await;
 
             assert_eq!(stats.tcp6_scrapes_handled, 1);
 

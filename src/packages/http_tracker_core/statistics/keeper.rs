@@ -51,9 +51,9 @@ impl Keeper {
 
 #[cfg(test)]
 mod tests {
-    use crate::statistics::event::Event;
-    use crate::statistics::keeper::Keeper;
-    use crate::statistics::metrics::Metrics;
+    use crate::packages::http_tracker_core::statistics::event::Event;
+    use crate::packages::http_tracker_core::statistics::keeper::Keeper;
+    use crate::packages::http_tracker_core::statistics::metrics::Metrics;
 
     #[tokio::test]
     async fn should_contain_the_tracker_statistics() {
@@ -70,7 +70,7 @@ mod tests {
 
         let event_sender = stats_tracker.run_event_listener();
 
-        let result = event_sender.send_event(Event::Udp4Connect).await;
+        let result = event_sender.send_event(Event::Tcp4Announce).await;
 
         assert!(result.is_some());
     }

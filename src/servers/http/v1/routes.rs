@@ -43,7 +43,7 @@ pub fn router(http_tracker_container: Arc<HttpTrackerContainer>, server_socket_a
                 http_tracker_container.announce_handler.clone(),
                 http_tracker_container.authentication_service.clone(),
                 http_tracker_container.whitelist_authorization.clone(),
-                http_tracker_container.stats_event_sender.clone(),
+                http_tracker_container.http_stats_event_sender.clone(),
             )),
         )
         .route(
@@ -53,7 +53,7 @@ pub fn router(http_tracker_container: Arc<HttpTrackerContainer>, server_socket_a
                 http_tracker_container.announce_handler.clone(),
                 http_tracker_container.authentication_service.clone(),
                 http_tracker_container.whitelist_authorization.clone(),
-                http_tracker_container.stats_event_sender.clone(),
+                http_tracker_container.http_stats_event_sender.clone(),
             )),
         )
         // Scrape request
@@ -63,7 +63,7 @@ pub fn router(http_tracker_container: Arc<HttpTrackerContainer>, server_socket_a
                 http_tracker_container.core_config.clone(),
                 http_tracker_container.scrape_handler.clone(),
                 http_tracker_container.authentication_service.clone(),
-                http_tracker_container.stats_event_sender.clone(),
+                http_tracker_container.http_stats_event_sender.clone(),
             )),
         )
         .route(
@@ -72,7 +72,7 @@ pub fn router(http_tracker_container: Arc<HttpTrackerContainer>, server_socket_a
                 http_tracker_container.core_config.clone(),
                 http_tracker_container.scrape_handler.clone(),
                 http_tracker_container.authentication_service.clone(),
-                http_tracker_container.stats_event_sender.clone(),
+                http_tracker_container.http_stats_event_sender.clone(),
             )),
         )
         // Add extension to get the client IP from the connection info

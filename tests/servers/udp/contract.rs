@@ -270,7 +270,7 @@ mod receiving_an_announce_request {
             info_hash,
         );
 
-        let udp_requests_banned_before = env.stats_repository.get_stats().await.udp_requests_banned;
+        let udp_requests_banned_before = env.udp_stats_repository.get_stats().await.udp_requests_banned;
 
         // This should return a timeout error
         match client.send(announce_request.into()).await {
@@ -280,7 +280,7 @@ mod receiving_an_announce_request {
 
         assert!(client.receive().await.is_err());
 
-        let udp_requests_banned_after = env.stats_repository.get_stats().await.udp_requests_banned;
+        let udp_requests_banned_after = env.udp_stats_repository.get_stats().await.udp_requests_banned;
         let udp_banned_ips_total_after = ban_service.read().await.get_banned_ips_total();
 
         // UDP counter for banned requests should be increased by 1

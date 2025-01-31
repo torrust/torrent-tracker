@@ -18,7 +18,8 @@ pub fn add(prefix: &str, router: Router, http_api_container: &Arc<HttpApiContain
         get(get_stats_handler).with_state((
             http_api_container.in_memory_torrent_repository.clone(),
             http_api_container.ban_service.clone(),
-            http_api_container.stats_repository.clone(),
+            http_api_container.http_stats_repository.clone(),
+            http_api_container.udp_stats_repository.clone(),
         )),
     )
 }

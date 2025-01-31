@@ -61,8 +61,8 @@ impl Environment<Stopped> {
             keys_handler: app_container.keys_handler.clone(),
             whitelist_manager: app_container.whitelist_manager.clone(),
             ban_service: app_container.ban_service.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
-            stats_repository: app_container.stats_repository.clone(),
+            http_stats_repository: app_container.http_stats_repository.clone(),
+            udp_stats_repository: app_container.udp_stats_repository.clone(),
         });
 
         Self {

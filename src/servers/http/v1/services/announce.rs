@@ -5,17 +5,17 @@
 //! It delegates the `announce` logic to the [`AnnounceHandler`] and it returns
 //! the [`AnnounceData`].
 //!
-//! It also sends an [`statistics::event::Event`]
+//! It also sends an [`http_tracker_core::statistics::event::Event`]
 //! because events are specific for the HTTP tracker.
 use std::net::IpAddr;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
-use bittorrent_tracker_core::statistics;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
 use torrust_tracker_primitives::core::AnnounceData;
 use torrust_tracker_primitives::peer;
+
+use crate::packages::http_tracker_core;
 
 /// The HTTP tracker `announce` service.
 ///
@@ -29,7 +29,7 @@ use torrust_tracker_primitives::peer;
 /// > each `announce` request.
 pub async fn invoke(
     announce_handler: Arc<AnnounceHandler>,
-    opt_stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    opt_http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     info_hash: InfoHash,
     peer: &mut peer::Peer,
     peers_wanted: &PeersWanted,
@@ -39,13 +39,17 @@ pub async fn invoke(
     // The tracker could change the original peer ip
     let announce_data = announce_handler.announce(&info_hash, peer, &original_peer_ip, peers_wanted);
 
-    if let Some(stats_event_sender) = opt_stats_event_sender.as_deref() {
+    if let Some(http_stats_event_sender) = opt_http_stats_event_sender.as_deref() {
         match original_peer_ip {
             IpAddr::V4(_) => {
-                stats_event_sender.send_event(statistics::event::Event::Tcp4Announce).await;
+                http_stats_event_sender
+                    .send_event(http_tracker_core::statistics::event::Event::Tcp4Announce)
+                    .await;
             }
             IpAddr::V6(_) => {
-                stats_event_sender.send_event(statistics::event::Event::Tcp6Announce).await;
+                http_stats_event_sender
+                    .send_event(http_tracker_core::statistics::event::Event::Tcp6Announce)
+                    .await;
             }
         }
     }
@@ -61,8 +65,6 @@ mod tests {
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_tracker_core::announce_handler::AnnounceHandler;
     use bittorrent_tracker_core::databases::setup::initialize_database;
-    use bittorrent_tracker_core::statistics;
-    use bittorrent_tracker_core::statistics::event::sender::Sender;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
     use torrust_tracker_configuration::Core;
@@ -72,29 +74,39 @@ mod tests {
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,
         pub announce_handler: Arc<AnnounceHandler>,
-        pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
     }
 
-    fn initialize_core_tracker_services() -> CoreTrackerServices {
+    struct CoreHttpTrackerServices {
+        pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
+    }
+
+    fn initialize_core_tracker_services() -> (CoreTrackerServices, CoreHttpTrackerServices) {
         let config = configuration::ephemeral_public();
 
         let core_config = Arc::new(config.core.clone());
         let database = initialize_database(&config);
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
         let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
-        let (stats_event_sender, _stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-        let stats_event_sender = Arc::new(stats_event_sender);
+
         let announce_handler = Arc::new(AnnounceHandler::new(
             &config.core,
             &in_memory_torrent_repository,
             &db_torrent_repository,
         ));
 
-        CoreTrackerServices {
-            core_config,
-            announce_handler,
-            stats_event_sender,
-        }
+        // HTTP stats
+        let (http_stats_event_sender, http_stats_repository) =
+            http_tracker_core::statistics::setup::factory(config.core.tracker_usage_statistics);
+        let http_stats_event_sender = Arc::new(http_stats_event_sender);
+        let _http_stats_repository = Arc::new(http_stats_repository);
+
+        (
+            CoreTrackerServices {
+                core_config,
+                announce_handler,
+            },
+            CoreHttpTrackerServices { http_stats_event_sender },
+        )
     }
 
     fn sample_peer_using_ipv4() -> peer::Peer {
@@ -122,15 +134,16 @@ mod tests {
         }
     }
 
-    use bittorrent_tracker_core::statistics::event::Event;
     use futures::future::BoxFuture;
     use mockall::mock;
     use tokio::sync::mpsc::error::SendError;
 
+    use crate::packages::http_tracker_core;
+
     mock! {
-        StatsEventSender {}
-        impl Sender for StatsEventSender {
-             fn send_event(&self, event: Event) -> BoxFuture<'static,Option<Result<(),SendError<Event> > > > ;
+        HttpStatsEventSender {}
+        impl http_tracker_core::statistics::event::sender::Sender for HttpStatsEventSender {
+             fn send_event(&self, event: http_tracker_core::statistics::event::Event) -> BoxFuture<'static,Option<Result<(),SendError<http_tracker_core::statistics::event::Event> > > > ;
         }
     }
 
@@ -142,7 +155,6 @@ mod tests {
         use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
         use bittorrent_tracker_core::core_tests::sample_info_hash;
         use bittorrent_tracker_core::databases::setup::initialize_database;
-        use bittorrent_tracker_core::statistics;
         use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
         use mockall::predicate::eq;
@@ -152,9 +164,10 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
+        use crate::packages::http_tracker_core;
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{
-            initialize_core_tracker_services, sample_peer, MockStatsEventSender,
+            initialize_core_tracker_services, sample_peer, MockHttpStatsEventSender,
         };
 
         fn initialize_announce_handler() -> Arc<AnnounceHandler> {
@@ -173,13 +186,13 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_the_announce_data() {
-            let core_tracker_services = initialize_core_tracker_services();
+            let (core_tracker_services, core_http_tracker_services) = initialize_core_tracker_services();
 
             let mut peer = sample_peer();
 
             let announce_data = invoke(
                 core_tracker_services.announce_handler.clone(),
-                core_tracker_services.stats_event_sender.clone(),
+                core_http_tracker_services.http_stats_event_sender.clone(),
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,
@@ -201,14 +214,14 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_send_the_tcp_4_announce_event_when_the_peer_uses_ipv4() {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
+            let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
+            http_stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp4Announce))
+                .with(eq(http_tracker_core::statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
+            let http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(http_stats_event_sender_mock)));
 
             let announce_handler = initialize_announce_handler();
 
@@ -216,7 +229,7 @@ mod tests {
 
             let _announce_data = invoke(
                 announce_handler,
-                stats_event_sender,
+                http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,
@@ -246,14 +259,14 @@ mod tests {
             // Tracker changes the peer IP to the tracker external IP when the peer is using the loopback IP.
 
             // Assert that the event sent is a TCP4 event
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
+            let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
+            http_stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp4Announce))
+                .with(eq(http_tracker_core::statistics::event::Event::Tcp4Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
+            let http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(http_stats_event_sender_mock)));
 
             let mut peer = peer_with_the_ipv4_loopback_ip();
 
@@ -261,7 +274,7 @@ mod tests {
 
             let _announce_data = invoke(
                 announce_handler,
-                stats_event_sender,
+                http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,
@@ -272,14 +285,14 @@ mod tests {
         #[tokio::test]
         async fn it_should_send_the_tcp_6_announce_event_when_the_peer_uses_ipv6_even_if_the_tracker_changes_the_peer_ip_to_ipv4()
         {
-            let mut stats_event_sender_mock = MockStatsEventSender::new();
-            stats_event_sender_mock
+            let mut http_stats_event_sender_mock = MockHttpStatsEventSender::new();
+            http_stats_event_sender_mock
                 .expect_send_event()
-                .with(eq(statistics::event::Event::Tcp6Announce))
+                .with(eq(http_tracker_core::statistics::event::Event::Tcp6Announce))
                 .times(1)
                 .returning(|_| Box::pin(future::ready(Some(Ok(())))));
-            let stats_event_sender: Arc<Option<Box<dyn statistics::event::sender::Sender>>> =
-                Arc::new(Some(Box::new(stats_event_sender_mock)));
+            let http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>> =
+                Arc::new(Some(Box::new(http_stats_event_sender_mock)));
 
             let announce_handler = initialize_announce_handler();
 
@@ -287,7 +300,7 @@ mod tests {
 
             let _announce_data = invoke(
                 announce_handler,
-                stats_event_sender,
+                http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
                 &PeersWanted::All,

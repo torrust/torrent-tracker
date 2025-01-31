@@ -600,7 +600,6 @@ dependencies = [
  "bittorrent-primitives",
  "chrono",
  "derive_more",
- "futures",
  "local-ip-address",
  "mockall",
  "r2d2",

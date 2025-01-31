@@ -4,13 +4,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use aquatic_udp_protocol::Response;
-use bittorrent_tracker_core::statistics;
-use bittorrent_tracker_core::statistics::event::UdpResponseKind;
 use tokio::time::Instant;
 use tracing::{instrument, Level};
 
 use super::bound_socket::BoundSocket;
 use crate::container::UdpTrackerContainer;
+use crate::packages::udp_tracker_core;
 use crate::servers::udp::handlers::CookieTimeValues;
 use crate::servers::udp::{handlers, RawRequest};
 
@@ -60,11 +59,13 @@ impl Processor {
             Response::Error(e) => format!("Error: {e:?}"),
         };
 
-        let response_kind = match &response {
-            Response::Connect(_) => UdpResponseKind::Connect,
-            Response::AnnounceIpv4(_) | Response::AnnounceIpv6(_) => UdpResponseKind::Announce,
-            Response::Scrape(_) => UdpResponseKind::Scrape,
-            Response::Error(_e) => UdpResponseKind::Error,
+        let udp_response_kind = match &response {
+            Response::Connect(_) => udp_tracker_core::statistics::event::UdpResponseKind::Connect,
+            Response::AnnounceIpv4(_) | Response::AnnounceIpv6(_) => {
+                udp_tracker_core::statistics::event::UdpResponseKind::Announce
+            }
+            Response::Scrape(_) => udp_tracker_core::statistics::event::UdpResponseKind::Scrape,
+            Response::Error(_e) => udp_tracker_core::statistics::event::UdpResponseKind::Error,
         };
 
         let mut writer = Cursor::new(Vec::with_capacity(200));
@@ -82,20 +83,20 @@ impl Processor {
                             tracing::debug!(%bytes_count, %sent_bytes, "sent {response_type}");
                         }
 
-                        if let Some(stats_event_sender) = self.udp_tracker_container.stats_event_sender.as_deref() {
+                        if let Some(udp_stats_event_sender) = self.udp_tracker_container.udp_stats_event_sender.as_deref() {
                             match target.ip() {
                                 IpAddr::V4(_) => {
-                                    stats_event_sender
-                                        .send_event(statistics::event::Event::Udp4Response {
-                                            kind: response_kind,
+                                    udp_stats_event_sender
+                                        .send_event(udp_tracker_core::statistics::event::Event::Udp4Response {
+                                            kind: udp_response_kind,
                                             req_processing_time,
                                         })
                                         .await;
                                 }
                                 IpAddr::V6(_) => {
-                                    stats_event_sender
-                                        .send_event(statistics::event::Event::Udp6Response {
-                                            kind: response_kind,
+                                    udp_stats_event_sender
+                                        .send_event(udp_tracker_core::statistics::event::Event::Udp6Response {
+                                            kind: udp_response_kind,
                                             req_processing_time,
                                         })
                                         .await;

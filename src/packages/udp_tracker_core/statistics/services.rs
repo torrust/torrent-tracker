@@ -2,14 +2,14 @@
 //!
 //! It includes:
 //!
-//! - A [`factory`](bittorrent_tracker_core::statistics::setup::factory) function to build the structs needed to collect the tracker metrics.
-//! - A [`get_metrics`] service to get the tracker [`metrics`](bittorrent_tracker_core::statistics::metrics::Metrics).
+//! - A [`factory`](crate::packages::udp_tracker_core::statistics::setup::factory) function to build the structs needed to collect the tracker metrics.
+//! - A [`get_metrics`] service to get the tracker [`metrics`](crate::packages::udp_tracker_core::statistics::metrics::Metrics).
 //!
 //! Tracker metrics are collected using a Publisher-Subscribe pattern.
 //!
 //! The factory function builds two structs:
 //!
-//! - An statistics event [`Sender`](bittorrent_tracker_core::statistics::event::sender::Sender)
+//! - An statistics event [`Sender`](crate::packages::udp_tracker_core::statistics::event::sender::Sender)
 //! - An statistics [`Repository`]
 //!
 //! ```text
@@ -21,7 +21,7 @@
 //! There is an event listener that is receiving all the events and processing them with an event handler.
 //! Then, the event handler updates the metrics depending on the received event.
 //!
-//! For example, if you send the event [`Event::Udp4Connect`](bittorrent_tracker_core::statistics::event::Event::Udp4Connect):
+//! For example, if you send the event [`Event::Udp4Connect`](crate::packages::udp_tracker_core::statistics::event::Event::Udp4Connect):
 //!
 //! ```text
 //! let result = event_sender.send_event(Event::Udp4Connect).await;
@@ -38,13 +38,28 @@
 //! ```
 use std::sync::Arc;
 
-use bittorrent_tracker_core::statistics::metrics::Metrics;
-use bittorrent_tracker_core::statistics::repository::Repository;
-use bittorrent_tracker_core::statistics::services::TrackerMetrics;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+use packages::udp_tracker_core::statistics::metrics::Metrics;
+use packages::udp_tracker_core::statistics::repository::Repository;
 use tokio::sync::RwLock;
+use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
+use crate::packages;
 use crate::servers::udp::server::banning::BanService;
+
+/// All the metrics collected by the tracker.
+#[derive(Debug, PartialEq)]
+pub struct TrackerMetrics {
+    /// Domain level metrics.
+    ///
+    /// General metrics for all torrents (number of seeders, leechers, etcetera)
+    pub torrents_metrics: TorrentsMetrics,
+
+    /// Application level metrics. Usage statistics/metrics.
+    ///
+    /// Metrics about how the tracker is been used (number of udp announce requests, etcetera)
+    pub protocol_metrics: Metrics,
+}
 
 /// It returns all the [`TrackerMetrics`]
 pub async fn get_metrics(
@@ -59,14 +74,6 @@ pub async fn get_metrics(
     TrackerMetrics {
         torrents_metrics,
         protocol_metrics: Metrics {
-            // TCPv4
-            tcp4_connections_handled: stats.tcp4_connections_handled,
-            tcp4_announces_handled: stats.tcp4_announces_handled,
-            tcp4_scrapes_handled: stats.tcp4_scrapes_handled,
-            // TCPv6
-            tcp6_connections_handled: stats.tcp6_connections_handled,
-            tcp6_announces_handled: stats.tcp6_announces_handled,
-            tcp6_scrapes_handled: stats.tcp6_scrapes_handled,
             // UDP
             udp_requests_aborted: stats.udp_requests_aborted,
             udp_requests_banned: stats.udp_requests_banned,
@@ -96,15 +103,16 @@ pub async fn get_metrics(
 mod tests {
     use std::sync::Arc;
 
-    use bittorrent_tracker_core::statistics::services::TrackerMetrics;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
-    use bittorrent_tracker_core::{self, statistics};
+    use bittorrent_tracker_core::{self};
     use tokio::sync::RwLock;
     use torrust_tracker_configuration::Configuration;
     use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
     use torrust_tracker_test_helpers::configuration;
 
-    use crate::core::statistics::services::get_metrics;
+    use crate::packages::udp_tracker_core;
+    use crate::packages::udp_tracker_core::statistics;
+    use crate::packages::udp_tracker_core::statistics::services::{get_metrics, TrackerMetrics};
     use crate::servers::udp::server::banning::BanService;
     use crate::servers::udp::server::launcher::MAX_CONNECTION_ID_ERRORS_PER_IP;
 
@@ -117,14 +125,16 @@ mod tests {
         let config = tracker_configuration();
 
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
-        let (_stats_event_sender, stats_repository) = statistics::setup::factory(config.core.tracker_usage_statistics);
-        let stats_repository = Arc::new(stats_repository);
         let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
+
+        let (_udp_stats_event_sender, udp_stats_repository) =
+            udp_tracker_core::statistics::setup::factory(config.core.tracker_usage_statistics);
+        let udp_stats_repository = Arc::new(udp_stats_repository);
 
         let tracker_metrics = get_metrics(
             in_memory_torrent_repository.clone(),
             ban_service.clone(),
-            stats_repository.clone(),
+            udp_stats_repository.clone(),
         )
         .await;
 

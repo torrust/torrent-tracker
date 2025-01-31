@@ -3,7 +3,6 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::authentication::handler::KeysHandler;
 use bittorrent_tracker_core::databases::Database;
-use bittorrent_tracker_core::statistics::repository::Repository;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 use futures::executor::block_on;
@@ -11,6 +10,7 @@ use torrust_tracker_configuration::Configuration;
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::bootstrap::jobs::make_rust_tls;
 use torrust_tracker_lib::container::HttpTrackerContainer;
+use torrust_tracker_lib::packages::http_tracker_core;
 use torrust_tracker_lib::servers::http::server::{HttpServer, Launcher, Running, Stopped};
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_primitives::peer;
@@ -21,7 +21,7 @@ pub struct Environment<S> {
     pub database: Arc<Box<dyn Database>>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub keys_handler: Arc<KeysHandler>,
-    pub stats_repository: Arc<Repository>,
+    pub http_stats_repository: Arc<http_tracker_core::statistics::repository::Repository>,
     pub whitelist_manager: Arc<WhitelistManager>,
 
     pub registar: Registar,
@@ -60,7 +60,7 @@ impl Environment<Stopped> {
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
+            http_stats_event_sender: app_container.http_stats_event_sender.clone(),
             authentication_service: app_container.authentication_service.clone(),
         });
 
@@ -70,7 +70,7 @@ impl Environment<Stopped> {
             database: app_container.database.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
             keys_handler: app_container.keys_handler.clone(),
-            stats_repository: app_container.stats_repository.clone(),
+            http_stats_repository: app_container.http_stats_repository.clone(),
             whitelist_manager: app_container.whitelist_manager.clone(),
 
             registar: Registar::default(),
@@ -86,7 +86,7 @@ impl Environment<Stopped> {
             database: self.database.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
             keys_handler: self.keys_handler.clone(),
-            stats_repository: self.stats_repository.clone(),
+            http_stats_repository: self.http_stats_repository.clone(),
             whitelist_manager: self.whitelist_manager.clone(),
 
             registar: self.registar.clone(),
@@ -111,7 +111,7 @@ impl Environment<Running> {
             database: self.database,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
             keys_handler: self.keys_handler,
-            stats_repository: self.stats_repository,
+            http_stats_repository: self.http_stats_repository,
             whitelist_manager: self.whitelist_manager,
 
             registar: Registar::default(),

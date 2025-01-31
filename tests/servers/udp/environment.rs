@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::databases::Database;
-use bittorrent_tracker_core::statistics::repository::Repository;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use torrust_tracker_configuration::{Configuration, DEFAULT_TIMEOUT};
 use torrust_tracker_lib::bootstrap::app::{initialize_app_container, initialize_global_services};
 use torrust_tracker_lib::container::UdpTrackerContainer;
+use torrust_tracker_lib::packages::udp_tracker_core;
 use torrust_tracker_lib::servers::registar::Registar;
 use torrust_tracker_lib::servers::udp::server::spawner::Spawner;
 use torrust_tracker_lib::servers::udp::server::states::{Running, Stopped};
@@ -22,7 +22,7 @@ where
 
     pub database: Arc<Box<dyn Database>>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
-    pub stats_repository: Arc<Repository>,
+    pub udp_stats_repository: Arc<udp_tracker_core::statistics::repository::Repository>,
 
     pub registar: Registar,
     pub server: Server<S>,
@@ -60,7 +60,7 @@ impl Environment<Stopped> {
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
+            udp_stats_event_sender: app_container.udp_stats_event_sender.clone(),
             ban_service: app_container.ban_service.clone(),
         });
 
@@ -69,7 +69,7 @@ impl Environment<Stopped> {
 
             database: app_container.database.clone(),
             in_memory_torrent_repository: app_container.in_memory_torrent_repository.clone(),
-            stats_repository: app_container.stats_repository.clone(),
+            udp_stats_repository: app_container.udp_stats_repository.clone(),
 
             registar: Registar::default(),
             server,
@@ -85,7 +85,7 @@ impl Environment<Stopped> {
 
             database: self.database.clone(),
             in_memory_torrent_repository: self.in_memory_torrent_repository.clone(),
-            stats_repository: self.stats_repository.clone(),
+            udp_stats_repository: self.udp_stats_repository.clone(),
 
             registar: self.registar.clone(),
             server: self
@@ -115,7 +115,7 @@ impl Environment<Running> {
 
             database: self.database,
             in_memory_torrent_repository: self.in_memory_torrent_repository,
-            stats_repository: self.stats_repository,
+            udp_stats_repository: self.udp_stats_repository,
 
             registar: Registar::default(),
             server: stopped.expect("it stop the udp tracker service"),

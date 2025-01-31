@@ -16,10 +16,6 @@ pub mod sender;
 pub enum Event {
     // code-review: consider one single event for request type with data: Event::Announce { scheme: HTTPorUDP, ip_version: V4orV6 }
     // Attributes are enums too.
-    Tcp4Announce,
-    Tcp4Scrape,
-    Tcp6Announce,
-    Tcp6Scrape,
     UdpRequestAborted,
     UdpRequestBanned,
     Udp4Request,

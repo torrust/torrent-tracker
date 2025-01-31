@@ -494,7 +494,7 @@ pub mod app;
 pub mod bootstrap;
 pub mod console;
 pub mod container;
-pub mod core;
+pub mod packages;
 pub mod servers;
 pub mod shared;
 

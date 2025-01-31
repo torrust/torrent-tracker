@@ -29,42 +29,6 @@ impl Repository {
         self.stats.read().await
     }
 
-    pub async fn increase_tcp4_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_announces_handled += 1;
-        drop(stats_lock);
-    }
-
-    pub async fn increase_tcp4_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_connections_handled += 1;
-        drop(stats_lock);
-    }
-
-    pub async fn increase_tcp4_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp4_scrapes_handled += 1;
-        drop(stats_lock);
-    }
-
-    pub async fn increase_tcp6_announces(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_announces_handled += 1;
-        drop(stats_lock);
-    }
-
-    pub async fn increase_tcp6_connections(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_connections_handled += 1;
-        drop(stats_lock);
-    }
-
-    pub async fn increase_tcp6_scrapes(&self) {
-        let mut stats_lock = self.stats.write().await;
-        stats_lock.tcp6_scrapes_handled += 1;
-        drop(stats_lock);
-    }
-
     pub async fn increase_udp_requests_aborted(&self) {
         let mut stats_lock = self.stats.write().await;
         stats_lock.udp_requests_aborted += 1;

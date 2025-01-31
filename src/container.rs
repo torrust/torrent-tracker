@@ -5,8 +5,6 @@ use bittorrent_tracker_core::authentication::handler::KeysHandler;
 use bittorrent_tracker_core::authentication::service::AuthenticationService;
 use bittorrent_tracker_core::databases::Database;
 use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
-use bittorrent_tracker_core::statistics::event::sender::Sender;
-use bittorrent_tracker_core::statistics::repository::Repository;
 use bittorrent_tracker_core::torrent::manager::TorrentsManager;
 use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
 use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -15,6 +13,7 @@ use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Core, HttpApi, HttpTracker, UdpTracker};
 
+use crate::packages::{http_tracker_core, udp_tracker_core};
 use crate::servers::udp::server::banning::BanService;
 
 pub struct AppContainer {
@@ -26,8 +25,10 @@ pub struct AppContainer {
     pub authentication_service: Arc<AuthenticationService>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub ban_service: Arc<RwLock<BanService>>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    pub stats_repository: Arc<Repository>,
+    pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
+    pub udp_stats_event_sender: Arc<Option<Box<dyn udp_tracker_core::statistics::event::sender::Sender>>>,
+    pub http_stats_repository: Arc<http_tracker_core::statistics::repository::Repository>,
+    pub udp_stats_repository: Arc<udp_tracker_core::statistics::repository::Repository>,
     pub whitelist_manager: Arc<WhitelistManager>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
@@ -40,7 +41,7 @@ pub struct UdpTrackerContainer {
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub udp_stats_event_sender: Arc<Option<Box<dyn udp_tracker_core::statistics::event::sender::Sender>>>,
     pub ban_service: Arc<RwLock<BanService>>,
 }
 
@@ -53,7 +54,7 @@ impl UdpTrackerContainer {
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
+            udp_stats_event_sender: app_container.udp_stats_event_sender.clone(),
             ban_service: app_container.ban_service.clone(),
         }
     }
@@ -65,7 +66,7 @@ pub struct HttpTrackerContainer {
     pub announce_handler: Arc<AnnounceHandler>,
     pub scrape_handler: Arc<ScrapeHandler>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
     pub authentication_service: Arc<AuthenticationService>,
 }
 
@@ -78,7 +79,7 @@ impl HttpTrackerContainer {
             announce_handler: app_container.announce_handler.clone(),
             scrape_handler: app_container.scrape_handler.clone(),
             whitelist_authorization: app_container.whitelist_authorization.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
+            http_stats_event_sender: app_container.http_stats_event_sender.clone(),
             authentication_service: app_container.authentication_service.clone(),
         }
     }
@@ -91,8 +92,8 @@ pub struct HttpApiContainer {
     pub keys_handler: Arc<KeysHandler>,
     pub whitelist_manager: Arc<WhitelistManager>,
     pub ban_service: Arc<RwLock<BanService>>,
-    pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
-    pub stats_repository: Arc<Repository>,
+    pub http_stats_repository: Arc<http_tracker_core::statistics::repository::Repository>,
+    pub udp_stats_repository: Arc<udp_tracker_core::statistics::repository::Repository>,
 }
 
 impl HttpApiContainer {
@@ -105,8 +106,8 @@ impl HttpApiContainer {
             keys_handler: app_container.keys_handler.clone(),
             whitelist_manager: app_container.whitelist_manager.clone(),
             ban_service: app_container.ban_service.clone(),
-            stats_event_sender: app_container.stats_event_sender.clone(),
-            stats_repository: app_container.stats_repository.clone(),
+            http_stats_repository: app_container.http_stats_repository.clone(),
+            udp_stats_repository: app_container.udp_stats_repository.clone(),
         }
     }
 }
