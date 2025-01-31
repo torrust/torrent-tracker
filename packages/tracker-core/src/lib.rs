@@ -370,60 +370,6 @@
 //! To learn more about tracker authentication, refer to the following modules :
 //!
 //! - [`authentication`] module.
-//! - [`core`](crate::core) module.
-//! - [`http`](crate::servers::http) module.
-//!
-//! # Statistics
-//!
-//! The `Tracker` keeps metrics for some events:
-//!
-//! ```rust,no_run
-//! pub struct Metrics {
-//!     // IP version 4
-//!
-//!     // HTTP tracker
-//!     pub tcp4_connections_handled: u64,
-//!     pub tcp4_announces_handled: u64,
-//!     pub tcp4_scrapes_handled: u64,
-//!
-//!     // UDP tracker
-//!     pub udp4_connections_handled: u64,
-//!     pub udp4_announces_handled: u64,
-//!     pub udp4_scrapes_handled: u64,
-//!
-//!     // IP version 6
-//!
-//!     // HTTP tracker
-//!     pub tcp6_connections_handled: u64,
-//!     pub tcp6_announces_handled: u64,
-//!     pub tcp6_scrapes_handled: u64,
-//!
-//!     // UDP tracker
-//!     pub udp6_connections_handled: u64,
-//!     pub udp6_announces_handled: u64,
-//!     pub udp6_scrapes_handled: u64,
-//! }
-//! ```
-//!
-//! The metrics maintained by the `Tracker` are:
-//!
-//! - `connections_handled`: number of connections handled by the tracker
-//! - `announces_handled`: number of `announce` requests handled by the tracker
-//! - `scrapes_handled`: number of `scrape` handled requests by the tracker
-//!
-//! > **NOTICE**: as the HTTP tracker does not have an specific `connection` request like the UDP tracker, `connections_handled` are
-//! > increased on every `announce` and `scrape` requests.
-//!
-//! The tracker exposes an event sender API that allows the tracker users to send events. When a higher application service handles a
-//! `connection` , `announce` or `scrape` requests, it notifies the `Tracker` by sending statistics events.
-//!
-//! For example, the HTTP tracker would send an event like the following when it handles an `announce` request received from a peer using IP version 4.
-//!
-//! ```text
-//! stats_event_sender.send_stats_event(statistics::event::Event::Tcp4Announce).await
-//! ```
-//!
-//! Refer to [`statistics`] module for more information about statistics.
 //!
 //! # Persistence
 //!
