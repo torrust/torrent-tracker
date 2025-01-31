@@ -1,9 +1,9 @@
 //! API responses for the [`stats`](crate::servers::apis::v1::context::stats)
 //! API context.
 use axum::response::{IntoResponse, Json, Response};
-use bittorrent_tracker_core::statistics::services::TrackerMetrics;
 
 use super::resources::Stats;
+use crate::core::statistics::services::TrackerMetrics;
 
 /// `200` response that contains the [`Stats`] resource as json.
 #[must_use]
