@@ -15,7 +15,7 @@ use packages::statistics::repository::Repository;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Core, HttpApi, HttpTracker, UdpTracker};
 
-use crate::packages;
+use crate::packages::{self, http_tracker_core, udp_tracker_core};
 use crate::servers::udp::server::banning::BanService;
 
 pub struct AppContainer {
@@ -28,7 +28,11 @@ pub struct AppContainer {
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub ban_service: Arc<RwLock<BanService>>,
     pub stats_event_sender: Arc<Option<Box<dyn Sender>>>,
+    pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
+    pub udp_stats_event_sender: Arc<Option<Box<dyn udp_tracker_core::statistics::event::sender::Sender>>>,
     pub stats_repository: Arc<Repository>,
+    pub http_stats_repository: Arc<http_tracker_core::statistics::repository::Repository>,
+    pub udp_stats_repository: Arc<udp_tracker_core::statistics::repository::Repository>,
     pub whitelist_manager: Arc<WhitelistManager>,
     pub in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
     pub db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
